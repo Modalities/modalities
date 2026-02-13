@@ -1,0 +1,450 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.vision_transformer.vision_transformer_model &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.models.vision_transformer.vision_transformer_model</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.models.vision_transformer.vision_transformer_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">floor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">einops.layers.torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rearrange</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">nn</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.nn.attention</span><span class="w"> </span><span class="kn">import</span> <span class="n">AttentionConfig</span><span class="p">,</span> <span class="n">AttentionType</span><span class="p">,</span> <span class="n">MultiHeadAttention</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.nn.mlp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MLP</span>
+
+
+<div class="viewcode-block" id="VisionTransformerConfig">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VisionTransformerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Configuration class for the VisionTransformer.</span>
+
+
+<span class="sd">    Args:</span>
+<span class="sd">        sample_key (str): The key for the input sample.</span>
+<span class="sd">        prediction_key (str): The key for the model prediction.</span>
+<span class="sd">        img_size (tuple[int, int] | int, optional): The size of the input image. Defaults to 224.</span>
+<span class="sd">        n_classes (int, optional): The number of output classes. Defaults to 1000.</span>
+<span class="sd">        n_layer (int): The number of layers in the model. Defaults to 12.</span>
+<span class="sd">        attention_config (AttentionConfig, optional): The configuration for the attention mechanism. Defaults to None.</span>
+<span class="sd">        n_head (int): The number of attention heads. Defaults to 8.</span>
+<span class="sd">        n_embd (int): The dimensionality of the embedding. Defaults to 768.</span>
+<span class="sd">        dropout (float): The dropout rate. Defaults to 0.0.</span>
+<span class="sd">        patch_size (int): The size of the image patches. Defaults to 16.</span>
+<span class="sd">        patch_stride (int): The stride of the image patches. Defaults to 16.</span>
+<span class="sd">        n_img_channels (int): The number of image channels. Defaults to 3.</span>
+<span class="sd">        add_cls_token (bool): Flag indicating whether to add a classification token. Defaults to True.</span>
+<span class="sd">        bias (bool): Flag indicating whether to include bias terms. Defaults to True.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">img_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">224</span>
+    <span class="n">n_classes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]]</span> <span class="o">=</span> <span class="mi">1000</span>
+    <span class="n">n_layer</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">12</span>
+    <span class="n">attention_config</span><span class="p">:</span> <span class="n">AttentionConfig</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">n_head</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">n_embd</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">768</span>
+    <span class="n">dropout</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)]</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">patch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">patch_stride</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">16</span>
+    <span class="n">n_img_channels</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">add_cls_token</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="ImagePatchEmbedding">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.ImagePatchEmbedding">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImagePatchEmbedding</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;ImagePatchEmbedding class.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">n_img_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">768</span><span class="p">,</span>
+        <span class="n">patch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+        <span class="n">patch_stride</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+        <span class="n">add_cls_token</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes an ImagePatchEmbedding object.</span>
+
+
+<span class="sd">        Args:</span>
+<span class="sd">            n_img_channels (int): Number of image channels. Defaults to 3.</span>
+<span class="sd">            n_embd (int): Number of embedding dimensions. Defaults to 768.</span>
+<span class="sd">            patch_size (int): Patch size for convolutional layer. Defaults to 16.</span>
+<span class="sd">            patch_stride (int): Patch stride for convolutional layer. Defaults to 16.</span>
+<span class="sd">            add_cls_token (bool): Flag indicating whether to add a classification token. Defaults to True.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span>
+            <span class="n">in_channels</span><span class="o">=</span><span class="n">n_img_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="n">patch_size</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="n">patch_stride</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Define a rearrangement operation to reshape the tensor from</span>
+        <span class="c1"># batched 4D format (batch_size, channels, height, width) to</span>
+        <span class="c1"># batched 3D format (batch_size, height*width, channels).</span>
+        <span class="c1"># This is required to support torch.compile.</span>
+        <span class="c1"># See https://github.com/arogozhnikov/einops/wiki/Using-torch.compile-with-einops</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rearrange</span> <span class="o">=</span> <span class="n">Rearrange</span><span class="p">(</span><span class="s2">&quot;b c h w -&gt; b (h w) c&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cls_token</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">add_cls_token</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cls_token</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_embd</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ImagePatchEmbedding.forward">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.ImagePatchEmbedding.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of the ImagePatchEmbedding.</span>
+
+
+<span class="sd">        Args:</span>
+<span class="sd">            x (torch.Tensor): Input tensor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Output tensor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rearrange</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cls_token</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">cls_token</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">x</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="VisionTransformerBlock">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerBlock">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VisionTransformerBlock</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;VisionTransformerBlock class.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">768</span><span class="p">,</span>
+        <span class="n">n_head</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+        <span class="n">ffn_hidden</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3072</span><span class="p">,</span>
+        <span class="n">bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">attention_config</span><span class="p">:</span> <span class="n">AttentionConfig</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes a VisionTransformerBlock object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            n_embd (int, optional): The dimensionality of the embedding layer. Defaults to 768.</span>
+<span class="sd">            n_head (int, optional): The number of attention heads. Defaults to 8.</span>
+<span class="sd">            ffn_hidden (int, optional): The number of hidden units in the feed-forward network. Defaults to 3072.</span>
+<span class="sd">            bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.</span>
+<span class="sd">            dropout (float, optional): The dropout rate. Defaults to 0.0.</span>
+<span class="sd">            attention_config (AttentionConfig, optional): The configuration for the attention mechanism.</span>
+<span class="sd">            Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">n_embd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attention</span> <span class="o">=</span> <span class="n">MultiHeadAttention</span><span class="p">(</span>
+            <span class="n">n_embd</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span>
+            <span class="n">n_head</span><span class="o">=</span><span class="n">n_head</span><span class="p">,</span>
+            <span class="n">attention_config</span><span class="o">=</span><span class="n">attention_config</span><span class="p">,</span>
+            <span class="n">attention_type</span><span class="o">=</span><span class="n">AttentionType</span><span class="o">.</span><span class="n">NON_CAUSAL_SELF_ATTENTION</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">n_embd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span> <span class="o">=</span> <span class="n">MLP</span><span class="p">(</span><span class="n">in_features</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="n">ffn_hidden</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">bias</span><span class="p">,</span> <span class="n">dropout</span><span class="o">=</span><span class="n">dropout</span><span class="p">)</span>
+
+<div class="viewcode-block" id="VisionTransformerBlock.forward">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerBlock.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of the VisionTransformerBlock module.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            x (torch.Tensor): Input tensor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Output tensor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">norm1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">norm2</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">x</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="VisionTransformer">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VisionTransformer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    VisionTransformer class.</span>
+
+<span class="sd">    The Vision Transformer (ViT) is a pure transformer architecture</span>
+<span class="sd">    that applies attention mechanisms directly to sequences of image patches for image classification tasks.</span>
+
+<span class="sd">    Paper: `An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale`</span>
+<span class="sd">    Link: https://arxiv.org/abs/2010.11929</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">img_size</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">224</span><span class="p">,</span>
+        <span class="n">n_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">n_layer</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
+        <span class="n">attention_config</span><span class="p">:</span> <span class="n">AttentionConfig</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">n_head</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+        <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">768</span><span class="p">,</span>
+        <span class="n">ffn_hidden</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3072</span><span class="p">,</span>
+        <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">patch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+        <span class="n">patch_stride</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+        <span class="n">n_img_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">add_cls_token</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the VisionTransformer object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            sample_key (str): The key for the samples.</span>
+<span class="sd">            prediction_key (str): The key for the predictions.</span>
+<span class="sd">            img_size (tuple[int, int] | int, optional): The size of the input image. Defaults to 224.</span>
+<span class="sd">            n_classes (int, optional): The number of classes. Defaults to 1000.</span>
+<span class="sd">            n_layer (int, optional): The number of layers. Defaults to 12.</span>
+<span class="sd">            attention_config (AttentionConfig, optional): The attention configuration. Defaults to None.</span>
+<span class="sd">            n_head (int, optional): The number of attention heads. Defaults to 8.</span>
+<span class="sd">            n_embd (int, optional): The embedding dimension. Defaults to 768.</span>
+<span class="sd">            ffn_hidden (int, optional): The hidden dimension of the feed-forward network. Defaults to 3072.</span>
+<span class="sd">            dropout (float, optional): The dropout rate. Defaults to 0.0.</span>
+<span class="sd">            patch_size (int, optional): The size of the image patch. Defaults to 16.</span>
+<span class="sd">            patch_stride (int, optional): The stride of the image patch. Defaults to 16.</span>
+<span class="sd">            n_img_channels (int, optional): The number of image channels. Defaults to 3.</span>
+<span class="sd">            add_cls_token (bool, optional): Flag indicating whether to add a classification token. Defaults to True.</span>
+<span class="sd">            bias (bool, optional): Flag indicating whether to include bias terms. Defaults to True.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample_key</span> <span class="o">=</span> <span class="n">sample_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span> <span class="o">=</span> <span class="n">prediction_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">img_size</span> <span class="o">=</span> <span class="n">img_size</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">img_size</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">img_size</span><span class="p">,</span> <span class="n">img_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_block_size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">img_size</span><span class="p">,</span> <span class="n">patch_size</span><span class="p">,</span> <span class="n">patch_stride</span><span class="p">,</span> <span class="n">add_cls_token</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">embedding_fn</span> <span class="o">=</span> <span class="n">ImagePatchEmbedding</span><span class="p">(</span><span class="n">n_img_channels</span><span class="p">,</span> <span class="n">n_embd</span><span class="p">,</span> <span class="n">patch_size</span><span class="p">,</span> <span class="n">patch_stride</span><span class="p">,</span> <span class="n">add_cls_token</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">positional_embedding_fn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">num_embeddings</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">block_size</span><span class="p">,</span> <span class="n">embedding_dim</span><span class="o">=</span><span class="n">n_embd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">dropout</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">blocks</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">VisionTransformerBlock</span><span class="p">(</span>
+                    <span class="n">n_embd</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span>
+                    <span class="n">n_head</span><span class="o">=</span><span class="n">n_head</span><span class="p">,</span>
+                    <span class="n">ffn_hidden</span><span class="o">=</span><span class="n">ffn_hidden</span><span class="p">,</span>
+                    <span class="n">bias</span><span class="o">=</span><span class="n">bias</span><span class="p">,</span>
+                    <span class="n">dropout</span><span class="o">=</span><span class="n">dropout</span><span class="p">,</span>
+                    <span class="n">attention_config</span><span class="o">=</span><span class="n">attention_config</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_layer</span><span class="p">)</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">n_classes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">n_embd</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="o">=</span><span class="n">n_embd</span><span class="p">,</span> <span class="n">out_features</span><span class="o">=</span><span class="n">n_classes</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">bias</span><span class="p">)</span>
+
+<div class="viewcode-block" id="VisionTransformer.forward_images">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer.forward_images">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward_images</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass for processing images using the VisionTransformer module.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Output tensor after processing the input images.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">positional_embedding_fn</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">blocks</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">block</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span></div>
+
+
+<div class="viewcode-block" id="VisionTransformer.forward">
+<a class="viewcode-back" href="../../../../api/modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of the VisionTransformer module.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            inputs (dict[str, torch.Tensor]): Dictionary containing input tensors.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, torch.Tensor]: Dictionary containing output tensor.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_key</span><span class="p">]</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_images</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_fn</span><span class="o">.</span><span class="n">cls_token</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span><span class="p">:</span> <span class="n">x</span><span class="p">}</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_calculate_block_size</span><span class="p">(</span><span class="n">img_size</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">patch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch_stride</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">add_cls_token</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates the block size.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            img_size (tuple[int, int]): The size of the input image.</span>
+<span class="sd">            patch_size (int): The size of each patch.</span>
+<span class="sd">            patch_stride (int): The stride of each patch.</span>
+<span class="sd">            add_cls_token (bool): Flag indicating whether to add a classification token.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The calculated block size.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># See https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html for details</span>
+        <span class="n">block_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">floor</span><span class="p">((</span><span class="n">img_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">patch_size</span><span class="p">)</span> <span class="o">/</span> <span class="n">patch_stride</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="n">floor</span><span class="p">((</span><span class="n">img_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">patch_size</span><span class="p">)</span> <span class="o">/</span> <span class="n">patch_stride</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="p">)</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">add_cls_token</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">block_size</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

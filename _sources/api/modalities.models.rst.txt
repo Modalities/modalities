@@ -1,0 +1,51 @@
+modalities.models package
+=========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.models.coca
+   modalities.models.components
+   modalities.models.gpt2
+   modalities.models.huggingface
+   modalities.models.huggingface_adapters
+   modalities.models.parallelism
+   modalities.models.vision_transformer
+
+Submodules
+----------
+
+modalities.models.model module
+------------------------------
+
+.. automodule:: modalities.models.model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.model\_factory module
+---------------------------------------
+
+.. automodule:: modalities.models.model_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.utils module
+------------------------------
+
+.. automodule:: modalities.models.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models
+   :members:
+   :show-inheritance:
+   :undoc-members:

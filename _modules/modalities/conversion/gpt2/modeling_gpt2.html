@@ -1,0 +1,660 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.conversion.gpt2.modeling_gpt2 &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.conversion.gpt2.modeling_gpt2</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.conversion.gpt2.modeling_gpt2</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding=utf-8</span>
+<span class="c1"># This code was copied and modified from the Llama implementation of the Hugging Face Transformers library.</span>
+<span class="c1"># The original code can be found at:</span>
+<span class="c1">#   https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py</span>
+<span class="c1"># Original license information:</span>
+<span class="c1"># Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># This code is based on EleutherAI&#39;s GPT-NeoX library and the GPT-NeoX</span>
+<span class="c1"># and OPT implementations in this library. It has been modified from its</span>
+<span class="c1"># original forms to accommodate minor architectural differences compared</span>
+<span class="c1"># to GPT-NeoX and OPT used by the Meta AI team that trained the model.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.activations</span><span class="w"> </span><span class="kn">import</span> <span class="n">ACT2FN</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.cache_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cache</span><span class="p">,</span> <span class="n">DynamicCache</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.generation</span><span class="w"> </span><span class="kn">import</span> <span class="n">GenerationMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.masking_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_causal_mask</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.modeling_layers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">GenericForQuestionAnswering</span><span class="p">,</span>
+    <span class="n">GenericForSequenceClassification</span><span class="p">,</span>
+    <span class="n">GenericForTokenClassification</span><span class="p">,</span>
+    <span class="n">GradientCheckpointingLayer</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.modeling_outputs</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModelOutputWithPast</span><span class="p">,</span> <span class="n">CausalLMOutputWithPast</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.modeling_rope_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">ROPE_INIT_FUNCTIONS</span><span class="p">,</span> <span class="n">dynamic_rope_update</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.modeling_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">ALL_ATTENTION_FUNCTIONS</span><span class="p">,</span> <span class="n">PreTrainedModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.processing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Unpack</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransformersKwargs</span><span class="p">,</span> <span class="n">auto_docstring</span><span class="p">,</span> <span class="n">can_return_tuple</span><span class="p">,</span> <span class="n">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.utils.generic</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_model_inputs</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.conversion.gpt2.configuration_gpt2</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT2Config</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LlamaRotaryEmbedding</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GPT2Config</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># BC: &quot;rope_type&quot; was originally &quot;type&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;rope_scaling&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">rope_scaling</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rope_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">rope_scaling</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rope_type&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">rope_scaling</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rope_type</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_seq_len_cached</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">max_position_embeddings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_max_seq_len</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">max_position_embeddings</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rope_init_fn</span> <span class="o">=</span> <span class="n">ROPE_INIT_FUNCTIONS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">rope_type</span><span class="p">]</span>
+
+        <span class="n">inv_freq</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_scaling</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rope_init_fn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">register_buffer</span><span class="p">(</span><span class="s2">&quot;inv_freq&quot;</span><span class="p">,</span> <span class="n">inv_freq</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original_inv_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inv_freq</span>
+
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="nd">@dynamic_rope_update</span>  <span class="c1"># power user: used with advanced RoPE types (e.g. dynamic rope)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">position_ids</span><span class="p">):</span>
+        <span class="n">inv_freq_expanded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inv_freq</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">position_ids</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">position_ids_expanded</span> <span class="o">=</span> <span class="n">position_ids</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="n">device_type</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">&quot;mps&quot;</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">device_type</span><span class="o">=</span><span class="n">device_type</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>  <span class="c1"># Force float32</span>
+            <span class="n">freqs</span> <span class="o">=</span> <span class="p">(</span><span class="n">inv_freq_expanded</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">@</span> <span class="n">position_ids_expanded</span><span class="o">.</span><span class="n">float</span><span class="p">())</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="n">emb</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">freqs</span><span class="p">,</span> <span class="n">freqs</span><span class="p">),</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">cos</span> <span class="o">=</span> <span class="n">emb</span><span class="o">.</span><span class="n">cos</span><span class="p">()</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_scaling</span>
+            <span class="n">sin</span> <span class="o">=</span> <span class="n">emb</span><span class="o">.</span><span class="n">sin</span><span class="p">()</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_scaling</span>
+
+        <span class="k">return</span> <span class="n">cos</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">sin</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">rotate_half</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rotates half the hidden dims of the input.&quot;&quot;&quot;</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="mi">2</span> <span class="p">:]</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="o">-</span><span class="n">x2</span><span class="p">,</span> <span class="n">x1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_rotary_pos_emb</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">cos</span><span class="p">,</span> <span class="n">sin</span><span class="p">,</span> <span class="n">position_ids</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">unsqueeze_dim</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Applies Rotary Position Embedding to the query and key tensors.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        q (`torch.Tensor`): The query tensor.</span>
+<span class="sd">        k (`torch.Tensor`): The key tensor.</span>
+<span class="sd">        cos (`torch.Tensor`): The cosine part of the rotary embedding.</span>
+<span class="sd">        sin (`torch.Tensor`): The sine part of the rotary embedding.</span>
+<span class="sd">        position_ids (`torch.Tensor`, *optional*):</span>
+<span class="sd">            Deprecated and unused.</span>
+<span class="sd">        unsqueeze_dim (`int`, *optional*, defaults to 1):</span>
+<span class="sd">            The &#39;unsqueeze_dim&#39; argument specifies the dimension along which to unsqueeze cos[position_ids] and</span>
+<span class="sd">            sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note</span>
+<span class="sd">            that cos[position_ids] and sin[position_ids] have the shape [batch_size, seq_len, head_dim]. Then, if q and</span>
+<span class="sd">            k have the shape [batch_size, heads, seq_len, head_dim], then setting unsqueeze_dim=1 makes</span>
+<span class="sd">            cos[position_ids] and sin[position_ids] broadcastable to the shapes of q and k. Similarly, if q and k have</span>
+<span class="sd">            the shape [batch_size, seq_len, heads, head_dim], then set unsqueeze_dim=2.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cos</span> <span class="o">=</span> <span class="n">cos</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">unsqueeze_dim</span><span class="p">)</span>
+    <span class="n">sin</span> <span class="o">=</span> <span class="n">sin</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">unsqueeze_dim</span><span class="p">)</span>
+    <span class="n">q_embed</span> <span class="o">=</span> <span class="p">(</span><span class="n">q</span> <span class="o">*</span> <span class="n">cos</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">rotate_half</span><span class="p">(</span><span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span><span class="p">)</span>
+    <span class="n">k_embed</span> <span class="o">=</span> <span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">cos</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">rotate_half</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">q_embed</span><span class="p">,</span> <span class="n">k_embed</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LlamaMLP</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intermediate_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">intermediate_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gate_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">intermediate_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">mlp_bias</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">up_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">intermediate_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">mlp_bias</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">down_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">intermediate_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">mlp_bias</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">act_fn</span> <span class="o">=</span> <span class="n">ACT2FN</span><span class="p">[</span><span class="n">config</span><span class="o">.</span><span class="n">hidden_act</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">down_proj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">down_proj</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">act_fn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gate_proj</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">up_proj</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">down_proj</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">repeat_kv</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,</span>
+<span class="sd">    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">batch</span><span class="p">,</span> <span class="n">num_key_value_heads</span><span class="p">,</span> <span class="n">slen</span><span class="p">,</span> <span class="n">head_dim</span> <span class="o">=</span> <span class="n">hidden_states</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">if</span> <span class="n">n_rep</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">hidden_states</span>
+    <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">hidden_states</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">num_key_value_heads</span><span class="p">,</span> <span class="n">n_rep</span><span class="p">,</span> <span class="n">slen</span><span class="p">,</span> <span class="n">head_dim</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">hidden_states</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">num_key_value_heads</span> <span class="o">*</span> <span class="n">n_rep</span><span class="p">,</span> <span class="n">slen</span><span class="p">,</span> <span class="n">head_dim</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">eager_attention_forward</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">key</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">attention_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">scaling</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">dropout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">TransformersKwargs</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="n">key_states</span> <span class="o">=</span> <span class="n">repeat_kv</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">num_key_value_groups</span><span class="p">)</span>
+    <span class="n">value_states</span> <span class="o">=</span> <span class="n">repeat_kv</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">num_key_value_groups</span><span class="p">)</span>
+
+    <span class="n">attn_weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">key_states</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span> <span class="o">*</span> <span class="n">scaling</span>
+    <span class="k">if</span> <span class="n">attention_mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">causal_mask</span> <span class="o">=</span> <span class="n">attention_mask</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="p">:</span> <span class="n">key_states</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]]</span>
+        <span class="n">attn_weights</span> <span class="o">=</span> <span class="n">attn_weights</span> <span class="o">+</span> <span class="n">causal_mask</span>
+
+    <span class="c1"># Note we do not upcast the attention weights to float32 here, as it introduces</span>
+    <span class="c1"># noise in the attention weights and is not necessary when using BF16</span>
+    <span class="n">attn_weights</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">attn_weights</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">query</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">attn_weights</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">attn_weights</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">dropout</span><span class="p">,</span> <span class="n">training</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">training</span><span class="p">)</span>
+    <span class="n">attn_output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">attn_weights</span><span class="p">,</span> <span class="n">value_states</span><span class="p">)</span>
+    <span class="n">attn_output</span> <span class="o">=</span> <span class="n">attn_output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">attn_output</span><span class="p">,</span> <span class="n">attn_weights</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LlamaAttention</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multi-headed attention from &#39;Attention Is All You Need&#39; paper&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GPT2Config</span><span class="p">,</span> <span class="n">layer_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_idx</span> <span class="o">=</span> <span class="n">layer_idx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;head_dim&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span> <span class="o">//</span> <span class="n">config</span><span class="o">.</span><span class="n">num_attention_heads</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_key_value_groups</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">num_attention_heads</span> <span class="o">//</span> <span class="n">config</span><span class="o">.</span><span class="n">num_key_value_heads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scaling</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="o">**-</span><span class="mf">0.5</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attention_dropout</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">attention_dropout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_causal</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">q_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">num_attention_heads</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">attention_bias</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">k_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">num_key_value_heads</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">attention_bias</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">v_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">num_key_value_heads</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">attention_bias</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">o_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">num_attention_heads</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">attention_bias</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hidden_states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">position_embeddings</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">attention_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">past_key_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Cache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">TransformersKwargs</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">input_shape</span> <span class="o">=</span> <span class="n">hidden_states</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">hidden_shape</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">input_shape</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span><span class="p">)</span>
+
+        <span class="n">query_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">q_proj</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">hidden_shape</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">key_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">k_proj</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">hidden_shape</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">value_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">v_proj</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">hidden_shape</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">cos</span><span class="p">,</span> <span class="n">sin</span> <span class="o">=</span> <span class="n">position_embeddings</span>
+        <span class="n">query_states</span><span class="p">,</span> <span class="n">key_states</span> <span class="o">=</span> <span class="n">apply_rotary_pos_emb</span><span class="p">(</span><span class="n">query_states</span><span class="p">,</span> <span class="n">key_states</span><span class="p">,</span> <span class="n">cos</span><span class="p">,</span> <span class="n">sin</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">past_key_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># sin and cos are specific to RoPE models; cache_position needed for the static cache</span>
+            <span class="n">cache_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;sin&quot;</span><span class="p">:</span> <span class="n">sin</span><span class="p">,</span> <span class="s2">&quot;cos&quot;</span><span class="p">:</span> <span class="n">cos</span><span class="p">,</span> <span class="s2">&quot;cache_position&quot;</span><span class="p">:</span> <span class="n">cache_position</span><span class="p">}</span>
+            <span class="n">key_states</span><span class="p">,</span> <span class="n">value_states</span> <span class="o">=</span> <span class="n">past_key_value</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">key_states</span><span class="p">,</span> <span class="n">value_states</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_idx</span><span class="p">,</span> <span class="n">cache_kwargs</span><span class="p">)</span>
+
+        <span class="n">attention_interface</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">eager_attention_forward</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">_attn_implementation</span> <span class="o">!=</span> <span class="s2">&quot;eager&quot;</span><span class="p">:</span>
+            <span class="n">attention_interface</span> <span class="o">=</span> <span class="n">ALL_ATTENTION_FUNCTIONS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">_attn_implementation</span><span class="p">]</span>
+
+        <span class="n">attn_output</span><span class="p">,</span> <span class="n">attn_weights</span> <span class="o">=</span> <span class="n">attention_interface</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">query_states</span><span class="p">,</span>
+            <span class="n">key_states</span><span class="p">,</span>
+            <span class="n">value_states</span><span class="p">,</span>
+            <span class="n">attention_mask</span><span class="p">,</span>
+            <span class="n">dropout</span><span class="o">=</span><span class="mf">0.0</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">training</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">,</span>
+            <span class="n">scaling</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">attn_output</span> <span class="o">=</span> <span class="n">attn_output</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">*</span><span class="n">input_shape</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">attn_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">o_proj</span><span class="p">(</span><span class="n">attn_output</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">attn_output</span><span class="p">,</span> <span class="n">attn_weights</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2DecoderLayer</span><span class="p">(</span><span class="n">GradientCheckpointingLayer</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GPT2Config</span><span class="p">,</span> <span class="n">layer_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">self_attn</span> <span class="o">=</span> <span class="n">LlamaAttention</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span> <span class="n">layer_idx</span><span class="o">=</span><span class="n">layer_idx</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span> <span class="o">=</span> <span class="n">LlamaMLP</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_layernorm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span>
+            <span class="n">eps</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_eps</span><span class="p">,</span>
+            <span class="n">elementwise_affine</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_elementwise_affine</span><span class="p">,</span>
+            <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_bias</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">post_attention_layernorm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span>
+            <span class="n">eps</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_eps</span><span class="p">,</span>
+            <span class="n">elementwise_affine</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_elementwise_affine</span><span class="p">,</span>
+            <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_bias</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hidden_states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">attention_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">position_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">past_key_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Cache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">cache_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">position_embeddings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># necessary, but kept here for BC</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">TransformersKwargs</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">residual</span> <span class="o">=</span> <span class="n">hidden_states</span>
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_layernorm</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span>
+        <span class="c1"># Self Attention</span>
+        <span class="n">hidden_states</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">self_attn</span><span class="p">(</span>
+            <span class="n">hidden_states</span><span class="o">=</span><span class="n">hidden_states</span><span class="p">,</span>
+            <span class="n">attention_mask</span><span class="o">=</span><span class="n">attention_mask</span><span class="p">,</span>
+            <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">,</span>
+            <span class="n">past_key_value</span><span class="o">=</span><span class="n">past_key_value</span><span class="p">,</span>
+            <span class="n">use_cache</span><span class="o">=</span><span class="n">use_cache</span><span class="p">,</span>
+            <span class="n">cache_position</span><span class="o">=</span><span class="n">cache_position</span><span class="p">,</span>
+            <span class="n">position_embeddings</span><span class="o">=</span><span class="n">position_embeddings</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">residual</span> <span class="o">+</span> <span class="n">hidden_states</span>
+
+        <span class="c1"># Fully Connected</span>
+        <span class="n">residual</span> <span class="o">=</span> <span class="n">hidden_states</span>
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">post_attention_layernorm</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span>
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span>
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">residual</span> <span class="o">+</span> <span class="n">hidden_states</span>
+        <span class="k">return</span> <span class="n">hidden_states</span>
+
+
+<div class="viewcode-block" id="GPT2PreTrainedModel">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel">[docs]</a>
+<span class="nd">@auto_docstring</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2PreTrainedModel</span><span class="p">(</span><span class="n">PreTrainedModel</span><span class="p">):</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">GPT2Config</span>
+    <span class="n">base_model_prefix</span> <span class="o">=</span> <span class="s2">&quot;model&quot;</span>
+    <span class="n">supports_gradient_checkpointing</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">_no_split_modules</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;GPT2DecoderLayer&quot;</span><span class="p">]</span>
+    <span class="n">_skip_keys_device_placement</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;past_key_values&quot;</span><span class="p">]</span>
+    <span class="n">_supports_flash_attn</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">_supports_sdpa</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">_supports_flex_attn</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">_can_compile_fullgraph</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">_supports_attention_backend</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">_can_record_outputs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;hidden_states&quot;</span><span class="p">:</span> <span class="n">GPT2DecoderLayer</span><span class="p">,</span>
+        <span class="s2">&quot;attentions&quot;</span><span class="p">:</span> <span class="n">LlamaAttention</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="GPT2Model">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2Model">[docs]</a>
+<span class="nd">@auto_docstring</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2Model</span><span class="p">(</span><span class="n">GPT2PreTrainedModel</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GPT2Config</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">padding_idx</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">pad_token_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vocab_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">embed_tokens</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">padding_idx</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">GPT2DecoderLayer</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">layer_idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">layer_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">num_hidden_layers</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span>
+            <span class="n">eps</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_eps</span><span class="p">,</span>
+            <span class="n">elementwise_affine</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_elementwise_affine</span><span class="p">,</span>
+            <span class="n">bias</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">layer_norm_bias</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rotary_emb</span> <span class="o">=</span> <span class="n">LlamaRotaryEmbedding</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gradient_checkpointing</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># Initialize weights and apply final processing</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">post_init</span><span class="p">()</span>
+
+<div class="viewcode-block" id="GPT2Model.forward">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2Model.forward">[docs]</a>
+    <span class="nd">@check_model_inputs</span>
+    <span class="nd">@auto_docstring</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">input_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">attention_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">position_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Cache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">inputs_embeds</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">TransformersKwargs</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseModelOutputWithPast</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">input_ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">inputs_embeds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;You must specify exactly one of input_ids or inputs_embeds&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">inputs_embeds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs_embeds</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">embed_tokens</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">use_cache</span> <span class="ow">and</span> <span class="n">past_key_values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">past_key_values</span> <span class="o">=</span> <span class="n">DynamicCache</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">cache_position</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">past_seen_tokens</span> <span class="o">=</span> <span class="n">past_key_values</span><span class="o">.</span><span class="n">get_seq_length</span><span class="p">()</span> <span class="k">if</span> <span class="n">past_key_values</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">cache_position</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+                <span class="n">past_seen_tokens</span><span class="p">,</span> <span class="n">past_seen_tokens</span> <span class="o">+</span> <span class="n">inputs_embeds</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">inputs_embeds</span><span class="o">.</span><span class="n">device</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">position_ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">position_ids</span> <span class="o">=</span> <span class="n">cache_position</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">causal_mask</span> <span class="o">=</span> <span class="n">create_causal_mask</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span>
+            <span class="n">input_embeds</span><span class="o">=</span><span class="n">inputs_embeds</span><span class="p">,</span>
+            <span class="n">attention_mask</span><span class="o">=</span><span class="n">attention_mask</span><span class="p">,</span>
+            <span class="n">cache_position</span><span class="o">=</span><span class="n">cache_position</span><span class="p">,</span>
+            <span class="n">past_key_values</span><span class="o">=</span><span class="n">past_key_values</span><span class="p">,</span>
+            <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">inputs_embeds</span>
+        <span class="n">position_embeddings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rotary_emb</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">,</span> <span class="n">position_ids</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">decoder_layer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">num_hidden_layers</span><span class="p">]:</span>
+            <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">decoder_layer</span><span class="p">(</span>
+                <span class="n">hidden_states</span><span class="p">,</span>
+                <span class="n">attention_mask</span><span class="o">=</span><span class="n">causal_mask</span><span class="p">,</span>
+                <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">,</span>
+                <span class="n">past_key_value</span><span class="o">=</span><span class="n">past_key_values</span><span class="p">,</span>
+                <span class="n">cache_position</span><span class="o">=</span><span class="n">cache_position</span><span class="p">,</span>
+                <span class="n">position_embeddings</span><span class="o">=</span><span class="n">position_embeddings</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">BaseModelOutputWithPast</span><span class="p">(</span>
+            <span class="n">last_hidden_state</span><span class="o">=</span><span class="n">hidden_states</span><span class="p">,</span>
+            <span class="n">past_key_values</span><span class="o">=</span><span class="n">past_key_values</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="GPT2ForCausalLM">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM">[docs]</a>
+<span class="nd">@auto_docstring</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2ForCausalLM</span><span class="p">(</span><span class="n">GPT2PreTrainedModel</span><span class="p">,</span> <span class="n">GenerationMixin</span><span class="p">):</span>
+    <span class="n">_tied_weights_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;lm_head.weight&quot;</span><span class="p">]</span>
+    <span class="n">_tp_plan</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;lm_head&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise_rep&quot;</span><span class="p">}</span>
+    <span class="n">_pp_plan</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;lm_head&quot;</span><span class="p">:</span> <span class="p">([</span><span class="s2">&quot;hidden_states&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;logits&quot;</span><span class="p">])}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">GPT2Model</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vocab_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lm_head</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># Initialize weights and apply final processing</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">post_init</span><span class="p">()</span>
+
+<div class="viewcode-block" id="GPT2ForCausalLM.set_decoder">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.set_decoder">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_decoder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">decoder</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">decoder</span></div>
+
+
+<div class="viewcode-block" id="GPT2ForCausalLM.get_decoder">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.get_decoder">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_decoder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="GPT2ForCausalLM.forward">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.forward">[docs]</a>
+    <span class="nd">@can_return_tuple</span>
+    <span class="nd">@auto_docstring</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">input_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">attention_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">position_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Cache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">inputs_embeds</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">labels</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">logits_to_keep</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">TransformersKwargs</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CausalLMOutputWithPast</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Example:</span>
+
+<span class="sd">        ```python</span>
+<span class="sd">        &gt;&gt;&gt; from transformers import AutoTokenizer, LlamaForCausalLM</span>
+
+<span class="sd">        &gt;&gt;&gt; model = LlamaForCausalLM.from_pretrained(&quot;meta-llama/Llama-2-7b-hf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; tokenizer = AutoTokenizer.from_pretrained(&quot;meta-llama/Llama-2-7b-hf&quot;)</span>
+
+<span class="sd">        &gt;&gt;&gt; prompt = &quot;Hey, are you conscious? Can you talk to me?&quot;</span>
+<span class="sd">        &gt;&gt;&gt; inputs = tokenizer(prompt, return_tensors=&quot;pt&quot;)</span>
+
+<span class="sd">        &gt;&gt;&gt; # Generate</span>
+<span class="sd">        &gt;&gt;&gt; generate_ids = model.generate(inputs.input_ids, max_length=30)</span>
+<span class="sd">        &gt;&gt;&gt; tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]</span>
+<span class="sd">        &quot;Hey, are you conscious? Can you talk to me?\nI&#39;m not conscious, but I can talk to you.&quot;</span>
+<span class="sd">        ```&quot;&quot;&quot;</span>
+        <span class="n">outputs</span><span class="p">:</span> <span class="n">BaseModelOutputWithPast</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span>
+            <span class="n">input_ids</span><span class="o">=</span><span class="n">input_ids</span><span class="p">,</span>
+            <span class="n">attention_mask</span><span class="o">=</span><span class="n">attention_mask</span><span class="p">,</span>
+            <span class="n">position_ids</span><span class="o">=</span><span class="n">position_ids</span><span class="p">,</span>
+            <span class="n">past_key_values</span><span class="o">=</span><span class="n">past_key_values</span><span class="p">,</span>
+            <span class="n">inputs_embeds</span><span class="o">=</span><span class="n">inputs_embeds</span><span class="p">,</span>
+            <span class="n">use_cache</span><span class="o">=</span><span class="n">use_cache</span><span class="p">,</span>
+            <span class="n">cache_position</span><span class="o">=</span><span class="n">cache_position</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">hidden_states</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">last_hidden_state</span>
+        <span class="c1"># Only compute necessary logits, and do not upcast them to float if we are not computing the loss</span>
+        <span class="n">slice_indices</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="o">-</span><span class="n">logits_to_keep</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">logits_to_keep</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="n">logits_to_keep</span>
+        <span class="n">logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lm_head</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">[:,</span> <span class="n">slice_indices</span><span class="p">,</span> <span class="p">:])</span>
+
+        <span class="n">loss</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">labels</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_function</span><span class="p">(</span><span class="n">logits</span><span class="o">=</span><span class="n">logits</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">vocab_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">vocab_size</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">CausalLMOutputWithPast</span><span class="p">(</span>
+            <span class="n">loss</span><span class="o">=</span><span class="n">loss</span><span class="p">,</span>
+            <span class="n">logits</span><span class="o">=</span><span class="n">logits</span><span class="p">,</span>
+            <span class="n">past_key_values</span><span class="o">=</span><span class="n">outputs</span><span class="o">.</span><span class="n">past_key_values</span><span class="p">,</span>
+            <span class="n">hidden_states</span><span class="o">=</span><span class="n">outputs</span><span class="o">.</span><span class="n">hidden_states</span><span class="p">,</span>
+            <span class="n">attentions</span><span class="o">=</span><span class="n">outputs</span><span class="o">.</span><span class="n">attentions</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="GPT2ForSequenceClassification">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForSequenceClassification">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2ForSequenceClassification</span><span class="p">(</span><span class="n">GenericForSequenceClassification</span><span class="p">,</span> <span class="n">GPT2PreTrainedModel</span><span class="p">):</span>
+    <span class="o">...</span></div>
+
+
+
+<div class="viewcode-block" id="GPT2ForQuestionAnswering">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2ForQuestionAnswering</span><span class="p">(</span><span class="n">GenericForQuestionAnswering</span><span class="p">,</span> <span class="n">GPT2PreTrainedModel</span><span class="p">):</span>
+    <span class="n">base_model_prefix</span> <span class="o">=</span> <span class="s2">&quot;transformer&quot;</span>  <span class="c1"># For BC, where `transformer` was used instead of `model`</span></div>
+
+
+
+<div class="viewcode-block" id="GPT2ForTokenClassification">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.modeling_gpt2.GPT2ForTokenClassification">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2ForTokenClassification</span><span class="p">(</span><span class="n">GenericForTokenClassification</span><span class="p">,</span> <span class="n">GPT2PreTrainedModel</span><span class="p">):</span>
+    <span class="o">...</span></div>
+
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;GPT2ForCausalLM&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GPT2Model&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GPT2PreTrainedModel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GPT2ForSequenceClassification&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GPT2ForQuestionAnswering&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GPT2ForTokenClassification&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,828 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.conversion.gpt2 package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.dataloader package" href="modalities.dataloader.html" />
+    <link rel="prev" title="modalities.conversion package" href="modalities.conversion.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.conversion.html">modalities.conversion package</a></li>
+      <li class="breadcrumb-item active">modalities.conversion.gpt2 package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.conversion.gpt2.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-conversion-gpt2-package">
+<h1>modalities.conversion.gpt2 package<a class="headerlink" href="#modalities-conversion-gpt2-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.conversion.gpt2.configuration_gpt2">
+<span id="modalities-conversion-gpt2-configuration-gpt2-module"></span><h2>modalities.conversion.gpt2.configuration_gpt2 module<a class="headerlink" href="#module-modalities.conversion.gpt2.configuration_gpt2" title="Link to this heading"></a></h2>
+<p>LLaMA-like GPT2 model configuration</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.configuration_gpt2.GPT2Config">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.configuration_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2Config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vocab_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4096</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">intermediate_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">11008</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_hidden_layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_attention_heads</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_key_value_heads</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_act</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'silu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_position_embeddings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2048</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initializer_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.02</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rms_norm_eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer_norm_eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer_norm_bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer_norm_elementwise_affine</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pad_token_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bos_token_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_token_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pretraining_tp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tie_word_embeddings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rope_theta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rope_scaling</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_dropout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mlp_bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/configuration_gpt2.html#GPT2Config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PreTrainedConfig</span></code></p>
+<p>This is the configuration class to store the configuration of a [<cite>GPT2Model</cite>]. It is used to instantiate an GPT2
+model according to the specified arguments, defining the model architecture. Instantiating a configuration with the
+defaults will yield a similar configuration to that of the LLaMA-7B.</p>
+<p>Configuration objects inherit from [<cite>PretrainedConfig</cite>] and can be used to control the model outputs. Read the
+documentation from [<cite>PretrainedConfig</cite>] for more information.</p>
+<dl>
+<dt>Args:</dt><dd><dl>
+<dt>vocab_size (<cite>int</cite>, <em>optional</em>, defaults to 32000):</dt><dd><p>Vocabulary size of the GPT2 model. Defines the number of different tokens that can be represented by the
+<cite>inputs_ids</cite> passed when calling [<cite>GPT2Model</cite>]</p>
+</dd>
+<dt>hidden_size (<cite>int</cite>, <em>optional</em>, defaults to 4096):</dt><dd><p>Dimension of the hidden representations.</p>
+</dd>
+<dt>intermediate_size (<cite>int</cite>, <em>optional</em>, defaults to 11008):</dt><dd><p>Dimension of the MLP representations.</p>
+</dd>
+<dt>num_hidden_layers (<cite>int</cite>, <em>optional</em>, defaults to 32):</dt><dd><p>Number of hidden layers in the Transformer decoder.</p>
+</dd>
+<dt>num_attention_heads (<cite>int</cite>, <em>optional</em>, defaults to 32):</dt><dd><p>Number of attention heads for each attention layer in the Transformer decoder.</p>
+</dd>
+<dt>num_key_value_heads (<cite>int</cite>, <em>optional</em>):</dt><dd><p>This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+<cite>num_key_value_heads=num_attention_heads</cite>, the model will use Multi Head Attention (MHA), if
+<cite>num_key_value_heads=1</cite> the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+by meanpooling all the original heads within that group. For more details checkout [this
+paper](<a class="reference external" href="https://arxiv.org/pdf/2305.13245.pdf">https://arxiv.org/pdf/2305.13245.pdf</a>). If it is not specified, will default to
+<cite>num_attention_heads</cite>.</p>
+</dd>
+<dt>hidden_act (<cite>str</cite> or <cite>function</cite>, <em>optional</em>, defaults to <cite>“silu”</cite>):</dt><dd><p>The non-linear activation function (function or string) in the decoder.</p>
+</dd>
+<dt>max_position_embeddings (<cite>int</cite>, <em>optional</em>, defaults to 2048):</dt><dd><p>The maximum sequence length that this model might ever be used with.</p>
+</dd>
+<dt>initializer_range (<cite>float</cite>, <em>optional</em>, defaults to 0.02):</dt><dd><p>The standard deviation of the truncated_normal_initializer for initializing all weight matrices.</p>
+</dd>
+<dt>rms_norm_eps (<cite>float</cite>, <em>optional</em>, defaults to 1e-06):</dt><dd><p>The epsilon used by the rms normalization layers.</p>
+</dd>
+<dt>use_cache (<cite>bool</cite>, <em>optional</em>, defaults to <cite>True</cite>):</dt><dd><p>Whether or not the model should return the last key/values attentions (not used by all models). Only
+relevant if <cite>config.is_decoder=True</cite>.</p>
+</dd>
+<dt>pad_token_id (<cite>int</cite>, <em>optional</em>):</dt><dd><p>Padding token id.</p>
+</dd>
+<dt>bos_token_id (<cite>int</cite>, <em>optional</em>, defaults to 1):</dt><dd><p>Beginning of stream token id.</p>
+</dd>
+<dt>eos_token_id (<cite>int</cite>, <em>optional</em>, defaults to 2):</dt><dd><p>End of stream token id.</p>
+</dd>
+<dt>pretraining_tp (<cite>int</cite>, <em>optional</em>, defaults to 1):</dt><dd><p>Experimental feature. Tensor parallelism rank used during pretraining. Please refer to [this
+document](<a class="reference external" href="https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism">https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism</a>) to
+understand more about it. This value is necessary to ensure exact reproducibility of the pretraining
+results. Please refer to [this issue](<a class="reference external" href="https://github.com/pytorch/pytorch/issues/76232">https://github.com/pytorch/pytorch/issues/76232</a>).</p>
+</dd>
+<dt>tie_word_embeddings (<cite>bool</cite>, <em>optional</em>, defaults to <cite>False</cite>):</dt><dd><p>Whether to tie weight embeddings</p>
+</dd>
+<dt>rope_theta (<cite>float</cite>, <em>optional</em>, defaults to 10000.0):</dt><dd><p>The base period of the RoPE embeddings.</p>
+</dd>
+<dt>rope_scaling (<cite>Dict</cite>, <em>optional</em>):</dt><dd><p>Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type
+and you expect the model to work on longer <cite>max_position_embeddings</cite>, we recommend you to update this value
+accordingly.
+Expected contents:</p>
+<blockquote>
+<div><dl class="simple">
+<dt><cite>rope_type</cite> (<cite>str</cite>):</dt><dd><p>The sub-variant of RoPE to use. Can be one of [‘default’, ‘linear’, ‘dynamic’, ‘yarn’, ‘longrope’,
+‘llama3’], with ‘default’ being the original RoPE implementation.</p>
+</dd>
+<dt><cite>factor</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Used with all rope types except ‘default’. The scaling factor to apply to the RoPE embeddings. In
+most scaling types, a <cite>factor</cite> of x will enable the model to handle sequences of length x *
+original maximum pre-trained length.</p>
+</dd>
+<dt><cite>original_max_position_embeddings</cite> (<cite>int</cite>, <em>optional</em>):</dt><dd><p>Used with ‘dynamic’, ‘longrope’ and ‘llama3’. The original max position embeddings used during
+pretraining.</p>
+</dd>
+<dt><cite>attention_factor</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Used with ‘yarn’ and ‘longrope’. The scaling factor to be applied on the attention
+computation. If unspecified, it defaults to value recommended by the implementation, using the
+<cite>factor</cite> field to infer the suggested value.</p>
+</dd>
+<dt><cite>beta_fast</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘yarn’. Parameter to set the boundary for extrapolation (only) in the linear
+ramp function. If unspecified, it defaults to 32.</p>
+</dd>
+<dt><cite>beta_slow</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘yarn’. Parameter to set the boundary for interpolation (only) in the linear
+ramp function. If unspecified, it defaults to 1.</p>
+</dd>
+<dt><cite>short_factor</cite> (<cite>List[float]</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘longrope’. The scaling factor to be applied to short contexts (&lt;
+<cite>original_max_position_embeddings</cite>). Must be a list of numbers with the same length as the hidden
+size divided by the number of attention heads divided by 2</p>
+</dd>
+<dt><cite>long_factor</cite> (<cite>List[float]</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘longrope’. The scaling factor to be applied to long contexts (&lt;
+<cite>original_max_position_embeddings</cite>). Must be a list of numbers with the same length as the hidden
+size divided by the number of attention heads divided by 2</p>
+</dd>
+<dt><cite>low_freq_factor</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘llama3’. Scaling factor applied to low frequency components of the RoPE</p>
+</dd>
+<dt><cite>high_freq_factor</cite> (<cite>float</cite>, <em>optional</em>):</dt><dd><p>Only used with ‘llama3’. Scaling factor applied to high frequency components of the RoPE</p>
+</dd>
+</dl>
+</div></blockquote>
+</dd>
+<dt>attention_bias (<cite>bool</cite>, <em>optional</em>, defaults to <cite>False</cite>):</dt><dd><p>Whether to use a bias in the query, key, value and output projection layers during self-attention.</p>
+</dd>
+<dt>attention_dropout (<cite>float</cite>, <em>optional</em>, defaults to 0.0):</dt><dd><p>The dropout ratio for the attention probabilities.</p>
+</dd>
+<dt>mlp_bias (<cite>bool</cite>, <em>optional</em>, defaults to <cite>False</cite>):</dt><dd><p>Whether to use a bias in up_proj, down_proj and gate_proj layers in the MLP layers.</p>
+</dd>
+<dt>head_dim (<cite>int</cite>, <em>optional</em>):</dt><dd><p>The attention head dimension. If None, it will default to hidden_size // num_heads</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p><a href="#id1"><span class="problematic" id="id2">``</span></a><a href="#id3"><span class="problematic" id="id4">`</span></a>python
+&gt;&gt;&gt; from transformers import GPT2Model, GPT2Config</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Initializing a GPT2 with a llama-7b style configuration</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">configuration</span> <span class="o">=</span> <span class="n">GPT2Config</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Initializing a model from the llama-7b style configuration</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">GPT2Model</span><span class="p">(</span><span class="n">configuration</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Accessing the model configuration</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">configuration</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span>
+<span class="go">```</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>layer_norm_eps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>layer_norm_bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>layer_norm_elementwise_affine</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.configuration_gpt2.GPT2Config.base_model_tp_plan">
+<span class="sig-name descname"><span class="pre">base_model_tp_plan</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'layers.*.mlp.down_proj':</span> <span class="pre">'rowwise',</span> <span class="pre">'layers.*.mlp.gate_proj':</span> <span class="pre">'colwise',</span> <span class="pre">'layers.*.mlp.up_proj':</span> <span class="pre">'colwise',</span> <span class="pre">'layers.*.self_attn.k_proj':</span> <span class="pre">'colwise',</span> <span class="pre">'layers.*.self_attn.o_proj':</span> <span class="pre">'rowwise',</span> <span class="pre">'layers.*.self_attn.q_proj':</span> <span class="pre">'colwise',</span> <span class="pre">'layers.*.self_attn.v_proj':</span> <span class="pre">'colwise'}</span></span><a class="headerlink" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config.base_model_tp_plan" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.configuration_gpt2.GPT2Config.keys_to_ignore_at_inference">
+<span class="sig-name descname"><span class="pre">keys_to_ignore_at_inference</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['past_key_values']</span></span><a class="headerlink" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config.keys_to_ignore_at_inference" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.configuration_gpt2.GPT2Config.model_type">
+<span class="sig-name descname"><span class="pre">model_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'modalities-gpt2'</span></span><a class="headerlink" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config.model_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.conversion.gpt2.conversion_code">
+<span id="modalities-conversion-gpt2-conversion-code-module"></span><h2>modalities.conversion.gpt2.conversion_code module<a class="headerlink" href="#module-modalities.conversion.gpt2.conversion_code" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.conversion_code.transfer_model_code">
+<span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.conversion_code.</span></span><span class="sig-name descname"><span class="pre">transfer_model_code</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/conversion_code.html#transfer_model_code"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.conversion_code.transfer_model_code" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Copies the required model code to the output directory and replaces modalities imports.</dt><dd><p>This allows the converted model to be used without the modalities package via:
+&gt;&gt;&gt; from transformers import AutoModelForCausalLM
+&gt;&gt;&gt; model = AutoModelForCausalLM.from_pretrained(“path/to/converted/model”, trust_remote_code=True)</p>
+</dd>
+<dt>Args:</dt><dd><p>output_dir (str): Directory of the converted model.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>output_dir</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="modalities-conversion-gpt2-conversion-model-module">
+<h2>modalities.conversion.gpt2.conversion_model module<a class="headerlink" href="#modalities-conversion-gpt2-conversion-model-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.conversion.gpt2.conversion_tokenizer">
+<span id="modalities-conversion-gpt2-conversion-tokenizer-module"></span><h2>modalities.conversion.gpt2.conversion_tokenizer module<a class="headerlink" href="#module-modalities.conversion.gpt2.conversion_tokenizer" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.conversion_tokenizer.convert_tokenizer">
+<span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.conversion_tokenizer.</span></span><span class="sig-name descname"><span class="pre">convert_tokenizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokenizer_model_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/conversion_tokenizer.html#convert_tokenizer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.conversion_tokenizer.convert_tokenizer" title="Link to this definition"></a></dt>
+<dd><p>Converts a SentencePiece tokenizer to a Huggingface tokenizer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>tokenizer_model_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>output_dir</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>tokenizer_model_path (str): Path to the SentencePiece tokenizer model file.
+output_dir (str): Path to the directory where the converted tokenizer will be saved.</p>
+</dd>
+<dt>Returns:</dt><dd><dl class="simple">
+<dt>tuple[int, int, int, int]: The actual bos_token_id, eos_token_id, pad_token_id and</dt><dd><p>unk_token_id of the tokenizer. Note, that these are not
+set in the transformers part of the created tokenizer.
+Only in the wrapped SentencePiece tokenizer.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="modalities-conversion-gpt2-convert-gpt2-module">
+<h2>modalities.conversion.gpt2.convert_gpt2 module<a class="headerlink" href="#modalities-conversion-gpt2-convert-gpt2-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.conversion.gpt2.modeling_gpt2">
+<span id="modalities-conversion-gpt2-modeling-gpt2-module"></span><h2>modalities.conversion.gpt2.modeling_gpt2 module<a class="headerlink" href="#module-modalities.conversion.gpt2.modeling_gpt2" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2ForCausalLM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForCausalLM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2PreTrainedModel</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">GenerationMixin</span></code></p>
+<p>This model inherits from [<cite>PreTrainedModel</cite>]. Check the superclass documentation for the generic methods the
+library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
+etc.)</p>
+<p>This model is also a PyTorch [torch.nn.Module](<a class="reference external" href="https://pytorch.org/docs/stable/nn.html#torch.nn.Module">https://pytorch.org/docs/stable/nn.html#torch.nn.Module</a>) subclass.
+Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
+and behavior.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><dl class="simple">
+<dt>config ([<cite>GPT2ForCausalLM</cite>]):</dt><dd><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Args:
+config ([<cite>GPT2ForCausalLM</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">past_key_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs_embeds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logits_to_keep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForCausalLM.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.forward" title="Link to this definition"></a></dt>
+<dd><p>The [<cite>GPT2ForCausalLM</cite>] forward method, overrides the <cite>__call__</cite> special method.</p>
+<p>&lt;Tip&gt;</p>
+<p>Although the recipe for forward pass needs to be defined within this function, one should call the [<cite>Module</cite>]
+instance afterwards instead of this since the former takes care of running the pre and post processing steps while
+the latter silently ignores them.</p>
+<p>&lt;/Tip&gt;</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://huggingface.co/docs/transformers/main/en/main_classes/output#transformers.modeling_outputs.CausalLMOutputWithPast" title="(in transformers main)"><code class="xref py py-class docutils literal notranslate"><span class="pre">CausalLMOutputWithPast</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>input_ids</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>attention_mask</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>position_ids</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>past_key_values</strong> (<em>Cache</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>inputs_embeds</strong> (<em>FloatTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>labels</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>use_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>cache_position</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>logits_to_keep</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Unpack" title="(in Python v3.14)"><em>Unpack</em></a><em>[</em><em>TransformersKwargs</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><dl>
+<dt>input_ids (<cite>torch.LongTensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices of input sequence tokens in the vocabulary. Padding will be ignored by default.</p>
+<p>Indices can be obtained using [<cite>AutoTokenizer</cite>]. See [<cite>PreTrainedTokenizer.encode</cite>] and
+[<cite>PreTrainedTokenizer.__call__</cite>] for details.</p>
+<p>[What are input IDs?](../glossary#input-ids)</p>
+</dd>
+<dt>attention_mask (<cite>torch.Tensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Mask to avoid performing attention on padding token indices. Mask values selected in <cite>[0, 1]</cite>:</p>
+<ul class="simple">
+<li><p>1 for tokens that are <strong>not masked</strong>,</p></li>
+<li><p>0 for tokens that are <strong>masked</strong>.</p></li>
+</ul>
+<p>[What are attention masks?](../glossary#attention-mask)</p>
+</dd>
+<dt>position_ids (<cite>torch.LongTensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices of positions of each input sequence tokens in the position embeddings. Selected in the range <cite>[0, config.n_positions - 1]</cite>.</p>
+<p>[What are position IDs?](../glossary#position-ids)</p>
+</dd>
+<dt>past_key_values (<cite>~cache_utils.Cache</cite>, <em>optional</em>):</dt><dd><p>Pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+blocks) that can be used to speed up sequential decoding. This typically consists in the <cite>past_key_values</cite>
+returned by the model at a previous stage of decoding, when <cite>use_cache=True</cite> or <cite>config.use_cache=True</cite>.</p>
+<p>Only [<cite>~cache_utils.Cache</cite>] instance is allowed as input, see our [kv cache guide](<a class="reference external" href="https://huggingface.co/docs/transformers/en/kv_cache">https://huggingface.co/docs/transformers/en/kv_cache</a>).
+If no <cite>past_key_values</cite> are passed, [<cite>~cache_utils.DynamicCache</cite>] will be initialized by default.</p>
+<p>The model will output the same cache format that is fed as input.</p>
+<p>If <cite>past_key_values</cite> are used, the user is expected to input only unprocessed <cite>input_ids</cite> (those that don’t
+have their past key value states given to this model) of shape <cite>(batch_size, unprocessed_length)</cite> instead of all <cite>input_ids</cite>
+of shape <cite>(batch_size, sequence_length)</cite>.</p>
+</dd>
+<dt>inputs_embeds (<cite>torch.FloatTensor</cite> of shape <cite>(batch_size, sequence_length, hidden_size)</cite>, <em>optional</em>):</dt><dd><p>Optionally, instead of passing <cite>input_ids</cite> you can choose to directly pass an embedded representation. This
+is useful if you want more control over how to convert <cite>input_ids</cite> indices into associated vectors than the
+model’s internal embedding lookup matrix.</p>
+</dd>
+<dt>labels (<cite>torch.LongTensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Labels for computing the masked language modeling loss. Indices should either be in <cite>[0, …,
+config.vocab_size]</cite> or -100 (see <cite>input_ids</cite> docstring). Tokens with indices set to <cite>-100</cite> are ignored
+(masked), the loss is only computed for the tokens with labels in <cite>[0, …, config.vocab_size]</cite>.</p>
+</dd>
+<dt>use_cache (<cite>bool</cite>, <em>optional</em>):</dt><dd><p>If set to <cite>True</cite>, <cite>past_key_values</cite> key value states are returned and can be used to speed up decoding (see
+<cite>past_key_values</cite>).</p>
+</dd>
+<dt>cache_position (<cite>torch.LongTensor</cite> of shape <cite>(sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices depicting the position of the input sequence tokens in the sequence. Contrarily to <cite>position_ids</cite>,
+this tensor is not affected by padding. It is used to update the cache in the correct position and to infer
+the complete sequence length.</p>
+</dd>
+<dt>logits_to_keep (<cite>Union[int, torch.Tensor]</cite>, <em>optional</em>, defaults to <cite>0</cite>):</dt><dd><p>If an <cite>int</cite>, compute logits for the last <cite>logits_to_keep</cite> tokens. If <cite>0</cite>, calculate logits for all
+<cite>input_ids</cite> (special case). Only last token logits are needed for generation, and calculating them only for that
+token can save memory, which becomes pretty significant for long sequences or large vocabulary size.
+If a <cite>torch.Tensor</cite>, must be 1D corresponding to the indices to keep in the sequence length dimension.
+This is useful when using packed tensor format (single dimension for batch and sequence length).</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>[<cite>transformers.modeling_outputs.CausalLMOutputWithPast</cite>] or <cite>tuple(torch.FloatTensor)</cite>: A [<cite>transformers.modeling_outputs.CausalLMOutputWithPast</cite>] or a tuple of
+<cite>torch.FloatTensor</cite> (if <cite>return_dict=False</cite> is passed or when <cite>config.return_dict=False</cite>) comprising various
+elements depending on the configuration ([<cite>None</cite>]) and inputs.</p>
+<ul>
+<li><p><strong>loss</strong> (<cite>torch.FloatTensor</cite> of shape <cite>(1,)</cite>, <em>optional</em>, returned when <cite>labels</cite> is provided) – Language modeling loss (for next-token prediction).</p></li>
+<li><p><strong>logits</strong> (<cite>torch.FloatTensor</cite> of shape <cite>(batch_size, sequence_length, config.vocab_size)</cite>) – Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).</p></li>
+<li><p><strong>past_key_values</strong> (<cite>Cache</cite>, <em>optional</em>, returned when <cite>use_cache=True</cite> is passed or when <cite>config.use_cache=True</cite>) – It is a [<cite>~cache_utils.Cache</cite>] instance. For more details, see our [kv cache guide](<a class="reference external" href="https://huggingface.co/docs/transformers/en/kv_cache">https://huggingface.co/docs/transformers/en/kv_cache</a>).</p>
+<p>Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
+<cite>past_key_values</cite> input) to speed up sequential decoding.</p>
+</li>
+<li><p><strong>hidden_states</strong> (<cite>tuple(torch.FloatTensor)</cite>, <em>optional</em>, returned when <cite>output_hidden_states=True</cite> is passed or when <cite>config.output_hidden_states=True</cite>) – Tuple of <cite>torch.FloatTensor</cite> (one for the output of the embeddings, if the model has an embedding layer, +
+one for the output of each layer) of shape <cite>(batch_size, sequence_length, hidden_size)</cite>.</p>
+<p>Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.</p>
+</li>
+<li><p><strong>attentions</strong> (<cite>tuple(torch.FloatTensor)</cite>, <em>optional</em>, returned when <cite>output_attentions=True</cite> is passed or when <cite>config.output_attentions=True</cite>) – Tuple of <cite>torch.FloatTensor</cite> (one for each layer) of shape <cite>(batch_size, num_heads, sequence_length,
+sequence_length)</cite>.</p>
+<p>Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+heads.</p>
+</li>
+</ul>
+</dd>
+</dl>
+<p>Example:</p>
+<p><a href="#id5"><span class="problematic" id="id6">``</span></a><a href="#id7"><span class="problematic" id="id8">`</span></a>python
+&gt;&gt;&gt; from transformers import AutoTokenizer, LlamaForCausalLM</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">LlamaForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;meta-llama/Llama-2-7b-hf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;meta-llama/Llama-2-7b-hf&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;Hey, are you conscious? Can you talk to me?&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Generate</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">generate_ids</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">input_ids</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tokenizer</span><span class="o">.</span><span class="n">batch_decode</span><span class="p">(</span><span class="n">generate_ids</span><span class="p">,</span> <span class="n">skip_special_tokens</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">clean_up_tokenization_spaces</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="go">&quot;Hey, are you conscious? Can you talk to me?\nI&#39;m not conscious, but I can talk to you.&quot;</span>
+<span class="go">```</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.get_decoder">
+<span class="sig-name descname"><span class="pre">get_decoder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForCausalLM.get_decoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.get_decoder" title="Link to this definition"></a></dt>
+<dd><p>Best-effort lookup of the <em>decoder</em> module.</p>
+<p>Order of attempts (covers ~85 % of current usages):</p>
+<ol class="arabic simple">
+<li><p><cite>self.decoder/self.language_model/self.text_model</cite></p></li>
+<li><p><cite>self.base_model</cite>                  (many wrappers store the decoder here)</p></li>
+<li><p><cite>self.base_model.get_decoder()</cite>    (nested wrappers)</p></li>
+<li><p>fallback: raise for the few exotic models that need a bespoke rule</p></li>
+</ol>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.set_decoder">
+<span class="sig-name descname"><span class="pre">set_decoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">decoder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForCausalLM.set_decoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForCausalLM.set_decoder" title="Link to this definition"></a></dt>
+<dd><p>Symmetric setter. Mirrors the lookup logic used in <cite>get_decoder</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2ForQuestionAnswering</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForQuestionAnswering"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">GenericForQuestionAnswering</span></code>, <a class="reference internal" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2PreTrainedModel</span></code></a></p>
+<p>Args:
+config ([<cite>PreTrainedConfig</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering.base_model_prefix">
+<span class="sig-name descname"><span class="pre">base_model_prefix</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'transformer'</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering.base_model_prefix" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForQuestionAnswering.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForSequenceClassification">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2ForSequenceClassification</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForSequenceClassification"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForSequenceClassification" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">GenericForSequenceClassification</span></code>, <a class="reference internal" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2PreTrainedModel</span></code></a></p>
+<p>Args:
+config ([<cite>PreTrainedConfig</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForSequenceClassification.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForSequenceClassification.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForTokenClassification">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2ForTokenClassification</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2ForTokenClassification"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForTokenClassification" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">GenericForTokenClassification</span></code>, <a class="reference internal" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2PreTrainedModel</span></code></a></p>
+<p>Args:
+config ([<cite>PreTrainedConfig</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2ForTokenClassification.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2ForTokenClassification.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2Model">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2Model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2Model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2Model" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2PreTrainedModel</span></code></a></p>
+<p>This model inherits from [<cite>PreTrainedModel</cite>]. Check the superclass documentation for the generic methods the
+library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
+etc.)</p>
+<p>This model is also a PyTorch [torch.nn.Module](<a class="reference external" href="https://pytorch.org/docs/stable/nn.html#torch.nn.Module">https://pytorch.org/docs/stable/nn.html#torch.nn.Module</a>) subclass.
+Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
+and behavior.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><dl class="simple">
+<dt>config ([<cite>GPT2Config</cite>]):</dt><dd><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Args:
+config ([<cite>GPT2Config</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2Model.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2Model.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2Model.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">past_key_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs_embeds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2Model.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2Model.forward" title="Link to this definition"></a></dt>
+<dd><p>The [<cite>GPT2Model</cite>] forward method, overrides the <cite>__call__</cite> special method.</p>
+<p>&lt;Tip&gt;</p>
+<p>Although the recipe for forward pass needs to be defined within this function, one should call the [<cite>Module</cite>]
+instance afterwards instead of this since the former takes care of running the pre and post processing steps while
+the latter silently ignores them.</p>
+<p>&lt;/Tip&gt;</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://huggingface.co/docs/transformers/main/en/main_classes/output#transformers.modeling_outputs.BaseModelOutputWithPast" title="(in transformers main)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModelOutputWithPast</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>input_ids</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>attention_mask</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>position_ids</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>past_key_values</strong> (<em>Cache</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>inputs_embeds</strong> (<em>FloatTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>cache_position</strong> (<em>LongTensor</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>use_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Unpack" title="(in Python v3.14)"><em>Unpack</em></a><em>[</em><em>TransformersKwargs</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><dl>
+<dt>input_ids (<cite>torch.LongTensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices of input sequence tokens in the vocabulary. Padding will be ignored by default.</p>
+<p>Indices can be obtained using [<cite>AutoTokenizer</cite>]. See [<cite>PreTrainedTokenizer.encode</cite>] and
+[<cite>PreTrainedTokenizer.__call__</cite>] for details.</p>
+<p>[What are input IDs?](../glossary#input-ids)</p>
+</dd>
+<dt>attention_mask (<cite>torch.Tensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Mask to avoid performing attention on padding token indices. Mask values selected in <cite>[0, 1]</cite>:</p>
+<ul class="simple">
+<li><p>1 for tokens that are <strong>not masked</strong>,</p></li>
+<li><p>0 for tokens that are <strong>masked</strong>.</p></li>
+</ul>
+<p>[What are attention masks?](../glossary#attention-mask)</p>
+</dd>
+<dt>position_ids (<cite>torch.LongTensor</cite> of shape <cite>(batch_size, sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices of positions of each input sequence tokens in the position embeddings. Selected in the range <cite>[0, config.n_positions - 1]</cite>.</p>
+<p>[What are position IDs?](../glossary#position-ids)</p>
+</dd>
+<dt>past_key_values (<cite>~cache_utils.Cache</cite>, <em>optional</em>):</dt><dd><p>Pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+blocks) that can be used to speed up sequential decoding. This typically consists in the <cite>past_key_values</cite>
+returned by the model at a previous stage of decoding, when <cite>use_cache=True</cite> or <cite>config.use_cache=True</cite>.</p>
+<p>Only [<cite>~cache_utils.Cache</cite>] instance is allowed as input, see our [kv cache guide](<a class="reference external" href="https://huggingface.co/docs/transformers/en/kv_cache">https://huggingface.co/docs/transformers/en/kv_cache</a>).
+If no <cite>past_key_values</cite> are passed, [<cite>~cache_utils.DynamicCache</cite>] will be initialized by default.</p>
+<p>The model will output the same cache format that is fed as input.</p>
+<p>If <cite>past_key_values</cite> are used, the user is expected to input only unprocessed <cite>input_ids</cite> (those that don’t
+have their past key value states given to this model) of shape <cite>(batch_size, unprocessed_length)</cite> instead of all <cite>input_ids</cite>
+of shape <cite>(batch_size, sequence_length)</cite>.</p>
+</dd>
+<dt>inputs_embeds (<cite>torch.FloatTensor</cite> of shape <cite>(batch_size, sequence_length, hidden_size)</cite>, <em>optional</em>):</dt><dd><p>Optionally, instead of passing <cite>input_ids</cite> you can choose to directly pass an embedded representation. This
+is useful if you want more control over how to convert <cite>input_ids</cite> indices into associated vectors than the
+model’s internal embedding lookup matrix.</p>
+</dd>
+<dt>cache_position (<cite>torch.LongTensor</cite> of shape <cite>(sequence_length)</cite>, <em>optional</em>):</dt><dd><p>Indices depicting the position of the input sequence tokens in the sequence. Contrarily to <cite>position_ids</cite>,
+this tensor is not affected by padding. It is used to update the cache in the correct position and to infer
+the complete sequence length.</p>
+</dd>
+<dt>use_cache (<cite>bool</cite>, <em>optional</em>):</dt><dd><p>If set to <cite>True</cite>, <cite>past_key_values</cite> key value states are returned and can be used to speed up decoding (see
+<cite>past_key_values</cite>).</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>[<cite>transformers.modeling_outputs.BaseModelOutputWithPast</cite>] or <cite>tuple(torch.FloatTensor)</cite>: A [<cite>transformers.modeling_outputs.BaseModelOutputWithPast</cite>] or a tuple of
+<cite>torch.FloatTensor</cite> (if <cite>return_dict=False</cite> is passed or when <cite>config.return_dict=False</cite>) comprising various
+elements depending on the configuration ([<cite>None</cite>]) and inputs.</p>
+<ul>
+<li><p><strong>last_hidden_state</strong> (<cite>torch.FloatTensor</cite> of shape <cite>(batch_size, sequence_length, hidden_size)</cite>) – Sequence of hidden-states at the output of the last layer of the model.</p>
+<p>If <cite>past_key_values</cite> is used only the last hidden-state of the sequences of shape <cite>(batch_size, 1,
+hidden_size)</cite> is output.</p>
+</li>
+<li><p><strong>past_key_values</strong> (<cite>Cache</cite>, <em>optional</em>, returned when <cite>use_cache=True</cite> is passed or when <cite>config.use_cache=True</cite>) – It is a [<cite>~cache_utils.Cache</cite>] instance. For more details, see our [kv cache guide](<a class="reference external" href="https://huggingface.co/docs/transformers/en/kv_cache">https://huggingface.co/docs/transformers/en/kv_cache</a>).</p>
+<p>Contains pre-computed hidden-states (key and values in the self-attention blocks and optionally if
+<cite>config.is_encoder_decoder=True</cite> in the cross-attention blocks) that can be used (see <cite>past_key_values</cite>
+input) to speed up sequential decoding.</p>
+</li>
+<li><p><strong>hidden_states</strong> (<cite>tuple(torch.FloatTensor)</cite>, <em>optional</em>, returned when <cite>output_hidden_states=True</cite> is passed or when <cite>config.output_hidden_states=True</cite>) – Tuple of <cite>torch.FloatTensor</cite> (one for the output of the embeddings, if the model has an embedding layer, +
+one for the output of each layer) of shape <cite>(batch_size, sequence_length, hidden_size)</cite>.</p>
+<p>Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.</p>
+</li>
+<li><p><strong>attentions</strong> (<cite>tuple(torch.FloatTensor)</cite>, <em>optional</em>, returned when <cite>output_attentions=True</cite> is passed or when <cite>config.output_attentions=True</cite>) – Tuple of <cite>torch.FloatTensor</cite> (one for each layer) of shape <cite>(batch_size, num_heads, sequence_length,
+sequence_length)</cite>.</p>
+<p>Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+heads.</p>
+</li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.conversion.gpt2.modeling_gpt2.</span></span><span class="sig-name descname"><span class="pre">GPT2PreTrainedModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">inputs</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/conversion/gpt2/modeling_gpt2.html#GPT2PreTrainedModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PreTrainedModel</span></code></p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><dl class="simple">
+<dt>config ([<cite>PreTrainedConfig</cite>]):</dt><dd><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Args:
+config ([<cite>PreTrainedConfig</cite>]):</p>
+<blockquote>
+<div><p>Model configuration class with all the parameters of the model. Initializing with a config file does not
+load the weights associated with the model, only the configuration. Check out the
+[<cite>~PreTrainedModel.from_pretrained</cite>] method to load the model weights.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><em>GPT2Config</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.base_model_prefix">
+<span class="sig-name descname"><span class="pre">base_model_prefix</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'model'</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.base_model_prefix" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.config">
+<span class="sig-name descname"><span class="pre">config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><span class="pre">GPT2Config</span></a></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.config_class">
+<span class="sig-name descname"><span class="pre">config_class</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.config_class" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="#modalities.conversion.gpt2.configuration_gpt2.GPT2Config" title="modalities.conversion.gpt2.configuration_gpt2.GPT2Config"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2Config</span></code></a></p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.supports_gradient_checkpointing">
+<span class="sig-name descname"><span class="pre">supports_gradient_checkpointing</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></span><a class="headerlink" href="#modalities.conversion.gpt2.modeling_gpt2.GPT2PreTrainedModel.supports_gradient_checkpointing" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.conversion.gpt2">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.conversion.gpt2" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.conversion.html" class="btn btn-neutral float-left" title="modalities.conversion package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.dataloader.html" class="btn btn-neutral float-right" title="modalities.dataloader package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,277 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.huggingface.huggingface_model &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.models.huggingface.huggingface_model</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.models.huggingface.huggingface_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoModelForCausalLM</span><span class="p">,</span> <span class="n">AutoModelForMaskedLM</span><span class="p">,</span> <span class="n">AutoTokenizer</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.lookup_enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">LookupEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">NNModel</span>
+
+<span class="c1"># Huggingface Model dependencies</span>
+<span class="c1">#</span>
+<span class="c1"># ModuleUtilsMixin</span>
+<span class="c1"># GenerationMixin</span>
+<span class="c1"># PushToHubMixin</span>
+<span class="c1"># PeftAdapterMixin</span>
+<span class="c1">#   &lt;- PreTrainedModel</span>
+<span class="c1">#       &lt;- LlamaPreTrainedModel    The bare LLaMA Model outputting raw hidden-states without any specific head on top.</span>
+<span class="c1">#           &lt;- LlamaModel      The bare LLaMA Model outputting raw hidden-states without any specific head on top.</span>
+<span class="c1">#           &lt;- LlamaForCausalLM</span>
+<span class="c1">#           &lt;- LlamaForSequenceClassification    The LLaMa transformer with a sequence classif. head on top (lin. layer)</span>
+
+
+<div class="viewcode-block" id="HuggingFaceModelTypes">
+<a class="viewcode-back" href="../../../../api/modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFaceModelTypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HuggingFaceModelTypes</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    HuggingFaceModelTypes enumeration class representing different types of HuggingFace models.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        AutoModelForCausalLM: Represents the AutoModelForCausalLM class.</span>
+<span class="sd">        AutoModelForMaskedLM: Represents the AutoModelForMaskedLM class.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">AutoModelForCausalLM</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span>
+    <span class="n">AutoModelForMaskedLM</span> <span class="o">=</span> <span class="n">AutoModelForMaskedLM</span></div>
+
+
+
+<div class="viewcode-block" id="HuggingFacePretrainedModelConfig">
+<a class="viewcode-back" href="../../../../api/modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HuggingFacePretrainedModelConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Configuration class for HuggingFacePretrainedModel.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        model_type (HuggingFaceModelTypes): The type of the HuggingFace model.</span>
+<span class="sd">        model_name (Path): The path to the HuggingFace model.</span>
+<span class="sd">        prediction_key (str): The key for accessing the prediction.</span>
+<span class="sd">        huggingface_prediction_subscription_key (str): The subscription key for HuggingFace prediction.</span>
+<span class="sd">        sample_key (str): The key for accessing the sample.</span>
+<span class="sd">        model_args (Any, optional): Optional additional arguments for the model.</span>
+<span class="sd">        kwargs (Any, optional): Optional additional keyword arguments.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model_type</span><span class="p">:</span> <span class="n">HuggingFaceModelTypes</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">huggingface_prediction_subscription_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">model_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># avoid warning about protected namespace &#39;model_&#39;, see</span>
+    <span class="c1"># https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces</span>
+    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">protected_namespaces</span><span class="o">=</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="HuggingFacePretrainedModel">
+<a class="viewcode-back" href="../../../../api/modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HuggingFacePretrainedModel</span><span class="p">(</span><span class="n">NNModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;HuggingFacePretrainedModel class for HuggingFace models.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_type</span><span class="p">:</span> <span class="n">HuggingFaceModelTypes</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">huggingface_prediction_subscription_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">model_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes a HuggingFaceModel object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_type (HuggingFaceModelTypes): The type of Hugging Face model.</span>
+<span class="sd">            model_name (str): The name of the Hugging Face model.</span>
+<span class="sd">            prediction_key (str): The key for accessing predictions.</span>
+<span class="sd">            huggingface_prediction_subscription_key (str): The subscription key for Hugging Face predictions.</span>
+<span class="sd">            sample_key (str): The key for accessing samples.</span>
+<span class="sd">            model_args (Any, optional): Additional arguments for the Hugging Face model. Defaults to None.</span>
+<span class="sd">            kwargs (Any, optional): Additional keyword arguments for the Hugging Face model. Defaults to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">model_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">model_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span> <span class="o">=</span> <span class="n">prediction_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">huggingface_prediction_subscription_key</span> <span class="o">=</span> <span class="n">huggingface_prediction_subscription_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample_key</span> <span class="o">=</span> <span class="n">sample_key</span>
+
+        <span class="c1"># NOTE: If the model needs to be downloaded, it is NOT necessary to guard the access for rank 0.</span>
+        <span class="c1"># This is taken care of internally in huggingface hub see:</span>
+        <span class="c1"># https://github.com/huggingface/huggingface_hub/blob/3788f537b10c7d02149d6bf017d2ce19885f90a2/src/huggingface_hub/file_download.py#L1457</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">huggingface_model</span> <span class="o">=</span> <span class="n">model_type</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">model_name</span><span class="p">),</span> <span class="n">local_files_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">model_args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="HuggingFacePretrainedModel.forward">
+<a class="viewcode-back" href="../../../../api/modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModel.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, torch.Tensor]: A dictionary containing output tensors.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">huggingface_model</span><span class="p">(</span><span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_key</span><span class="p">])</span>
+        <span class="k">return</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span><span class="p">:</span> <span class="n">output</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">huggingface_prediction_subscription_key</span><span class="p">]}</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fsdp_block_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a list of FSDP block names.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[str]: A list of FSDP block names.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">huggingface_model</span><span class="o">.</span><span class="n">_no_split_modules</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;epfl-llm/meditron-7b&quot;</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">HuggingFacePretrainedModel</span><span class="p">(</span>
+        <span class="n">model_type</span><span class="o">=</span><span class="n">HuggingFaceModelTypes</span><span class="o">.</span><span class="n">AutoModelForCausalLM</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;epfl-llm/meditron-7b&quot;</span><span class="p">,</span>
+        <span class="n">prediction_key</span><span class="o">=</span><span class="s2">&quot;logits&quot;</span><span class="p">,</span>
+        <span class="n">huggingface_prediction_subscription_key</span><span class="o">=</span><span class="s2">&quot;logits&quot;</span><span class="p">,</span>
+        <span class="n">sample_key</span><span class="o">=</span><span class="s2">&quot;input_ids&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

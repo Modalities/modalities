@@ -1,0 +1,603 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.dataloader.create_packed_data &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.dataloader.create_packed_data</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.dataloader.create_packed_data</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">io</span><span class="w"> </span><span class="kn">import</span> <span class="n">BufferedWriter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">jq</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilePath</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.large_file_lines_reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">LargeFileLinesReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.tokenization.tokenizer_wrapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TokenizerWrapper</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="EmptySampleError">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.EmptySampleError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EmptySampleError</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="PackedDataGenerator">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.PackedDataGenerator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PackedDataGenerator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads in a JSONL file and the corresponding index file and packs the dataset for LLM training.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">src_path</span><span class="p">:</span> <span class="n">FilePath</span><span class="p">,</span>
+        <span class="n">tokenizer</span><span class="p">:</span> <span class="n">TokenizerWrapper</span><span class="p">,</span>
+        <span class="n">eod_token</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">number_of_processes</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">jq_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">processing_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">raw_samples_queue_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">processed_samples_queue_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">index_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FilePath</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes a PackedDataGenerator object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            src_path (FilePath): Path to a JSONL file, which holds text data.</span>
+<span class="sd">            tokenizer (TokenizerWrapper): PretrainedTokenizer object used to tokenize the provided data in `src_path`.</span>
+<span class="sd">            eod_token (str): End-of-document token.</span>
+<span class="sd">            number_of_processes (int): Number of processes used for parallel processing.</span>
+<span class="sd">            jq_pattern (str): jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed.</span>
+<span class="sd">            processing_batch_size (int): Size of the batches that the workers process.</span>
+<span class="sd">            raw_samples_queue_size (int): Maximum size of the raw samples queue.</span>
+<span class="sd">            processed_samples_queue_size (int): Maximum size of the processed samples queue.</span>
+<span class="sd">            index_path (Optional[FilePath]): Path to an index file,</span>
+<span class="sd">                which indicates the start character position</span>
+<span class="sd">                and length of samples given in `src_path`. If not defined, an index file next to `src_path` is picked,</span>
+<span class="sd">                by replacing its suffix with &quot;.idx&quot;. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">src_path</span> <span class="o">=</span> <span class="n">src_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eod_token</span> <span class="o">=</span> <span class="n">eod_token</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_token_size_in_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_required_num_of_bytes_to_repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">vocab_size</span><span class="p">)</span>
+        <span class="n">eod_token_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">get_token_id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eod_token</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_encoded_eod_token_as_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_encoded_token_to_bytes</span><span class="p">(</span><span class="n">eod_token_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jq_filter</span> <span class="o">=</span> <span class="n">jq</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">jq_pattern</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_number_of_processes</span> <span class="o">=</span> <span class="n">number_of_processes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reader</span> <span class="o">=</span> <span class="n">LargeFileLinesReader</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="n">index_path</span><span class="o">=</span><span class="n">index_path</span><span class="p">)</span>  <span class="c1"># reads string with utf-8 encoding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_total_num_of_tokens</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_raw_samples_queue</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="n">raw_samples_queue_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processed_samples_queue</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="n">processed_samples_queue_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exception_buffer</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processing_batch_size</span> <span class="o">=</span> <span class="n">processing_batch_size</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_required_num_of_bytes_to_repr</span><span class="p">(</span><span class="n">int_to_get_repr</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates the required number of bytes to represent an integer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            int_to_get_repr (int): The integer to get the representation for.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The number of bytes required to represent the integer.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># we currently only support token sizes of 1, 2 and 4 bytes, as implemented here:</span>
+        <span class="c1"># https://github.com/Modalities/modalities/blob/fix_char_bytes_indexation_mismatch/src/modalities/dataloader/dataset.py#L202</span>
+        <span class="n">num_bytes</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">int_to_get_repr</span><span class="p">)</span> <span class="o">/</span> <span class="mi">8</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_bytes</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">num_bytes</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">2</span>
+        <span class="k">elif</span> <span class="n">num_bytes</span> <span class="o">&lt;=</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">4</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Currently only support token byte sizes of 1, 2, and 4.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_encoded_token_to_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoded_token</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts an encoded token to its byte representation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encoded_token (int): The encoded token to be converted.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bytes: The byte representation of the token.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">token_bytes</span> <span class="o">=</span> <span class="n">encoded_token</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_token_size_in_bytes</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">,</span> <span class="n">signed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OverflowError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Token </span><span class="si">{</span><span class="n">encoded_token</span><span class="si">}</span><span class="s2"> cannot be represented by </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_token_size_in_bytes</span><span class="si">}</span><span class="s2"> bytes.&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+        <span class="k">return</span> <span class="n">token_bytes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_default_destination_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">destination_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the default destination path for the packed data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            destination_path (Path, optional): The specific destination path. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Path: The default destination path for the packed data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">destination_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">default_destination_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">src_path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">src_path</span><span class="o">.</span><span class="n">stem</span><span class="si">}</span><span class="s2">.pbin&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No specific Destination Path provided. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Pointing to destination next to input data at: </span><span class="si">{</span><span class="n">default_destination_path</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">default_destination_path</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">destination_path</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PackedDataGenerator.run">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.PackedDataGenerator.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Packs data and saves it to (default) dst_path.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dst_path (Optional[Path]): The destination path to save the packed data.</span>
+<span class="sd">            If not provided, a default destination path will be used.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the file already exists at the destination path.</span>
+<span class="sd">            Exception: If an exception occurs during the data packing process.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_total_num_of_tokens</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;This </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> was already used and is exhausted. Use another!&quot;</span>
+        <span class="n">dst_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_destination_path</span><span class="p">(</span><span class="n">destination_path</span><span class="o">=</span><span class="n">dst_path</span><span class="p">)</span>
+
+        <span class="n">dst_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dst_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;file already exists at destination path &#39;</span><span class="si">{</span><span class="n">dst_path</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exception_buffer</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># not setting this can cause deadlocks when using hf&#39;s &quot;FastTokenizers&quot;. See also:</span>
+            <span class="c1"># https://stackoverflow.com/questions/62691279/how-to-disable-tokenizers-parallelism-true-false-warning/67254879#67254879</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TOKENIZERS_PARALLELISM&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;false&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_launch_parallelized_workers</span><span class="p">(</span><span class="n">dst_path</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">unsetenv</span><span class="p">(</span><span class="s2">&quot;TOKENIZERS_PARALLELISM&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exception_buffer</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exception_buffer</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_launch_parallelized_workers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
+        <span class="c1"># Launches workers in parallel for reading, writing, and processing data.</span>
+        <span class="c1"># The data is stored in the provided destination path.</span>
+
+        <span class="n">reader</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_reader_thread</span><span class="p">())</span>
+        <span class="n">reader</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_writer_thread</span><span class="p">(</span><span class="n">dst_path</span><span class="p">))</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="n">processor_threads</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_process_thread</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_number_of_processes</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">processor_threads</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">processor_threads</span><span class="p">:</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stop_processing</span><span class="p">()</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_stop_processing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Stops the processing of samples by putting None in the processed_samples_queue.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processed_samples_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generator_for_tokens_to_get_written</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Generator function that yields batches of processed samples.</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_for_parallel_errors</span><span class="p">():</span>
+                <span class="k">return</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processed_samples_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">batch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="k">yield</span> <span class="n">batch</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_for_parallel_errors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="c1"># Checks if there are any errors in the exception buffer.</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_exception_buffer</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_writer_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+        <span class="c1"># Returns a callable writer function that writes a batch</span>
+        <span class="c1"># received from the processed_samples_queue to the destination file.</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">writer</span><span class="p">():</span>
+            <span class="c1"># writes a batch received from the processed_samples_queue to the destination file</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">_write_batch</span><span class="p">(</span>
+                <span class="n">batch</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]],</span> <span class="n">prev_line_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">curr_offset</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">index_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">BufferedWriter</span>
+            <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+                <span class="c1"># write the tokens for each document</span>
+                <span class="k">for</span> <span class="n">line_id</span><span class="p">,</span> <span class="n">tokens_as_bytes</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">prev_line_id</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">!=</span> <span class="n">line_id</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Line IDs are not consecutive. Expected </span><span class="si">{</span><span class="n">prev_line_id</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">, but got </span><span class="si">{</span><span class="n">line_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">tokens_as_bytes</span><span class="p">)</span>
+                    <span class="n">segment_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens_as_bytes</span><span class="p">)</span>
+                    <span class="n">index_list</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">curr_offset</span><span class="p">,</span> <span class="n">segment_length</span><span class="p">))</span>
+                    <span class="n">curr_offset</span> <span class="o">+=</span> <span class="n">segment_length</span>
+                    <span class="n">prev_line_id</span> <span class="o">=</span> <span class="n">line_id</span>
+                <span class="k">return</span> <span class="n">prev_line_id</span><span class="p">,</span> <span class="n">curr_offset</span>
+
+            <span class="n">index_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">with</span> <span class="n">dst_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="c1"># allocate first self.header_size_in_bytes bytes for header (encodes length of data section)</span>
+                <span class="c1"># not possible to prepend header after determining size of data section</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">((</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">))</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_token_size_in_bytes</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span>
+                        <span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="c1"># The offset only applies to the data section, not the header</span>
+                <span class="c1"># When we load the file, we add the header size to the offset</span>
+                <span class="n">curr_offset</span> <span class="o">=</span> <span class="mi">0</span>
+
+                <span class="c1"># write data section (tokens)</span>
+                <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reader</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processed batches&quot;</span><span class="p">)</span>
+                <span class="n">prev_line_id</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+                <span class="n">batch_dict</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generator_for_tokens_to_get_written</span><span class="p">():</span>
+                    <span class="n">line_id</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">batch_dict</span><span class="p">[</span><span class="n">line_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">batch</span>
+
+                    <span class="k">while</span> <span class="n">prev_line_id</span> <span class="o">+</span> <span class="mi">1</span> <span class="ow">in</span> <span class="n">batch_dict</span><span class="p">:</span>
+                        <span class="n">batch</span> <span class="o">=</span> <span class="n">batch_dict</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">prev_line_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                        <span class="n">prev_line_id</span><span class="p">,</span> <span class="n">curr_offset</span> <span class="o">=</span> <span class="n">_write_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">prev_line_id</span><span class="p">,</span> <span class="n">curr_offset</span><span class="p">,</span> <span class="n">index_list</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+                        <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="p">))</span>
+                <span class="c1"># write index</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">index_list</span><span class="p">))</span>
+
+            <span class="n">update_data_length_in_pre_allocated_header</span><span class="p">(</span><span class="n">dst_path</span><span class="p">,</span> <span class="n">index_list</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">writer</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reader_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+        <span class="c1"># returns a reader function that reads lines from the reader and puts them into a queue.</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">reader</span><span class="p">():</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">line_id</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reader</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Reading jsonl&quot;</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="n">batch</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">line_id</span><span class="p">,</span> <span class="n">line</span><span class="p">))</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">processing_batch_size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_raw_samples_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+                    <span class="n">batch</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># add the remaining samples</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_raw_samples_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_number_of_processes</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_raw_samples_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">reader</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">process_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="c1"># Process the lines in a batch and put the processed samples into the processed_samples_queue.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_for_parallel_errors</span><span class="p">():</span>
+            <span class="k">return</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_for_parallel_errors</span><span class="p">():</span>
+                <span class="k">return</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_raw_samples_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">batch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">break</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">batch_processed</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">line_id</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+                    <span class="n">processed_line</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_line</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">process_id</span><span class="p">)</span>
+                    <span class="n">batch_processed</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">line_id</span><span class="p">,</span> <span class="n">processed_line</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">processed_samples_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">batch_processed</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">EmptySampleError</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Encountered empty sample in line </span><span class="si">{</span><span class="n">line_id</span><span class="si">}</span><span class="s2"> of file </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">src_path</span><span class="si">}</span><span class="s2"> within process </span><span class="si">{</span><span class="n">process_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exception</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Could not process line </span><span class="si">{</span><span class="n">line_id</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">src_path</span><span class="si">}</span><span class="s2"> within process </span><span class="si">{</span><span class="n">process_id</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Raised the following error: </span><span class="si">{</span><span class="n">exception</span><span class="si">=}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+                <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">process_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="c1"># extracts the text via the jq_filter and applies tokenization to the extract text</span>
+        <span class="n">jq_retrieved_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">jq_filter</span><span class="o">.</span><span class="n">input_text</span><span class="p">(</span><span class="n">line</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">jq_retrieved_text</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;jq was not able to find anything using the expression: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">jq_filter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">tokenize</span><span class="p">(</span><span class="n">jq_retrieved_text</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">EmptySampleError</span><span class="p">(</span><span class="s2">&quot;Received empty sample...&quot;</span><span class="p">)</span>
+        <span class="n">token_byte_string</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encoded_token_to_bytes</span><span class="p">,</span> <span class="n">tokens</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">token_byte_string</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encoded_eod_token_as_bytes</span><span class="p">):</span>
+            <span class="n">token_byte_string</span> <span class="o">=</span> <span class="n">token_byte_string</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_encoded_eod_token_as_bytes</span>
+        <span class="k">return</span> <span class="n">token_byte_string</span></div>
+
+
+
+<div class="viewcode-block" id="update_data_length_in_pre_allocated_header">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.update_data_length_in_pre_allocated_header">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_data_length_in_pre_allocated_header</span><span class="p">(</span><span class="n">dst_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">index_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]):</span>
+    <span class="c1"># Update the length of the data section in the pre-allocated header of the destination file.</span>
+    <span class="c1"># The data segment length is sum of the starting position and the length of the last document.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">length_of_byte_encoded_data_section</span> <span class="o">=</span> <span class="n">index_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">index_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">length_of_byte_encoded_data_section</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;No data was written to the file &quot;</span><span class="si">{</span><span class="n">dst_path</span><span class="si">}</span><span class="s1">&quot;. &#39;</span>
+            <span class="s2">&quot;This can happen if the input file is empty or all samples were filtered out.&quot;</span>
+        <span class="p">)</span>
+    <span class="n">data_section_length_in_bytes</span> <span class="o">=</span> <span class="n">length_of_byte_encoded_data_section</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span>
+        <span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span>
+    <span class="p">)</span>
+    <span class="k">with</span> <span class="n">dst_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;rb+&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fout</span><span class="p">:</span>
+        <span class="n">fout</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">fout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data_section_length_in_bytes</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="EmbeddedStreamData">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.EmbeddedStreamData">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EmbeddedStreamData</span><span class="p">:</span>
+    <span class="c1"># amount of bytes to represent number of all tokens in dataset.</span>
+    <span class="c1"># If the amount exceeds 2^(8*`header_size_in_bytes`), this requires adaptation.</span>
+    <span class="c1"># Decided to keep this constant, since a size of 8 bytes requires more data than the internet currently provides</span>
+    <span class="n">DATA_SECTION_LENGTH_IN_BYTES</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">HEADER_SIZE_IN_BYTES</span> <span class="o">=</span> <span class="n">DATA_SECTION_LENGTH_IN_BYTES</span> <span class="o">+</span> <span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">load_index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes an EmbeddedStreamData object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_path (Path): The path to the packed data file.</span>
+<span class="sd">            load_index (bool, optional): Whether to load the index. Defaults to True.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If the packed data file is not found at the specified path.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span> <span class="o">=</span> <span class="n">data_path</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Packed Data was not found at </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Create on in advance by using `modalities data pack_encoded_data`.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="c1"># get number of bytes in data section</span>
+            <span class="n">data_section_length_in_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_len</span> <span class="o">=</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">data_section_length_in_bytes</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">)</span>
+
+            <span class="c1"># get number of bytes for encoding a single token</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">)</span>
+            <span class="n">token_size_as_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">token_size_in_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">token_size_as_bytes</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">,</span> <span class="n">signed</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+            <span class="c1"># get index</span>
+            <span class="k">if</span> <span class="n">load_index</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">HEADER_SIZE_IN_BYTES</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_len</span><span class="p">)</span>
+                <span class="n">pkl_encoded_index</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                <span class="c1"># contains the start offset and length of each segment</span>
+                <span class="c1"># as byte positions in the data section</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_index_base</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pkl_encoded_index</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_index_base</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="c1"># initialize memmapped data section</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">memmap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">HEADER_SIZE_IN_BYTES</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_len</span><span class="p">,))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">index_base</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_base</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Index was not loaded. Set `load_index=True` during initialization.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_base</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span></div>
+
+
+
+<div class="viewcode-block" id="join_embedded_stream_data">
+<a class="viewcode-back" href="../../../api/modalities.dataloader.html#modalities.dataloader.create_packed_data.join_embedded_stream_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">join_embedded_stream_data</span><span class="p">(</span><span class="n">stream_data</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">EmbeddedStreamData</span><span class="p">],</span> <span class="n">target_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Joins the embedded stream data into a single file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        stream_data (list[EmbeddedStreamData]): A list of EmbeddedStreamData objects representing the stream data.</span>
+<span class="sd">        target_file (Path): The target file to write the joined data to.</span>
+<span class="sd">        chunk_size (int, optional): The size of each data chunk. Defaults to 2048.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        FileExistsError: If the target file already exists.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">target_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Target File at &quot;</span><span class="si">{</span><span class="n">target_file</span><span class="si">}</span><span class="s1">&quot; exists!&#39;</span><span class="p">)</span>
+    <span class="n">data_len</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">data_len</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">stream_data</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">({</span><span class="n">d</span><span class="o">.</span><span class="n">token_size_in_bytes</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">stream_data</span><span class="p">})</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">&quot;Found different token representation sizes. This could indicate the usage of different tokenizers. &quot;</span>
+        <span class="s2">&quot;Not supported!&quot;</span>
+    <span class="p">)</span>
+    <span class="n">token_size_in_bytes</span> <span class="o">=</span> <span class="n">stream_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">token_size_in_bytes</span>
+
+    <span class="n">num_data_chunks</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">data_len</span> <span class="o">/</span> <span class="n">chunk_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">stream_data</span><span class="p">)</span>
+    <span class="n">data_stream_generator</span> <span class="o">=</span> <span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">i</span> <span class="p">:</span> <span class="n">i</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">]</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">stream_data</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">data_len</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">))</span>
+
+    <span class="n">num_entries</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">index_base</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">stream_data</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">index_stream_generator</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="c1"># generates a stream of index offsets and segment lengths.</span>
+        <span class="n">curr_offset</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">embedded_stream_data</span> <span class="ow">in</span> <span class="n">stream_data</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">entry_offset</span><span class="p">,</span> <span class="n">segment_length</span> <span class="ow">in</span> <span class="n">embedded_stream_data</span><span class="o">.</span><span class="n">index_base</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">entry_offset</span> <span class="o">+</span> <span class="n">curr_offset</span><span class="p">,</span> <span class="n">segment_length</span>
+            <span class="n">curr_offset</span> <span class="o">+=</span> <span class="n">embedded_stream_data</span><span class="o">.</span><span class="n">data_len</span>
+            <span class="n">curr_offset</span> <span class="o">-=</span> <span class="n">embedded_stream_data</span><span class="o">.</span><span class="n">HEADER_SIZE_IN_BYTES</span>
+
+    <span class="k">with</span> <span class="n">target_file</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fout</span><span class="p">:</span>
+        <span class="n">fout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data_len</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">))</span>
+        <span class="n">fout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+            <span class="n">token_size_in_bytes</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">data_chunk</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">data_stream_generator</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="n">num_data_chunks</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Writing Data Chunks...&quot;</span><span class="p">):</span>
+            <span class="n">fout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data_chunk</span><span class="p">)</span>
+
+        <span class="n">joint_index</span> <span class="o">=</span> <span class="p">[</span><span class="n">entry</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">index_stream_generator</span><span class="p">(),</span> <span class="n">total</span><span class="o">=</span><span class="n">num_entries</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Concatenating Index&quot;</span><span class="p">)]</span>
+        <span class="n">pickled_index</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">joint_index</span><span class="p">)</span>
+        <span class="n">pickled_index_as_chunks</span> <span class="o">=</span> <span class="p">(</span><span class="n">pickled_index</span><span class="p">[</span><span class="n">i</span> <span class="p">:</span> <span class="n">i</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">pickled_index</span><span class="p">),</span> <span class="n">chunk_size</span><span class="p">))</span>
+        <span class="n">num_index_chunks</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pickled_index</span><span class="p">)</span> <span class="o">/</span> <span class="n">chunk_size</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index_chunk</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">pickled_index_as_chunks</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="n">num_index_chunks</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Writing Index Chunks...&quot;</span><span class="p">):</span>
+            <span class="n">fout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">index_chunk</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

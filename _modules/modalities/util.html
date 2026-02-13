@@ -1,0 +1,500 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.util &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.util</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.util</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">TracebackType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">TypeVar</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValidationError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceMesh</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPModule</span> <span class="k">as</span> <span class="n">FSDP2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP1</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">DTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Number</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeRecorderStateError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParallelismDegrees</span><span class="p">,</span> <span class="n">has_parallelism_method</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.maybe_list_parameter</span><span class="w"> </span><span class="kn">import</span> <span class="n">maybe_list_parameter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.typing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPX</span>
+
+
+<div class="viewcode-block" id="print_rank_0">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.print_rank_0">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">print_rank_0</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;If torch.distributed is initialized, print only on rank 0.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="warn_rank_0">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.warn_rank_0">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">warn_rank_0</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;If torch.distributed is initialized, print only on rank 0.&quot;&quot;&quot;</span>
+    <span class="n">message_with_color_code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\033</span><span class="s2">[91m </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2"> </span><span class="se">\033</span><span class="s2">[00m&quot;</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">message_with_color_code</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">message_with_color_code</span><span class="p">)</span></div>
+
+
+
+<span class="n">TEnum</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;TEnum&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">Enum</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="parse_enum_by_name">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.parse_enum_by_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_enum_by_name</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">enum_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">TEnum</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TEnum</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">enum_type</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid </span><span class="si">{</span><span class="n">enum_type</span><span class="si">}</span><span class="s2"> member name: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_experiment_id_from_config">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_experiment_id_from_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_experiment_id_from_config</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">hash_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">16</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create experiment ID including the date and time for file save uniqueness</span>
+<span class="sd">    example: 2022-05-07__14-31-22_fdh1xaj2&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">date_of_run</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">__%H-%M-%S&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">config_file_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">experiment_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">date_of_run</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">hash</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="n">hash_length</span><span class="p">]</span>
+        <span class="n">experiment_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">date_of_run</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="nb">hash</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="k">return</span> <span class="n">experiment_id</span></div>
+
+
+
+<div class="viewcode-block" id="get_synced_string">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_synced_string">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_synced_string</span><span class="p">(</span><span class="n">string_to_be_synced</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">from_rank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">max_string_byte_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Broadcast a string from one rank to all other ranks in the distributed setup.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        string_to_be_synced (str): The string to be synced across ranks.</span>
+<span class="sd">        from_rank (int, optional): The rank that generates the string. Defaults to 0.</span>
+<span class="sd">        max_string_byte_length (Optional[int], optional): Maximum byte length of the string to be synced.</span>
+<span class="sd">            Defaults to 1024.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The synced string, decoded from the byte array.</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the string exceeds the maximum byte length.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="n">from_rank</span><span class="p">:</span>
+        <span class="c1"># Generate a unique folder name</span>
+        <span class="n">string_to_be_synced_bytes</span> <span class="o">=</span> <span class="n">string_to_be_synced</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">string_to_be_synced_bytes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_string_byte_length</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Experiment ID is too long: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">string_to_be_synced_bytes</span><span class="p">)</span><span class="si">}</span><span class="s2"> bytes, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;max length is </span><span class="si">{</span><span class="n">max_string_byte_length</span><span class="si">}</span><span class="s2"> bytes&quot;</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">string_to_be_synced_bytes</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(</span><span class="n">max_string_byte_length</span><span class="p">)</span>  <span class="c1"># Preallocate buffer for receiving</span>
+
+    <span class="c1"># Ensure all ranks have the same folder name</span>
+    <span class="n">string_to_be_synced_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+        <span class="nb">list</span><span class="p">(</span><span class="n">string_to_be_synced_bytes</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">max_string_byte_length</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">string_to_be_synced_bytes</span><span class="p">)),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+    <span class="n">dist</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">string_to_be_synced_tensor</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">from_rank</span><span class="p">)</span>
+
+    <span class="c1"># Decode on all ranks</span>
+    <span class="n">synced_string</span> <span class="o">=</span> <span class="n">string_to_be_synced_tensor</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\x00</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">synced_string</span></div>
+
+
+
+<div class="viewcode-block" id="get_synced_experiment_id_of_run">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_synced_experiment_id_of_run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_synced_experiment_id_of_run</span><span class="p">(</span>
+    <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">hash_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span>
+    <span class="n">max_experiment_id_byte_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a unique experiment ID for the current run on rank 0 and broadcast it to all ranks.</span>
+<span class="sd">    Internally, the experiment ID is generated by hashing the configuration file path and appending</span>
+<span class="sd">    the current date and time.</span>
+<span class="sd">    The experiment ID is then converted to a byte array (with maximum length of max_experiment_id_byte_length) and</span>
+<span class="sd">    broadcasted to all ranks. In the unlikely case of the experiment ID being too long, a ValueError is raised</span>
+<span class="sd">    and max_experiment_id_byte_length must be increased. Each rank then decodes the byte array to the original</span>
+<span class="sd">    string representation and returns it. Having a globally synced experiment ID is mandatory for</span>
+<span class="sd">    saving files / checkpionts in a distributed training setup.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_file_path (Path): Path to the configuration file.</span>
+<span class="sd">        hash_length (Optional[int], optional): Defines the char length of the commit hash. Defaults to 16.</span>
+<span class="sd">        max_experiment_id_byte_length (Optional[int]): Defines max byte length of the experiment_id</span>
+<span class="sd">            to be shared to other ranks. Defaults to 1024.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The experiment ID.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">experiment_id</span> <span class="o">=</span> <span class="n">get_experiment_id_from_config</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">,</span> <span class="n">hash_length</span><span class="p">)</span>
+    <span class="n">experiment_id_synced</span> <span class="o">=</span> <span class="n">get_synced_string</span><span class="p">(</span>
+        <span class="n">string_to_be_synced</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span>
+        <span class="n">from_rank</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">max_string_byte_length</span><span class="o">=</span><span class="n">max_experiment_id_byte_length</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># Decode on all ranks</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rank </span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2"> received experiment_id: </span><span class="si">{</span><span class="n">experiment_id_synced</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">experiment_id_synced</span></div>
+
+
+
+<div class="viewcode-block" id="format_metrics_to_gb">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.format_metrics_to_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">format_metrics_to_gb</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;quick function to format numbers to gigabyte and round to 4 digit precision&quot;&quot;&quot;</span>
+    <span class="n">g_gigabyte</span> <span class="o">=</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">3</span>
+    <span class="n">metric_num</span> <span class="o">=</span> <span class="n">item</span> <span class="o">/</span> <span class="n">g_gigabyte</span>
+    <span class="n">metric_num</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">metric_num</span><span class="p">,</span> <span class="n">ndigits</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">metric_num</span></div>
+
+
+
+<div class="viewcode-block" id="get_local_number_of_trainable_parameters">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_local_number_of_trainable_parameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the number of trainable parameters that are materialized on the current rank.</span>
+<span class="sd">    The model can be sharded with FSDP1 or FSDP2 or not sharded at all.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model (nn.Module): The model for which to calculate the number of trainable parameters.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: The number of trainable parameters materialized on the current rank.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP2</span><span class="p">):</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">to_local</span><span class="p">()</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">DTensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">FSDP1</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)):</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">num_params</span></div>
+
+
+
+<div class="viewcode-block" id="get_total_number_of_trainable_parameters">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_total_number_of_trainable_parameters">[docs]</a>
+<span class="nd">@maybe_list_parameter</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="n">apply_to_list_result</span><span class="o">=</span><span class="nb">sum</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_total_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">FSDPX</span><span class="p">,</span> <span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Number</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the total number of trainable parameters across all ranks.</span>
+<span class="sd">    The model must be sharded with FSDP1 or FSDP2.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model (FSDPX): The model for which to calculate the number of trainable parameters.</span>
+<span class="sd">        device_mesh (DeviceMesh | None): The device mesh used for distributed training.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Number: The total number of trainable parameters across all ranks.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP1</span><span class="p">):</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">num_params_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">num_params</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">num_params_tensor</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">SUM</span><span class="p">)</span>
+        <span class="n">total_num_params</span> <span class="o">=</span> <span class="n">num_params_tensor</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="c1"># For HYBRID sharding, divide by sharding factor to get the correct number of parameters</span>
+        <span class="c1"># TODO: Define constant instead of hardcoding string</span>
+        <span class="c1"># Assumes that CUDA is available and each node has the same number of GPUs</span>
+        <span class="c1"># Note: Per default FSDP1 constructs process groups for the user to shard intra-node and replicate inter-node.</span>
+        <span class="c1"># However, users can also provide their own sharding process groups (currently not supported in Modalities)</span>
+        <span class="c1"># which would require to adapt the code.</span>
+        <span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">sharding_strategy</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;NO_SHARD&quot;</span><span class="p">:</span>
+            <span class="n">sharding_factor</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">model</span><span class="o">.</span><span class="n">sharding_strategy</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;HYBRID_SHARD&quot;</span><span class="p">:</span>
+            <span class="n">sharding_factor</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">//</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">device_count</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">model</span><span class="o">.</span><span class="n">sharding_strategy</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;FULL_SHARD&quot;</span><span class="p">:</span>
+            <span class="n">sharding_factor</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown sharding strategy: </span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">sharding_strategy</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">total_num_params</span> <span class="o">=</span> <span class="n">total_num_params</span> <span class="o">//</span> <span class="n">sharding_factor</span>
+        <span class="k">return</span> <span class="n">total_num_params</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP2</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">device_mesh</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Device mesh must be provided for FSDP2 models.&quot;</span><span class="p">)</span>
+        <span class="c1"># model.parameters() returns an iterable of distributed tensors (i.e., DTensor).</span>
+        <span class="c1"># Running numel() on DTensor, returns the unsharded number of weights.</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; parameter_tensor = list(model.parameters())[0]</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; type(parameter_tensor)</span>
+        <span class="c1"># &lt;class &#39;torch.distributed.tensor.DTensor&#39;&gt;</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; parameter_tensor.shape</span>
+        <span class="c1"># torch.Size([50304, 128])</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; parameter_tensor.to_local().shape</span>
+        <span class="c1"># torch.Size([25152, 128])</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; parameter_tensor.numel()</span>
+        <span class="c1"># 6438912</span>
+        <span class="c1">#</span>
+        <span class="c1"># &gt;&gt;&gt; parameter_tensor.shape[0] * parameter_tensor.shape[1]</span>
+        <span class="c1"># 6438912</span>
+
+        <span class="n">num_params_tensor</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">has_parallelism_method</span><span class="p">(</span><span class="n">device_mesh</span><span class="o">=</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="o">=</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="p">):</span>
+            <span class="n">num_params_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">num_params_tensor</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="n">pp_mesh</span> <span class="o">=</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+            <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">num_params_tensor</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">SUM</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">pp_mesh</span><span class="o">.</span><span class="n">get_group</span><span class="p">())</span>
+            <span class="k">return</span> <span class="n">num_params_tensor</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">num_params_tensor</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Model type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2"> is not supported. &quot;</span>
+            <span class="s2">&quot;Please use either FullyShardedDataParallel (FSDP1) or FullyShardedDataParallel (FSDP2).&quot;</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TimeRecorderStates">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.TimeRecorderStates">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeRecorderStates</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">RUNNING</span> <span class="o">=</span> <span class="s2">&quot;RUNNING&quot;</span>
+    <span class="n">STOPPED</span> <span class="o">=</span> <span class="s2">&quot;STOPPED&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TimeRecorder">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.TimeRecorder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeRecorder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class with context manager to record execution time&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta_t</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="p">:</span> <span class="n">TimeRecorderStates</span> <span class="o">=</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">STOPPED</span>
+
+<div class="viewcode-block" id="TimeRecorder.start">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.TimeRecorder.start">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">==</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">RUNNING</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">TimeRecorderStateError</span><span class="p">(</span><span class="s2">&quot;Cannot start a running TimeRecorder.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_s</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">=</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">RUNNING</span></div>
+
+
+<div class="viewcode-block" id="TimeRecorder.stop">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.TimeRecorder.stop">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">==</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">STOPPED</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">TimeRecorderStateError</span><span class="p">(</span><span class="s2">&quot;Cannot stop an already stopped TimeRecorder.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta_t</span> <span class="o">+=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_s</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">=</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">STOPPED</span></div>
+
+
+<div class="viewcode-block" id="TimeRecorder.reset">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.TimeRecorder.reset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">==</span> <span class="n">TimeRecorderStates</span><span class="o">.</span><span class="n">RUNNING</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">TimeRecorderStateError</span><span class="p">(</span><span class="s2">&quot;Can only reset a stopped TimeRecorder.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta_t</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_s</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="nb">type</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+        <span class="n">value</span><span class="p">:</span> <span class="kc">None</span> <span class="o">|</span> <span class="ne">BaseException</span><span class="p">,</span>
+        <span class="n">traceback</span><span class="p">:</span> <span class="kc">None</span> <span class="o">|</span> <span class="n">TracebackType</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">delta_t</span><span class="si">}</span><span class="s2">s&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="get_module_class_from_name">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.get_module_class_from_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_module_class_from_name</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;From Accelerate source code</span>
+<span class="sd">    (https://github.com/huggingface/accelerate/blob/1f7a79b428749f45187ec69485f2c966fe21926e/src/accelerate/utils/dataclasses.py#L1902)</span>
+<span class="sd">    Gets a class from a module by its name.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        module (`torch.nn.Module`): The module to get the class from.</span>
+<span class="sd">        name (`str`): The name of the class.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">modules_children</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">children</span><span class="p">())</span>
+    <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span>
+    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">modules_children</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">child_module</span> <span class="ow">in</span> <span class="n">modules_children</span><span class="p">:</span>
+            <span class="n">module_class</span> <span class="o">=</span> <span class="n">get_module_class_from_name</span><span class="p">(</span><span class="n">child_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">module_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">module_class</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="cpu_scalar_float">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.cpu_scalar_float">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cpu_scalar_float</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected scalar tensor, got shape </span><span class="si">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">())</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cpu_scalar_int">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.util.cpu_scalar_int">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cpu_scalar_int</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected scalar tensor, got shape </span><span class="si">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">())</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

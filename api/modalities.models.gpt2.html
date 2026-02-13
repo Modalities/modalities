@@ -1,0 +1,1265 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.gpt2 package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.models.huggingface package" href="modalities.models.huggingface.html" />
+    <link rel="prev" title="modalities.models.components package" href="modalities.models.components.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.models.html">modalities.models package</a></li>
+      <li class="breadcrumb-item active">modalities.models.gpt2 package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.models.gpt2.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-models-gpt2-package">
+<h1>modalities.models.gpt2 package<a class="headerlink" href="#modalities-models-gpt2-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.models.gpt2.collator">
+<span id="modalities-models-gpt2-collator-module"></span><h2>modalities.models.gpt2.collator module<a class="headerlink" href="#module-modalities.models.gpt2.collator" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.collator.GPT2LLMCollateFn">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.collator.</span></span><span class="sig-name descname"><span class="pre">GPT2LLMCollateFn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/collator.html#GPT2LLMCollateFn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.collator.GPT2LLMCollateFn" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">CollateFnIF</span></code></p>
+<p>GPT2LLMCollateFn class to define a collate function for GPT2 language model.</p>
+<p>Initializes the Collator object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>sample_key (str): The key for accessing the sample data.
+target_key (str): The key for accessing the target data.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>target_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.models.gpt2.gpt2_model">
+<span id="modalities-models-gpt2-gpt2-model-module"></span><h2>modalities.models.gpt2.gpt2_model module<a class="headerlink" href="#module-modalities.models.gpt2.gpt2_model" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">AttentionConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Configuration class for attention mechanism.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>qkv_transforms (list[QueryKeyValueTransformConfig]): List of configurations for query-key-value transforms.</p>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>qkv_transforms</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig"><em>QueryKeyValueTransformConfig</em></a><em>]</em>)</p></li>
+<li><p><strong>qk_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">QueryKeyValueTransformConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionConfig.QueryKeyValueTransformConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Configuration class for QueryKeyValueTransform.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>type_hint (QueryKeyValueTransformType): The type hint for the transform.
+config (RotaryTransformConfig | IdentityTransformConfig): The configuration for the transform.</p>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>type_hint</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType" title="modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType"><em>QueryKeyValueTransformType</em></a>)</p></li>
+<li><p><strong>config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig"><em>RotaryTransformConfig</em></a><em> | </em><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig"><em>IdentityTransformConfig</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">IdentityTransformConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>IdentityTransformConfig class.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">RotaryTransformConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Configuration class for RotaryTransform.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>n_embd (int): Number of embeddings.
+n_head (int): Number of attention heads.
+seq_length_dim (int): Dimension of the sequence length.
+base_freq (int): Base frequency for RoPE.</p>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>n_head</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>seq_length_dim</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>base_freq</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=10000</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.base_freq">
+<span class="sig-name descname"><span class="pre">base_freq</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">10000</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.base_freq" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.n_embd">
+<span class="sig-name descname"><span class="pre">n_embd</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.n_embd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.n_head">
+<span class="sig-name descname"><span class="pre">n_head</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.n_head" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.seq_length_dim">
+<span class="sig-name descname"><span class="pre">seq_length_dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig.seq_length_dim" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.config">
+<span class="sig-name descname"><span class="pre">config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig"><span class="pre">RotaryTransformConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.IdentityTransformConfig"><span class="pre">IdentityTransformConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.parse_sharding_strategy_by_name">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">parse_sharding_strategy_by_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionConfig.QueryKeyValueTransformConfig.parse_sharding_strategy_by_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.parse_sharding_strategy_by_name" title="Link to this definition"></a></dt>
+<dd><p>Parses a QueryKeyValueTransform by its name.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>name (str): The name of the sharding strategy.</p>
+</dd>
+<dt>Returns:</dt><dd><p>QueryKeyValueTransformType: The parsed sharding strategy.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.type_hint">
+<span class="sig-name descname"><span class="pre">type_hint</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType" title="modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType"><span class="pre">QueryKeyValueTransformType</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig.type_hint" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.qk_norm_config">
+<span class="sig-name descname"><span class="pre">qk_norm_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><span class="pre">LayerNormWrapperConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.qk_norm_config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionConfig.qkv_transforms">
+<span class="sig-name descname"><span class="pre">qkv_transforms</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig"><span class="pre">QueryKeyValueTransformConfig</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionConfig.qkv_transforms" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionImplementation">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">AttentionImplementation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#AttentionImplementation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Enum class representing different implementations of attention.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>MANUAL (str): Manual attention implementation.
+PYTORCH_FLASH (str): PyTorch’s flash attention implementation.
+DAO_FLASH (str): DAO’s flash attention implementation.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionImplementation.DAO_FLASH">
+<span class="sig-name descname"><span class="pre">DAO_FLASH</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dao_flash'</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation.DAO_FLASH" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionImplementation.MANUAL">
+<span class="sig-name descname"><span class="pre">MANUAL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'manual'</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation.MANUAL" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.AttentionImplementation.PYTORCH_FLASH">
+<span class="sig-name descname"><span class="pre">PYTORCH_FLASH</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'pytorch_flash'</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation.PYTORCH_FLASH" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">CausalSelfAttention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_head_q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_kv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_impl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>Causal Self Attention class.</p>
+<p>Initializes the CausalSelfAttention object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>n_head_q (int): Number of attention heads for queries.
+n_head_kv (int): Number of attention heads for keys and values.
+n_embd (int): Size of the embedding dimension.
+attention_config (AttentionConfig): The attention configuration.
+attention_impl (AttentionImplementation): The attention implementation.
+bias (bool): Whether to include bias in linear layers.
+dropout (float): Dropout rate.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_head_q</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>attention_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig"><em>AttentionConfig</em></a>)</p></li>
+<li><p><strong>attention_impl</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><em>AttentionImplementation</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_attention">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">execute_attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_impl</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention.execute_attention"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_attention" title="Link to this definition"></a></dt>
+<dd><p>Executes attention mechanism based on the specified implementation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>attention_impl</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><em>AttentionImplementation</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>cls (object): The class object.
+q (torch.Tensor): The query tensor.
+k (torch.Tensor): The key tensor.
+v (torch.Tensor): The value tensor.
+dropout (float): The dropout rate.
+attention_impl (AttentionImplementation): The attention implementation to use.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: The output tensor.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: If the specified attention implementation is not supported.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_qkv_transforms">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">execute_qkv_transforms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qkv_transforms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_q</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention.execute_qkv_transforms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_qkv_transforms" title="Link to this definition"></a></dt>
+<dd><p>Applies a series of transformations to the query, key, and value tensors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>qkv_transforms</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.ModuleList.html#torch.nn.ModuleList" title="(in PyTorch v2.10)"><em>ModuleList</em></a>)</p></li>
+<li><p><strong>n_head_q</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>q (torch.Tensor): The query tensors.
+k (torch.Tensor): The key tensors
+v (torch.Tensor): The value tensors.
+qkv_transforms (nn.ModuleList): A list of transformation modules to be applied to q, k, and v.
+n_head_q (int): The number of heads for the query tensors.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+A tuple containing the transformed query, key, and value tensors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the CausalSelfAttention module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): Input tensor of shape (B, T, n_embd)</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Output tensor of shape (B, T, n_embd), representing the output projection.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention.projection">
+<span class="sig-name descname"><span class="pre">projection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention.projection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention.projection" title="Link to this definition"></a></dt>
+<dd><p>Applies projections to the input tensor to get queries, keys, and values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): The input tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the query, key, and value tensors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.CausalSelfAttention.repeat_kv_heads">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">repeat_kv_heads</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#CausalSelfAttention.repeat_kv_heads"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.CausalSelfAttention.repeat_kv_heads" title="Link to this definition"></a></dt>
+<dd><p>Repeats the key-value (k, v) heads if the number of query (q) heads is different.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>cls (class): The class object.
+q (torch.Tensor): The query tensor of shape (B, nh_q, T, hs).
+k (torch.Tensor): The key tensor of shape (B, nh_kv, T, hs).
+v (torch.Tensor): The value tensor of shape (B, nh_kv, T, hs).</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple: A tuple containing the repeated key tensor (k) and the repeated value tensor (v).</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2Block">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">GPT2Block</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_kv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_impl</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_hidden</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_norm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_norm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enforce_swiglu_hidden_dim_multiple_of</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2Block"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2Block" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>GPT2Block class.</p>
+<p>Initializes the GPT2Block.</p>
+<dl>
+<dt>Args:</dt><dd><p>n_embd (int): The embedding dimension.
+bias (bool): Whether to include bias in the model.
+n_head_q (int): The number of attention heads for queries.
+n_head_kv (int): The number of attention heads for keys and values.
+activation_type (ActivationType): The type of activation function to use.
+attention_impl (AttentionImplementation): The implementation of attention mechanism.
+attention_config (AttentionConfig): The configuration for attention mechanism.
+dropout (float): The dropout rate.
+ffn_hidden (int): The size of the hidden layer in the feed-forward network.
+attention_norm (nn.Module): The normalization layer for attention.
+ffn_norm (nn.Module): The normalization layer for feed-forward network.
+enforce_swiglu_hidden_dim_multiple_of (int): Enforces the</p>
+<blockquote>
+<div><p>hidden dimension in the SwiGLU layer to be a multiple of this value. Note that this
+is only relevant if the activation_type is SwiGLU. Defaults to None.</p>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>n_head_q</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>activation_type</strong> (<a class="reference internal" href="modalities.models.html#modalities.models.model.ActivationType" title="modalities.models.model.ActivationType"><em>ActivationType</em></a>)</p></li>
+<li><p><strong>attention_impl</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><em>AttentionImplementation</em></a>)</p></li>
+<li><p><strong>attention_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig"><em>AttentionConfig</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>ffn_hidden</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>attention_norm</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>ffn_norm</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>enforce_swiglu_hidden_dim_multiple_of</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2Block.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2Block.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2Block.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the GPT2Block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): Input tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Output tensor.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLM">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">GPT2LLM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prediction_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">poe_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vocab_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head_kv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_hidden</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_implementation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_norm_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_norm_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lm_head_norm_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_weight_tying</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enforce_swiglu_hidden_dim_multiple_of</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLM" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modalities.models.html#modalities.models.model.NNModel" title="modalities.models.model.NNModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">NNModel</span></code></a></p>
+<p>GPT2LLM class.</p>
+<p>Initializes the GPT2LLM object.</p>
+<dl>
+<dt>Args:</dt><dd><p>sample_key (str): The sample key.
+prediction_key (str): The prediction key.
+poe_type (PositionTypes): The position type.
+sequence_length (int): The sequence length.
+vocab_size (int): The vocabulary size.
+n_layer (int): The number of layers.
+n_head_q (int): The number of query heads.
+n_head_kv (int): The number of key-value heads.
+n_embd (int): The embedding dimension.
+ffn_hidden (int): The hidden dimension of the feed-forward network.
+dropout (float): The dropout rate.
+bias (bool): Whether to include bias in linear layers.
+activation_type (ActivationType): The activation type.
+attention_implementation (AttentionImplementation): The attention implementation.
+attention_config (AttentionConfig): The attention configuration.
+attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
+ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
+lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
+seed (int, optional): The random seed. Defaults to None.
+use_weight_tying (bool): Whether to use weight tying.
+enforce_swiglu_hidden_dim_multiple_of (int): Enforces</p>
+<blockquote>
+<div><p>the hidden dimension in the SwiGLU layer to be a multiple of this value.
+Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.</p>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>prediction_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>poe_type</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.PositionTypes" title="modalities.models.gpt2.gpt2_model.PositionTypes"><em>PositionTypes</em></a>)</p></li>
+<li><p><strong>sequence_length</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>vocab_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head_q</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>ffn_hidden</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>activation_type</strong> (<a class="reference internal" href="modalities.models.html#modalities.models.model.ActivationType" title="modalities.models.model.ActivationType"><em>ActivationType</em></a>)</p></li>
+<li><p><strong>attention_implementation</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><em>AttentionImplementation</em></a>)</p></li>
+<li><p><strong>attention_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig"><em>AttentionConfig</em></a>)</p></li>
+<li><p><strong>attention_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>ffn_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>lm_head_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>use_weight_tying</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>enforce_swiglu_hidden_dim_multiple_of</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLM.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLM.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLM.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the GPT2LLM module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>] | <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>inputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em>] </em><em>| </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, torch.Tensor] | torch.Tensor: Model output.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLM.forward_impl">
+<span class="sig-name descname"><span class="pre">forward_impl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLM.forward_impl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLM.forward_impl" title="Link to this definition"></a></dt>
+<dd><p>Forward pass implementation of the GPT2LLM module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>inputs</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>inputs (torch.Tensor): A tensor containing input token ids.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: A tensor containing output logits.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">GPT2LLMConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLMConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Configuration class for GPT2LLM model.</p>
+<dl>
+<dt>Args:</dt><dd><p>sample_key (str): The key for the samples.
+prediction_key (str): The key for the predictions.
+use_meta_device (bool, optional): Whether to use meta device. Defaults to False.
+poe_type (PositionTypes): The type of position encoding.
+sequence_length (int): The length of the sequence.
+vocab_size (int): The size of the vocabulary.
+n_layer (int): The number of layers.
+n_head_q (int): The number of attention heads for queries.
+n_head_kv (int): The number of attention heads for keys and values.
+n_embd (int): The embedding size.
+ffn_hidden (int): The hidden size of the feed-forward network.
+dropout (float): The dropout rate.
+bias (bool): Whether to use bias in Linears.
+attention_config (AttentionConfig): The attention configuration.
+attention_implementation (AttentionImplementation): The attention implementation.
+activation_type (ActivationType): The activation type.
+attention_norm_config (LayerNormWrapperConfig): Config for normalization of the attention.
+ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
+lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
+use_weight_tying (bool): Whether to use weight tying.
+seed: Optional[int] = None: The random seed for reproducibility.
+enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension</p>
+<blockquote>
+<div><p>in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
+activation_type is SwiGLU. Defaults to 256.</p>
+</div></blockquote>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>prediction_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>use_meta_device</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>poe_type</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.PositionTypes" title="modalities.models.gpt2.gpt2_model.PositionTypes"><em>PositionTypes</em></a>)</p></li>
+<li><p><strong>sequence_length</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>vocab_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>n_layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>n_head_q</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>n_head_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>ffn_hidden</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=0.0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>attention_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig"><em>AttentionConfig</em></a>)</p></li>
+<li><p><strong>attention_implementation</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><em>AttentionImplementation</em></a>)</p></li>
+<li><p><strong>activation_type</strong> (<a class="reference internal" href="modalities.models.html#modalities.models.model.ActivationType" title="modalities.models.model.ActivationType"><em>ActivationType</em></a>)</p></li>
+<li><p><strong>attention_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>ffn_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>lm_head_norm_config</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><em>LayerNormWrapperConfig</em></a>)</p></li>
+<li><p><strong>use_weight_tying</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>enforce_swiglu_hidden_dim_multiple_of</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.activation_type">
+<span class="sig-name descname"><span class="pre">activation_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modalities.models.html#modalities.models.model.ActivationType" title="modalities.models.model.ActivationType"><span class="pre">ActivationType</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.activation_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_config">
+<span class="sig-name descname"><span class="pre">attention_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionConfig" title="modalities.models.gpt2.gpt2_model.AttentionConfig"><span class="pre">AttentionConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_implementation">
+<span class="sig-name descname"><span class="pre">attention_implementation</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.AttentionImplementation" title="modalities.models.gpt2.gpt2_model.AttentionImplementation"><span class="pre">AttentionImplementation</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_implementation" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_norm_config">
+<span class="sig-name descname"><span class="pre">attention_norm_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><span class="pre">LayerNormWrapperConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_norm_config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.bias">
+<span class="sig-name descname"><span class="pre">bias</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.bias" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.check_divisibility">
+<span class="sig-name descname"><span class="pre">check_divisibility</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLMConfig.check_divisibility"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.check_divisibility" title="Link to this definition"></a></dt>
+<dd><p>Check if the value of n_head_q is divisible by n_head_kv.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig" title="modalities.models.gpt2.gpt2_model.GPT2LLMConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2LLMConfig</span></code></a></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Raises:</dt><dd><p>ValueError: If n_head_q is not divisible by n_head_kv.</p>
+</dd>
+<dt>Returns:</dt><dd><p>GPT2LLMConfig: The current instance of GPT2LLMConfig.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.dropout">
+<span class="sig-name descname"><span class="pre">dropout</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="pre">0.0</span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.dropout" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.enforce_swiglu_hidden_dim_multiple_of">
+<span class="sig-name descname"><span class="pre">enforce_swiglu_hidden_dim_multiple_of</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.enforce_swiglu_hidden_dim_multiple_of" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_hidden">
+<span class="sig-name descname"><span class="pre">ffn_hidden</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_hidden" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_norm_config">
+<span class="sig-name descname"><span class="pre">ffn_norm_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><span class="pre">LayerNormWrapperConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_norm_config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.lm_head_norm_config">
+<span class="sig-name descname"><span class="pre">lm_head_norm_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><span class="pre">LayerNormWrapperConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.lm_head_norm_config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_embd">
+<span class="sig-name descname"><span class="pre">n_embd</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_embd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_kv">
+<span class="sig-name descname"><span class="pre">n_head_kv</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_kv" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_q">
+<span class="sig-name descname"><span class="pre">n_head_q</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_q" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_layer">
+<span class="sig-name descname"><span class="pre">n_layer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_layer" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.poe_type">
+<span class="sig-name descname"><span class="pre">poe_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.PositionTypes" title="modalities.models.gpt2.gpt2_model.PositionTypes"><span class="pre">PositionTypes</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.poe_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.prediction_key">
+<span class="sig-name descname"><span class="pre">prediction_key</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.prediction_key" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sample_key">
+<span class="sig-name descname"><span class="pre">sample_key</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sample_key" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.seed">
+<span class="sig-name descname"><span class="pre">seed</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.seed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sequence_length">
+<span class="sig-name descname"><span class="pre">sequence_length</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sequence_length" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_meta_device">
+<span class="sig-name descname"><span class="pre">use_meta_device</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_meta_device" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_weight_tying">
+<span class="sig-name descname"><span class="pre">use_weight_tying</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_weight_tying" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.validate_sizes">
+<span class="sig-name descname"><span class="pre">validate_sizes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#GPT2LLMConfig.validate_sizes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.validate_sizes" title="Link to this definition"></a></dt>
+<dd><p>Validates the sizes of the GPT2 model parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig" title="modalities.models.gpt2.gpt2_model.GPT2LLMConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">GPT2LLMConfig</span></code></a></span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>GPT2LLMConfig: The current instance of GPT2LLMConfig object.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If any of the parameters (ffn_hidden, vocab_size, n_embd) is not divisible by 128.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.GPT2LLMConfig.vocab_size">
+<span class="sig-name descname"><span class="pre">vocab_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.vocab_size" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.IdentityTransform">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">IdentityTransform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#IdentityTransform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.IdentityTransform" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform" title="modalities.models.gpt2.gpt2_model.QueryKeyValueTransform"><code class="xref py py-class docutils literal notranslate"><span class="pre">QueryKeyValueTransform</span></code></a></p>
+<p>IdentityTransform class which does not apply any transform.</p>
+<p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.IdentityTransform.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#IdentityTransform.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.IdentityTransform.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the IdentityTransform which does not apply any transform.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>q (torch.Tensor): The query tensor.
+k (torch.Tensor): The key tensor.
+v (torch.Tensor): The value tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The tensors q, k, and v.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">LayerNormWrapperConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#LayerNormWrapperConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>norm_type</strong> (<a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNorms" title="modalities.models.gpt2.gpt2_model.LayerNorms"><em>LayerNorms</em></a>)</p></li>
+<li><p><strong>config</strong> (<a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig" title="modalities.models.components.layer_norms.PytorchRMSLayerNormConfig"><em>PytorchRMSLayerNormConfig</em></a><em> | </em><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig" title="modalities.models.components.layer_norms.RMSLayerNormConfig"><em>RMSLayerNormConfig</em></a><em> | </em><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig" title="modalities.models.components.layer_norms.LayerNormConfig"><em>LayerNormConfig</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.config">
+<span class="sig-name descname"><span class="pre">config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig" title="modalities.models.components.layer_norms.PytorchRMSLayerNormConfig"><span class="pre">PytorchRMSLayerNormConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig" title="modalities.models.components.layer_norms.RMSLayerNormConfig"><span class="pre">RMSLayerNormConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig" title="modalities.models.components.layer_norms.LayerNormConfig"><span class="pre">LayerNormConfig</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.config" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.norm_type">
+<span class="sig-name descname"><span class="pre">norm_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.models.gpt2.gpt2_model.LayerNorms" title="modalities.models.gpt2.gpt2_model.LayerNorms"><span class="pre">LayerNorms</span></a></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.norm_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.LayerNorms">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">LayerNorms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#LayerNorms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.LayerNorms" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modalities.config.html#modalities.config.lookup_enum.LookupEnum" title="modalities.config.lookup_enum.LookupEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">LookupEnum</span></code></a></p>
+<p>Enum lookup class for LayerNorms.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>RMSNorm: RMSLayerNorm class.
+LayerNorm: nn.LayerNorm class.
+PyTorchRMSNorm: nn.RMSNorm class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.PositionTypes">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">PositionTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#PositionTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.PositionTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Enum class representing different position types.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>ABSOLUTE (str): Represents the absolute position type.
+NOPE (str): Represents the nope (no postional emebddigns) position type.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.PositionTypes.ABSOLUTE">
+<span class="sig-name descname"><span class="pre">ABSOLUTE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ABSOLUTE'</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.PositionTypes.ABSOLUTE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.PositionTypes.NOPE">
+<span class="sig-name descname"><span class="pre">NOPE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'NOPE'</span></span><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.PositionTypes.NOPE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.QueryKeyValueTransform">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">QueryKeyValueTransform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#QueryKeyValueTransform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>Query Key Value Transform base class.</p>
+<p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.QueryKeyValueTransform.forward">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#QueryKeyValueTransform.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform.forward" title="Link to this definition"></a></dt>
+<dd><p>Perform forward pass for transforming queries/keys/values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>q (torch.Tensor): The query tensor.
+k (torch.Tensor): The key tensor.
+v (torch.Tensor): The value tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing the output tensors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">QueryKeyValueTransformType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#QueryKeyValueTransformType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Enum class representing different types of query-key-value transform.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>IdentityTransform: Represents the identity transform.
+RotaryTransform: Represents the rotary transform.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.RotaryTransform">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">RotaryTransform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seq_length_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#RotaryTransform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.RotaryTransform" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform" title="modalities.models.gpt2.gpt2_model.QueryKeyValueTransform"><code class="xref py py-class docutils literal notranslate"><span class="pre">QueryKeyValueTransform</span></code></a></p>
+<p>RotaryTransform class which implements rotary positional embeddings.</p>
+<dl class="simple">
+<dt>Source: <a class="reference external" href="https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py">https://github.com/facebookresearch/xformers/blob/main/xformers/components/positional_embedding/rotary.py</a></dt><dd><p>We added the corresponding code here, becauase there is a conflict with “&#64;torch.jit.script” used in the
+XFormers implementation and removed in this implementation.#</p>
+</dd>
+</dl>
+<p>Initializes the RotaryTransform object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>n_embd (int): The size of the embedding dimension.
+n_head (int): The number of attention heads.
+seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
+base_freq (int): Base frequency for RoPE. Defaults to 10000.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>seq_length_dim</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>base_freq</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.RotaryTransform.apply_rotary_pos_emb">
+<span class="sig-name descname"><span class="pre">apply_rotary_pos_emb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sin</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#RotaryTransform.apply_rotary_pos_emb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.RotaryTransform.apply_rotary_pos_emb" title="Link to this definition"></a></dt>
+<dd><p>Applies rotary positional embedding to the input tensor.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): Input tensor.
+cos (torch.Tensor): Cosine values for rotary positional embedding.
+sin (torch.Tensor): Sine values for rotary positional embedding.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Tensor after applying rotary positional embedding.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.RotaryTransform.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#RotaryTransform.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.RotaryTransform.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the RotaryTransform module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>q</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>v</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>q (torch.Tensor): Query tensor.
+k (torch.Tensor): Key tensor.
+v (torch.Tensor): Value tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+Tuple containing the modified query tensor, key tensor, and value tensor.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.RotaryTransform.reset_parameters">
+<span class="sig-name descname"><span class="pre">reset_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#RotaryTransform.reset_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.RotaryTransform.reset_parameters" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.RotaryTransform.rotate_half">
+<span class="sig-name descname"><span class="pre">rotate_half</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#RotaryTransform.rotate_half"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.RotaryTransform.rotate_half" title="Link to this definition"></a></dt>
+<dd><p>Rearrange tensor elements.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): The input tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: The output tensor.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.TransformerMLP">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">TransformerMLP</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_hidden</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#TransformerMLP"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.TransformerMLP" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>TransformerMLP class.</p>
+<p>Initializes the TransformerMLP class.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>n_embd (int): The size of the input embedding.
+ffn_hidden (int): The size of the hidden layer in the feed-forward network.
+bias (bool): Whether to include bias terms in the linear layers.
+dropout (float): The dropout probability.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>ffn_hidden</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.TransformerMLP.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#TransformerMLP.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.TransformerMLP.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the TransformerMLP module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): Input tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Output tensor.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.models.gpt2.gpt2_model.manual_scaled_dot_product_attention">
+<span class="sig-prename descclassname"><span class="pre">modalities.models.gpt2.gpt2_model.</span></span><span class="sig-name descname"><span class="pre">manual_scaled_dot_product_attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attn_mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_causal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/gpt2/gpt2_model.html#manual_scaled_dot_product_attention"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.gpt2.gpt2_model.manual_scaled_dot_product_attention" title="Link to this definition"></a></dt>
+<dd><p>Compute scaled dot product attention.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><p>query (torch.Tensor): The query tensor of shape (batch_size, num_queries, query_dim).
+key (torch.Tensor): The key tensor of shape (batch_size, num_keys, key_dim).
+value (torch.Tensor): The value tensor of shape (batch_size, num_values, value_dim).
+attn_mask (torch.Tensor, optional): The attention mask tensor of shape (num_queries, num_keys).</p>
+<blockquote>
+<div><p>Defaults to None.</p>
+</div></blockquote>
+<p>dropout_p (float, optional): The dropout probability. Defaults to 0.0.
+is_causal (bool, optional): Whether the attention is causal or not. Defaults to False.
+scale (float, optional): The scaling factor. Defaults to None.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: The attention weights tensor of shape (batch_size, num_queries, num_keys).</p>
+</dd>
+<dt>Note:</dt><dd><p>Taken from <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.models.gpt2">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.models.gpt2" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.models.components.html" class="btn btn-neutral float-left" title="modalities.models.components package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.models.huggingface.html" class="btn btn-neutral float-right" title="modalities.models.huggingface package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

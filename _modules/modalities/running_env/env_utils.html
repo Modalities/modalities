@@ -1,0 +1,231 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.running_env.env_utils &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.running_env.env_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.running_env.env_utils</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.cuda.nccl</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nccl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+
+<span class="c1"># TODO find a solution for github actions</span>
+<span class="c1"># to install this as a dependency</span>
+<span class="c1"># from pkg_resources import packaging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedPrecision</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.lookup_enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">LookupEnum</span>
+
+
+<div class="viewcode-block" id="is_running_with_torchrun">
+<a class="viewcode-back" href="../../../api/modalities.running_env.html#modalities.running_env.env_utils.is_running_with_torchrun">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_running_with_torchrun</span><span class="p">():</span>
+    <span class="c1"># Check for one of the environment variables set by torchrun</span>
+    <span class="k">return</span> <span class="s2">&quot;LOCAL_RANK&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span></div>
+
+
+
+<div class="viewcode-block" id="has_bfloat_support">
+<a class="viewcode-back" href="../../../api/modalities.running_env.html#modalities.running_env.env_utils.has_bfloat_support">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">has_bfloat_support</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">version</span><span class="o">.</span><span class="n">cuda</span>
+        <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+        <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_bf16_supported</span><span class="p">()</span>
+        <span class="c1"># TODO find a solution for github actions</span>
+        <span class="c1"># to install this as a dependency</span>
+        <span class="c1"># and packaging.version.parse(torch.version.cuda).release &gt;= (11, 0)</span>
+        <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_nccl_available</span><span class="p">()</span>
+        <span class="ow">and</span> <span class="n">nccl</span><span class="o">.</span><span class="n">version</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="c1"># requires grad scaler in main loop</span>
+<span class="n">fpSixteen</span> <span class="o">=</span> <span class="n">MixedPrecision</span><span class="p">(</span>
+    <span class="n">param_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+    <span class="c1"># Gradient communication precision.</span>
+    <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+    <span class="c1"># Buffer precision.</span>
+    <span class="n">buffer_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">bfSixteen</span> <span class="o">=</span> <span class="n">MixedPrecision</span><span class="p">(</span>
+    <span class="n">param_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+    <span class="c1"># Gradient communication precision.</span>
+    <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+    <span class="c1"># Buffer precision.</span>
+    <span class="n">buffer_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">bfSixteen_working</span> <span class="o">=</span> <span class="n">MixedPrecision</span><span class="p">(</span>
+    <span class="n">param_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+    <span class="n">buffer_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">megatron_strategy</span> <span class="o">=</span> <span class="n">MixedPrecision</span><span class="p">(</span>
+    <span class="n">param_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+    <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="c1"># buffer_dtype=torch.bfloat16,</span>
+<span class="p">)</span>
+
+<span class="n">fpThirtytwo</span> <span class="o">=</span> <span class="n">MixedPrecision</span><span class="p">(</span>
+    <span class="n">param_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="n">reduce_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="n">buffer_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">no_mixed_precision</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="MixedPrecisionSettings">
+<a class="viewcode-back" href="../../../api/modalities.running_env.html#modalities.running_env.env_utils.MixedPrecisionSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MixedPrecisionSettings</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">FP_16</span> <span class="o">=</span> <span class="n">fpSixteen</span>
+    <span class="n">BF_16</span> <span class="o">=</span> <span class="n">bfSixteen</span>
+    <span class="n">BF_16_WORKING</span> <span class="o">=</span> <span class="n">bfSixteen_working</span>
+    <span class="n">FP_32</span> <span class="o">=</span> <span class="n">fpThirtytwo</span>
+    <span class="n">MIXED_PRECISION_MEGATRON</span> <span class="o">=</span> <span class="n">megatron_strategy</span>
+    <span class="n">NO_MIXED_PRECISION</span> <span class="o">=</span> <span class="n">no_mixed_precision</span></div>
+
+
+
+<div class="viewcode-block" id="PyTorchDtypes">
+<a class="viewcode-back" href="../../../api/modalities.running_env.html#modalities.running_env.env_utils.PyTorchDtypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyTorchDtypes</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+    <span class="n">FP_16</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float16</span>
+    <span class="n">FP_32</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+    <span class="n">BF_16</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span></div>
+
+
+
+<div class="viewcode-block" id="FSDP2MixedPrecisionSettings">
+<a class="viewcode-back" href="../../../api/modalities.running_env.html#modalities.running_env.env_utils.FSDP2MixedPrecisionSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP2MixedPrecisionSettings</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">param_dtype</span><span class="p">:</span> <span class="n">PyTorchDtypes</span>
+    <span class="n">reduce_dtype</span><span class="p">:</span> <span class="n">PyTorchDtypes</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

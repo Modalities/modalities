@@ -1,0 +1,306 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.loss_functions &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.loss_functions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.loss_functions</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">overload</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">CrossEntropyLoss</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.batch</span><span class="w"> </span><span class="kn">import</span> <span class="n">InferenceResultBatch</span>
+
+
+<div class="viewcode-block" id="Loss">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.loss_functions.Loss">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Loss</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tag</span> <span class="o">=</span> <span class="n">tag</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tag</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tag</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">forward_batch</span><span class="p">:</span> <span class="n">InferenceResultBatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates the loss</span>
+<span class="sd">        :return: Loss tensor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+
+<div class="viewcode-block" id="CLMCrossEntropyLoss">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.loss_functions.CLMCrossEntropyLoss">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CLMCrossEntropyLoss</span><span class="p">(</span><span class="n">Loss</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prediction_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;CLMCrossEntropyLoss&quot;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_key</span> <span class="o">=</span> <span class="n">target_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span> <span class="o">=</span> <span class="n">prediction_key</span>
+        <span class="c1"># Mean over the tokens in the local-batch (batch per rank)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loss_fun</span> <span class="o">=</span> <span class="n">CrossEntropyLoss</span><span class="p">(</span><span class="n">reduction</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">)</span>
+
+    <span class="nd">@overload</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">forward_batch</span><span class="p">:</span> <span class="n">InferenceResultBatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="o">...</span>
+
+    <span class="nd">@overload</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">outputs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">labels</span><span class="p">,</span> <span class="n">lm_logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_arguments</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># move labels to correct device to enable model parallelism</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="n">labels</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">lm_logits</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">shift_logits</span> <span class="o">=</span> <span class="n">lm_logits</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">shift_labels</span> <span class="o">=</span> <span class="n">labels</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="c1"># Flatten the tokens. We compute here, the loss per token.</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_fun</span><span class="p">(</span><span class="n">shift_logits</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">shift_logits</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)),</span> <span class="n">shift_labels</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">loss</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_arguments</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">args</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">InferenceResultBatch</span><span class="p">],</span>
+        <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">InferenceResultBatch</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">InferenceResultBatch</span><span class="p">):</span>
+            <span class="n">forward_batch</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_targets</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_key</span><span class="p">)</span>
+            <span class="n">lm_logits</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_predictions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;forward_batch&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;forward_batch&quot;</span><span class="p">],</span> <span class="n">InferenceResultBatch</span><span class="p">):</span>
+            <span class="n">forward_batch</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;forward_batch&quot;</span><span class="p">]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_targets</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_key</span><span class="p">)</span>
+            <span class="n">lm_logits</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_predictions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
+            <span class="n">lm_logits</span><span class="p">,</span> <span class="n">labels</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="s2">&quot;outputs&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="ow">and</span> <span class="s2">&quot;targets&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outputs&quot;</span><span class="p">],</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;targets&quot;</span><span class="p">],</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">lm_logits</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outputs&quot;</span><span class="p">]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;targets&quot;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="ow">and</span> <span class="s2">&quot;targets&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;targets&quot;</span><span class="p">],</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">lm_logits</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;targets&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Invalid arguments for CLMCrossEntropyLoss.__call__&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">labels</span><span class="p">,</span> <span class="n">lm_logits</span></div>
+
+
+
+<div class="viewcode-block" id="nce_loss">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.loss_functions.nce_loss">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">nce_loss</span><span class="p">(</span>
+    <span class="n">embedding1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">embedding2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">is_asymmetric</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This implementation calculates the noise contrastive estimation loss between embeddings of two different modalities</span>
+<span class="sd">    Implementation slightly adapted from https://arxiv.org/pdf/1912.06430.pdf, https://github.com/antoine77340/MIL-NCE_HowTo100M</span>
+<span class="sd">    changes include adding a temperature value and the choice of calculating asymmetric loss w.r.t. one modality</span>
+<span class="sd">    This implementation is adapted to contrastive loss from CoCa model https://arxiv.org/pdf/2205.01917.pdf</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        embedding1 (torch.Tensor): embeddings from modality 1 of size batch_size x embed_dim.</span>
+<span class="sd">        embedding2 (torch.Tensor): embeddings from modality 2 of size batch_size x embed_dim.</span>
+<span class="sd">        device (torch.device): torch device for calculating loss.</span>
+<span class="sd">        is_asymmetric (bool): boolean value to specify if the loss is calculated in one direction or both directions.</span>
+<span class="sd">        temperature (float): temperature value for regulating loss.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">            torch.Tensor: loss tensor.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># calculating the similarity matrix of size (batch_size x batch_size)</span>
+    <span class="n">sim_matrix</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">embedding1</span><span class="p">,</span> <span class="n">embedding2</span><span class="o">.</span><span class="n">t</span><span class="p">())</span> <span class="o">/</span> <span class="n">temperature</span>
+    <span class="c1"># numerator of loss: using similarity scores for all positive pairs (e.g., image and its caption)</span>
+    <span class="n">numerator</span> <span class="o">=</span> <span class="n">sim_matrix</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sim_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">numerator</span> <span class="o">=</span> <span class="n">numerator</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">sim_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">numerator</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">numerator</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">is_asymmetric</span><span class="p">:</span>
+        <span class="c1"># denominator of loss: using all similarity scores for all pairs (positive and negative)</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">sim_matrix</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># calculate bidirectional loss</span>
+        <span class="n">numerator</span> <span class="o">*=</span> <span class="mi">2</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">sim_matrix</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">sim_matrix</span><span class="o">.</span><span class="n">t</span><span class="p">(),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">denominator</span> <span class="o">-</span> <span class="n">numerator</span><span class="p">)</span>  <span class="c1"># calculated in log space</span></div>
+
+
+
+<div class="viewcode-block" id="NCELoss">
+<a class="viewcode-back" href="../../api/modalities.html#modalities.loss_functions.NCELoss">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NCELoss</span><span class="p">(</span><span class="n">Loss</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">prediction_key1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">prediction_key2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">is_asymmetric</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;NCELoss&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Noise Contrastive Estimation Loss</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            prediction_key1 (str): key to access embedding 1.</span>
+<span class="sd">            prediction_key2 (str): key to access embedding 2.</span>
+<span class="sd">            is_asymmetric (bool, optional): specifies symmetric or asymmetric calculation of NCEloss. Defaults to True.</span>
+<span class="sd">            temperature (float, optional): temperature. Defaults to 1.0.</span>
+<span class="sd">            tag (str, optional): Defaults to &quot;NCELoss&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_key1</span> <span class="o">=</span> <span class="n">prediction_key1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prediction_key2</span> <span class="o">=</span> <span class="n">prediction_key2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_asymmetric</span> <span class="o">=</span> <span class="n">is_asymmetric</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span> <span class="o">=</span> <span class="n">temperature</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">forward_batch</span><span class="p">:</span> <span class="n">InferenceResultBatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            forward_batch (InferenceResultBatch): data batch.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: loss tensor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">embedding1</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_predictions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key1</span><span class="p">)</span>
+        <span class="n">embedding2</span> <span class="o">=</span> <span class="n">forward_batch</span><span class="o">.</span><span class="n">get_predictions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prediction_key2</span><span class="p">)</span>
+
+        <span class="n">contiguous_embedding1</span> <span class="o">=</span> <span class="n">embedding1</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">contiguous_embedding2</span> <span class="o">=</span> <span class="n">embedding2</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">nce_loss</span><span class="p">(</span>
+            <span class="n">contiguous_embedding1</span><span class="p">,</span> <span class="n">contiguous_embedding2</span><span class="p">,</span> <span class="n">embedding1</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_asymmetric</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">loss</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

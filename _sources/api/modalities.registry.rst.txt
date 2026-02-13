@@ -1,0 +1,29 @@
+modalities.registry package
+===========================
+
+Submodules
+----------
+
+modalities.registry.components module
+-------------------------------------
+
+.. automodule:: modalities.registry.components
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.registry.registry module
+-----------------------------------
+
+.. automodule:: modalities.registry.registry
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.registry
+   :members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,0 +1,408 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.nn package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.nn.model_initialization package" href="modalities.nn.model_initialization.html" />
+    <link rel="prev" title="modalities.models.vision_transformer package" href="modalities.models.vision_transformer.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+      <li class="breadcrumb-item active">modalities.nn package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.nn.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-nn-package">
+<h1>modalities.nn package<a class="headerlink" href="#modalities-nn-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.nn.model_initialization.html">modalities.nn.model_initialization package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities-nn-model-initialization-composed-initialization-module">modalities.nn.model_initialization.composed_initialization module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#module-modalities.nn.model_initialization.initialization_if">modalities.nn.model_initialization.initialization_if module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_if.ModelInitializationIF"><code class="docutils literal notranslate"><span class="pre">ModelInitializationIF</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_if.ModelInitializationIF.initialize_in_place"><code class="docutils literal notranslate"><span class="pre">ModelInitializationIF.initialize_in_place()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#module-modalities.nn.model_initialization.initialization_routines">modalities.nn.model_initialization.initialization_routines module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.InitializationRoutines"><code class="docutils literal notranslate"><span class="pre">InitializationRoutines</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.InitializationRoutines.get_plain_initialization"><code class="docutils literal notranslate"><span class="pre">InitializationRoutines.get_plain_initialization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.InitializationRoutines.get_scaled_embed_initialization"><code class="docutils literal notranslate"><span class="pre">InitializationRoutines.get_scaled_embed_initialization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.InitializationRoutines.get_scaled_initialization"><code class="docutils literal notranslate"><span class="pre">InitializationRoutines.get_scaled_initialization()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.NamedParameterwiseNormalInitialization"><code class="docutils literal notranslate"><span class="pre">NamedParameterwiseNormalInitialization</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.NamedParameterwiseNormalInitialization.initialize_in_place"><code class="docutils literal notranslate"><span class="pre">NamedParameterwiseNormalInitialization.initialize_in_place()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.check_std_and_hidden_dim"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.check_std_and_hidden_dim()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.hidden_dim"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.hidden_dim</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.mean"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.mean</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.model_config"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.parameter_name_regexes"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.parameter_name_regexes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.PlainInitializationConfig.std"><code class="docutils literal notranslate"><span class="pre">PlainInitializationConfig.std</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledEmbedInitializationConfig"><code class="docutils literal notranslate"><span class="pre">ScaledEmbedInitializationConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledEmbedInitializationConfig.mean"><code class="docutils literal notranslate"><span class="pre">ScaledEmbedInitializationConfig.mean</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledEmbedInitializationConfig.model_config"><code class="docutils literal notranslate"><span class="pre">ScaledEmbedInitializationConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledEmbedInitializationConfig.parameter_name_regexes"><code class="docutils literal notranslate"><span class="pre">ScaledEmbedInitializationConfig.parameter_name_regexes</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig.mean"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig.mean</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig.model_config"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig.num_layers"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig.num_layers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig.parameter_name_regexes"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig.parameter_name_regexes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.initialization_routines.ScaledInitializationConfig.std"><code class="docutils literal notranslate"><span class="pre">ScaledInitializationConfig.std</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#module-modalities.nn.model_initialization.parameter_name_filters">modalities.nn.model_initialization.parameter_name_filters module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.RegexFilter"><code class="docutils literal notranslate"><span class="pre">RegexFilter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.RegexFilter.biases"><code class="docutils literal notranslate"><span class="pre">RegexFilter.biases</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.RegexFilter.model_config"><code class="docutils literal notranslate"><span class="pre">RegexFilter.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.RegexFilter.weights"><code class="docutils literal notranslate"><span class="pre">RegexFilter.weights</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.SupportWeightInitModels"><code class="docutils literal notranslate"><span class="pre">SupportWeightInitModels</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.SupportWeightInitModels.COCA"><code class="docutils literal notranslate"><span class="pre">SupportWeightInitModels.COCA</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.SupportWeightInitModels.GPT2"><code class="docutils literal notranslate"><span class="pre">SupportWeightInitModels.GPT2</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.WeightInitTypes"><code class="docutils literal notranslate"><span class="pre">WeightInitTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.WeightInitTypes.PLAIN"><code class="docutils literal notranslate"><span class="pre">WeightInitTypes.PLAIN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.WeightInitTypes.SCALED"><code class="docutils literal notranslate"><span class="pre">WeightInitTypes.SCALED</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.WeightInitTypes.SCALED_EMBED"><code class="docutils literal notranslate"><span class="pre">WeightInitTypes.SCALED_EMBED</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.nn.model_initialization.html#module-modalities.nn.model_initialization">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.nn.attention">
+<span id="modalities-nn-attention-module"></span><h2>modalities.nn.attention module<a class="headerlink" href="#module-modalities.nn.attention" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.nn.attention.</span></span><span class="sig-name descname"><span class="pre">AttentionConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/attention.html#AttentionConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.attention.AttentionConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>attention_engine_type</strong> (<a class="reference internal" href="#modalities.nn.attention.AttentionEngineType" title="modalities.nn.attention.AttentionEngineType"><em>AttentionEngineType</em></a>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionConfig.attention_engine_type">
+<span class="sig-name descname"><span class="pre">attention_engine_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.nn.attention.AttentionEngineType" title="modalities.nn.attention.AttentionEngineType"><span class="pre">AttentionEngineType</span></a></span><a class="headerlink" href="#modalities.nn.attention.AttentionConfig.attention_engine_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionEngineType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.nn.attention.</span></span><span class="sig-name descname"><span class="pre">AttentionEngineType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/attention.html#AttentionEngineType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.attention.AttentionEngineType" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionEngineType.DEFAULT_ATTENTION">
+<span class="sig-name descname"><span class="pre">DEFAULT_ATTENTION</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'default_attention'</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionEngineType.DEFAULT_ATTENTION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionEngineType.PYTORCH_FLASH_ATTENTION">
+<span class="sig-name descname"><span class="pre">PYTORCH_FLASH_ATTENTION</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'pytorch_flash_attention'</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionEngineType.PYTORCH_FLASH_ATTENTION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.nn.attention.</span></span><span class="sig-name descname"><span class="pre">AttentionType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/attention.html#AttentionType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.attention.AttentionType" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionType.CAUSAL_SELF_ATTENTION">
+<span class="sig-name descname"><span class="pre">CAUSAL_SELF_ATTENTION</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'causal_self_attention'</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionType.CAUSAL_SELF_ATTENTION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionType.CROSS_ATTENTION">
+<span class="sig-name descname"><span class="pre">CROSS_ATTENTION</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cross_attention'</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionType.CROSS_ATTENTION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.nn.attention.AttentionType.NON_CAUSAL_SELF_ATTENTION">
+<span class="sig-name descname"><span class="pre">NON_CAUSAL_SELF_ATTENTION</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'non_causal_self_attention'</span></span><a class="headerlink" href="#modalities.nn.attention.AttentionType.NON_CAUSAL_SELF_ATTENTION" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.nn.attention.MultiHeadAttention">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.nn.attention.</span></span><span class="sig-name descname"><span class="pre">MultiHeadAttention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attention_config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">AttentionType.CAUSAL_SELF_ATTENTION</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_embd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">768</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1024</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/attention.html#MultiHeadAttention"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.attention.MultiHeadAttention" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>attention_config</strong> (<a class="reference internal" href="#modalities.nn.attention.AttentionConfig" title="modalities.nn.attention.AttentionConfig"><em>AttentionConfig</em></a>)</p></li>
+<li><p><strong>attention_type</strong> (<a class="reference internal" href="#modalities.nn.attention.AttentionType" title="modalities.nn.attention.AttentionType"><em>AttentionType</em></a>)</p></li>
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>n_head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>block_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.nn.attention.MultiHeadAttention.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/attention.html#MultiHeadAttention.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.attention.MultiHeadAttention.forward" title="Link to this definition"></a></dt>
+<dd><p>Define the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>context</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.nn.mlp">
+<span id="modalities-nn-mlp-module"></span><h2>modalities.nn.mlp module<a class="headerlink" href="#module-modalities.nn.mlp" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.nn.mlp.MLP">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.nn.mlp.</span></span><span class="sig-name descname"><span class="pre">MLP</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_features</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;class</span> <span class="pre">'torch.nn.modules.activation.GELU'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/mlp.html#MLP"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.mlp.MLP" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>hidden_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>out_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>act_fn</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a><em>[</em><em>[</em><em>]</em><em>, </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.nn.mlp.MLP.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/nn/mlp.html#MLP.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.nn.mlp.MLP.forward" title="Link to this definition"></a></dt>
+<dd><p>Define the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.nn">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.nn" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.models.vision_transformer.html" class="btn btn-neutral float-left" title="modalities.models.vision_transformer package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.nn.model_initialization.html" class="btn btn-neutral float-right" title="modalities.nn.model_initialization package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,677 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.models.coca package" href="modalities.models.coca.html" />
+    <link rel="prev" title="modalities.logging_broker.subscriber_impl package" href="modalities.logging_broker.subscriber_impl.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+      <li class="breadcrumb-item active">modalities.models package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.models.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-models-package">
+<h1>modalities.models package<a class="headerlink" href="#modalities-models-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.coca.html">modalities.models.coca package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca.attention_pooling">modalities.models.coca.attention_pooling module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.attention_pooling.AttentionPooling"><code class="docutils literal notranslate"><span class="pre">AttentionPooling</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.attention_pooling.AttentionPooling.forward"><code class="docutils literal notranslate"><span class="pre">AttentionPooling.forward()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca.coca_model">modalities.models.coca.coca_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCa"><code class="docutils literal notranslate"><span class="pre">CoCa</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCa.forward"><code class="docutils literal notranslate"><span class="pre">CoCa.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig"><code class="docutils literal notranslate"><span class="pre">CoCaConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.bias_attn_pool"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.bias_attn_pool</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.epsilon_attn_pool"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.epsilon_attn_pool</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.model_config"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.n_pool_head"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.n_pool_head</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.n_vision_queries"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.n_vision_queries</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.prediction_key"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.text_cls_prediction_key"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.text_cls_prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.text_decoder_config"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.text_decoder_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.text_embd_prediction_key"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.text_embd_prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.vision_cls_prediction_key"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.vision_cls_prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.vision_embd_prediction_key"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.vision_embd_prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.CoCaConfig.vision_encoder_config"><code class="docutils literal notranslate"><span class="pre">CoCaConfig.vision_encoder_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.activation"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.activation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.attention_config"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.attention_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.bias"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.bias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.block_size"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.block_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.dropout"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.dropout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.epsilon"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.epsilon</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.ffn_hidden"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.ffn_hidden</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.model_config"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.n_embd"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.n_embd</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.n_head"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.n_head</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.n_layer_multimodal_text"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.n_layer_multimodal_text</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.n_layer_text"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.n_layer_text</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.prediction_key"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.sample_key"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.sample_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.coca_model.TextDecoderConfig.vocab_size"><code class="docutils literal notranslate"><span class="pre">TextDecoderConfig.vocab_size</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca.collator">modalities.models.coca.collator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig.model_config"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig.sample_keys"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig.sample_keys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig.target_keys"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig.target_keys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig.text_sample_key"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig.text_sample_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollateFnConfig.text_target_key"><code class="docutils literal notranslate"><span class="pre">CoCaCollateFnConfig.text_target_key</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollatorFn"><code class="docutils literal notranslate"><span class="pre">CoCaCollatorFn</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.collator.CoCaCollatorFn.device"><code class="docutils literal notranslate"><span class="pre">CoCaCollatorFn.device</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca.multi_modal_decoder">modalities.models.coca.multi_modal_decoder module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.multi_modal_decoder.MultiModalTextDecoder"><code class="docutils literal notranslate"><span class="pre">MultiModalTextDecoder</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.multi_modal_decoder.MultiModalTextDecoder.forward"><code class="docutils literal notranslate"><span class="pre">MultiModalTextDecoder.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.multi_modal_decoder.TransformerBlock"><code class="docutils literal notranslate"><span class="pre">TransformerBlock</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.multi_modal_decoder.TransformerBlock.forward"><code class="docutils literal notranslate"><span class="pre">TransformerBlock.forward()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca.text_decoder">modalities.models.coca.text_decoder module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.text_decoder.TextDecoder"><code class="docutils literal notranslate"><span class="pre">TextDecoder</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.coca.html#modalities.models.coca.text_decoder.TextDecoder.forward"><code class="docutils literal notranslate"><span class="pre">TextDecoder.forward()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.coca.html#module-modalities.models.coca">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.components.html">modalities.models.components package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.components.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.components.html#module-modalities.models.components.layer_norms">modalities.models.components.layer_norms module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig.bias"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig.bias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig.elementwise_affine"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig.elementwise_affine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig.eps"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig.eps</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig.model_config"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.LayerNormConfig.normalized_shape"><code class="docutils literal notranslate"><span class="pre">LayerNormConfig.normalized_shape</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig"><code class="docutils literal notranslate"><span class="pre">PytorchRMSLayerNormConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig.eps"><code class="docutils literal notranslate"><span class="pre">PytorchRMSLayerNormConfig.eps</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig.model_config"><code class="docutils literal notranslate"><span class="pre">PytorchRMSLayerNormConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.PytorchRMSLayerNormConfig.normalized_shape"><code class="docutils literal notranslate"><span class="pre">PytorchRMSLayerNormConfig.normalized_shape</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNorm"><code class="docutils literal notranslate"><span class="pre">RMSLayerNorm</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNorm.forward"><code class="docutils literal notranslate"><span class="pre">RMSLayerNorm.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNorm.reset_parameters"><code class="docutils literal notranslate"><span class="pre">RMSLayerNorm.reset_parameters()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig"><code class="docutils literal notranslate"><span class="pre">RMSLayerNormConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig.bias"><code class="docutils literal notranslate"><span class="pre">RMSLayerNormConfig.bias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig.epsilon"><code class="docutils literal notranslate"><span class="pre">RMSLayerNormConfig.epsilon</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig.model_config"><code class="docutils literal notranslate"><span class="pre">RMSLayerNormConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.components.html#modalities.models.components.layer_norms.RMSLayerNormConfig.ndim"><code class="docutils literal notranslate"><span class="pre">RMSLayerNormConfig.ndim</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.components.html#module-modalities.models.components">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.gpt2.html">modalities.models.gpt2 package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.gpt2.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.gpt2.html#module-modalities.models.gpt2.collator">modalities.models.gpt2.collator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.collator.GPT2LLMCollateFn"><code class="docutils literal notranslate"><span class="pre">GPT2LLMCollateFn</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.gpt2.html#module-modalities.models.gpt2.gpt2_model">modalities.models.gpt2.gpt2_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionConfig"><code class="docutils literal notranslate"><span class="pre">AttentionConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionConfig.QueryKeyValueTransformConfig"><code class="docutils literal notranslate"><span class="pre">AttentionConfig.QueryKeyValueTransformConfig</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionConfig.model_config"><code class="docutils literal notranslate"><span class="pre">AttentionConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionConfig.qk_norm_config"><code class="docutils literal notranslate"><span class="pre">AttentionConfig.qk_norm_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionConfig.qkv_transforms"><code class="docutils literal notranslate"><span class="pre">AttentionConfig.qkv_transforms</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionImplementation"><code class="docutils literal notranslate"><span class="pre">AttentionImplementation</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionImplementation.DAO_FLASH"><code class="docutils literal notranslate"><span class="pre">AttentionImplementation.DAO_FLASH</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionImplementation.MANUAL"><code class="docutils literal notranslate"><span class="pre">AttentionImplementation.MANUAL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.AttentionImplementation.PYTORCH_FLASH"><code class="docutils literal notranslate"><span class="pre">AttentionImplementation.PYTORCH_FLASH</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_attention"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention.execute_attention()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention.execute_qkv_transforms"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention.execute_qkv_transforms()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention.forward"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention.projection"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention.projection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.CausalSelfAttention.repeat_kv_heads"><code class="docutils literal notranslate"><span class="pre">CausalSelfAttention.repeat_kv_heads()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2Block"><code class="docutils literal notranslate"><span class="pre">GPT2Block</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2Block.forward"><code class="docutils literal notranslate"><span class="pre">GPT2Block.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLM"><code class="docutils literal notranslate"><span class="pre">GPT2LLM</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLM.forward"><code class="docutils literal notranslate"><span class="pre">GPT2LLM.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLM.forward_impl"><code class="docutils literal notranslate"><span class="pre">GPT2LLM.forward_impl()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.activation_type"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.activation_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.attention_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_implementation"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.attention_implementation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.attention_norm_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.attention_norm_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.bias"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.bias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.check_divisibility"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.check_divisibility()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.dropout"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.dropout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.enforce_swiglu_hidden_dim_multiple_of"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.enforce_swiglu_hidden_dim_multiple_of</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_hidden"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.ffn_hidden</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.ffn_norm_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.ffn_norm_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.lm_head_norm_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.lm_head_norm_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.model_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_embd"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.n_embd</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_kv"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.n_head_kv</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_head_q"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.n_head_q</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.n_layer"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.n_layer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.poe_type"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.poe_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.prediction_key"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sample_key"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.sample_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.seed"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.seed</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.sequence_length"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.sequence_length</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_meta_device"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.use_meta_device</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.use_weight_tying"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.use_weight_tying</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.validate_sizes"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.validate_sizes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.GPT2LLMConfig.vocab_size"><code class="docutils literal notranslate"><span class="pre">GPT2LLMConfig.vocab_size</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.IdentityTransform"><code class="docutils literal notranslate"><span class="pre">IdentityTransform</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.IdentityTransform.forward"><code class="docutils literal notranslate"><span class="pre">IdentityTransform.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig"><code class="docutils literal notranslate"><span class="pre">LayerNormWrapperConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.config"><code class="docutils literal notranslate"><span class="pre">LayerNormWrapperConfig.config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.model_config"><code class="docutils literal notranslate"><span class="pre">LayerNormWrapperConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.LayerNormWrapperConfig.norm_type"><code class="docutils literal notranslate"><span class="pre">LayerNormWrapperConfig.norm_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.LayerNorms"><code class="docutils literal notranslate"><span class="pre">LayerNorms</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.PositionTypes"><code class="docutils literal notranslate"><span class="pre">PositionTypes</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.PositionTypes.ABSOLUTE"><code class="docutils literal notranslate"><span class="pre">PositionTypes.ABSOLUTE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.PositionTypes.NOPE"><code class="docutils literal notranslate"><span class="pre">PositionTypes.NOPE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform"><code class="docutils literal notranslate"><span class="pre">QueryKeyValueTransform</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.QueryKeyValueTransform.forward"><code class="docutils literal notranslate"><span class="pre">QueryKeyValueTransform.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.QueryKeyValueTransformType"><code class="docutils literal notranslate"><span class="pre">QueryKeyValueTransformType</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.RotaryTransform"><code class="docutils literal notranslate"><span class="pre">RotaryTransform</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.RotaryTransform.apply_rotary_pos_emb"><code class="docutils literal notranslate"><span class="pre">RotaryTransform.apply_rotary_pos_emb()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.RotaryTransform.forward"><code class="docutils literal notranslate"><span class="pre">RotaryTransform.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.RotaryTransform.reset_parameters"><code class="docutils literal notranslate"><span class="pre">RotaryTransform.reset_parameters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.RotaryTransform.rotate_half"><code class="docutils literal notranslate"><span class="pre">RotaryTransform.rotate_half()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.TransformerMLP"><code class="docutils literal notranslate"><span class="pre">TransformerMLP</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.TransformerMLP.forward"><code class="docutils literal notranslate"><span class="pre">TransformerMLP.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.gpt2.html#modalities.models.gpt2.gpt2_model.manual_scaled_dot_product_attention"><code class="docutils literal notranslate"><span class="pre">manual_scaled_dot_product_attention()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.gpt2.html#module-modalities.models.gpt2">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.huggingface.html">modalities.models.huggingface package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface.html#module-modalities.models.huggingface.huggingface_model">modalities.models.huggingface.huggingface_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFaceModelTypes"><code class="docutils literal notranslate"><span class="pre">HuggingFaceModelTypes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModel"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModel.forward"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModel.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModel.fsdp_block_names"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModel.fsdp_block_names</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.huggingface_prediction_subscription_key"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.huggingface_prediction_subscription_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.kwargs"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.kwargs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.model_args"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.model_args</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.model_config"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.model_name"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.model_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.model_type"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.model_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.prediction_key"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.huggingface.html#modalities.models.huggingface.huggingface_model.HuggingFacePretrainedModelConfig.sample_key"><code class="docutils literal notranslate"><span class="pre">HuggingFacePretrainedModelConfig.sample_key</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface.html#module-modalities.models.huggingface">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.huggingface_adapters.html">modalities.models.huggingface_adapters package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface_adapters.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface_adapters.html#modalities-models-huggingface-adapters-hf-adapter-module">modalities.models.huggingface_adapters.hf_adapter module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.huggingface_adapters.html#module-modalities.models.huggingface_adapters">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.parallelism.html">modalities.models.parallelism package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#modalities-models-parallelism-pipeline-parallelism-module">modalities.models.parallelism.pipeline_parallelism module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#modalities-models-parallelism-pipeline-parallelism-configs-module">modalities.models.parallelism.pipeline_parallelism_configs module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#module-modalities.models.parallelism.stages_generator">modalities.models.parallelism.stages_generator module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator.GPT2LLMStagesGenerator"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGenerator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator.StagesGenerator"><code class="docutils literal notranslate"><span class="pre">StagesGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator.StagesGenerator.get_stages"><code class="docutils literal notranslate"><span class="pre">StagesGenerator.get_stages()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#module-modalities.models.parallelism.stages_generator_configs">modalities.models.parallelism.stages_generator_configs module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.FQNsPerStageGeneratorConfig"><code class="docutils literal notranslate"><span class="pre">FQNsPerStageGeneratorConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.FQNsPerStageGeneratorConfig.model_config"><code class="docutils literal notranslate"><span class="pre">FQNsPerStageGeneratorConfig.model_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.GPT2LLMStagesGeneratorConfig"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGeneratorConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.GPT2LLMStagesGeneratorConfig.input_layer_equivalence"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGeneratorConfig.input_layer_equivalence</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.GPT2LLMStagesGeneratorConfig.model_config"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGeneratorConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.GPT2LLMStagesGeneratorConfig.num_model_layers"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGeneratorConfig.num_model_layers</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.parallelism.html#modalities.models.parallelism.stages_generator_configs.GPT2LLMStagesGeneratorConfig.output_layer_equivalence"><code class="docutils literal notranslate"><span class="pre">GPT2LLMStagesGeneratorConfig.output_layer_equivalence</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.parallelism.html#module-modalities.models.parallelism">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.models.vision_transformer.html">modalities.models.vision_transformer package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.vision_transformer.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.vision_transformer.html#module-modalities.models.vision_transformer.vision_transformer_model">modalities.models.vision_transformer.vision_transformer_model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.ImagePatchEmbedding"><code class="docutils literal notranslate"><span class="pre">ImagePatchEmbedding</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.ImagePatchEmbedding.forward"><code class="docutils literal notranslate"><span class="pre">ImagePatchEmbedding.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer"><code class="docutils literal notranslate"><span class="pre">VisionTransformer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer.forward"><code class="docutils literal notranslate"><span class="pre">VisionTransformer.forward()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformer.forward_images"><code class="docutils literal notranslate"><span class="pre">VisionTransformer.forward_images()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerBlock"><code class="docutils literal notranslate"><span class="pre">VisionTransformerBlock</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerBlock.forward"><code class="docutils literal notranslate"><span class="pre">VisionTransformerBlock.forward()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.add_cls_token"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.add_cls_token</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.attention_config"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.attention_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.bias"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.bias</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.dropout"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.dropout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.img_size"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.img_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.model_config"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.model_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.n_classes"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.n_classes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.n_embd"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.n_embd</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.n_head"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.n_head</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.n_img_channels"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.n_img_channels</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.n_layer"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.n_layer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.patch_size"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.patch_size</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.patch_stride"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.patch_stride</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.prediction_key"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.prediction_key</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.vision_transformer.html#modalities.models.vision_transformer.vision_transformer_model.VisionTransformerConfig.sample_key"><code class="docutils literal notranslate"><span class="pre">VisionTransformerConfig.sample_key</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.models.vision_transformer.html#module-modalities.models.vision_transformer">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.models.model">
+<span id="modalities-models-model-module"></span><h2>modalities.models.model module<a class="headerlink" href="#module-modalities.models.model" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.model.ActivationType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.model.</span></span><span class="sig-name descname"><span class="pre">ActivationType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#ActivationType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.ActivationType" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Enum class representing different activation types.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>GELU (str): GELU activation type.
+SWIGLU (str): SWIGLU activation type.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.model.ActivationType.GELU">
+<span class="sig-name descname"><span class="pre">GELU</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'gelu'</span></span><a class="headerlink" href="#modalities.models.model.ActivationType.GELU" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.models.model.ActivationType.SWIGLU">
+<span class="sig-name descname"><span class="pre">SWIGLU</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'swiglu'</span></span><a class="headerlink" href="#modalities.models.model.ActivationType.SWIGLU" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.model.NNModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.model.</span></span><span class="sig-name descname"><span class="pre">NNModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_decay_groups</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#NNModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.NNModel" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>NNModel class to define a base model.</p>
+<p>Initializes an NNModel object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>seed (int, optional): The seed value for random number generation. Defaults to None.
+weight_decay_groups (Optional[WeightDecayGroups], optional): The weight decay groups. Defaults to None.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>weight_decay_groups</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.model.NNModel.forward">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#NNModel.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.NNModel.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>inputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em>]</em>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, torch.Tensor]: A dictionary containing output tensors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.model.NNModel.get_parameters">
+<span class="sig-name descname"><span class="pre">get_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#NNModel.get_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.NNModel.get_parameters" title="Link to this definition"></a></dt>
+<dd><p>Returns a dictionary of the model’s parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a>]</span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>A dictionary where the keys are the parameter names and the values are the corresponding parameter tensors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.models.model.NNModel.weight_decay_groups">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">weight_decay_groups</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.models.model.NNModel.weight_decay_groups" title="Link to this definition"></a></dt>
+<dd><p>Returns the weight decay groups.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>WeightDecayGroups: The weight decay groups.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.models.model.SwiGLU">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.models.model.</span></span><span class="sig-name descname"><span class="pre">SwiGLU</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_embd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ffn_hidden</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enforce_swiglu_hidden_dim_multiple_of</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#SwiGLU"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.SwiGLU" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></p>
+<p>SwiGLU class to define the SwiGLU activation function.</p>
+<p>Initializes the SwiGLU object.</p>
+<dl>
+<dt>Args:</dt><dd><p>n_embd (int): The number of embedding dimensions.
+ffn_hidden (int): The number of hidden dimensions in the feed-forward network.
+Best practice: 4 * n_embd (<a class="reference external" href="https://arxiv.org/pdf/1706.03762">https://arxiv.org/pdf/1706.03762</a>)
+bias (bool): Whether to include bias terms in the linear layers.
+enforce_swiglu_hidden_dim_multiple_of (int): The multiple of which the hidden</p>
+<blockquote>
+<div><p>dimension should be enforced. Defaults to 256.
+This is required for FSDP + TP as the combincation does not support uneven sharding (yet).
+Defaults to 256 if not provided.</p>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_embd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>ffn_hidden</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>enforce_swiglu_hidden_dim_multiple_of</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.models.model.SwiGLU.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#SwiGLU.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.SwiGLU.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward pass of the SwiGLU module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>x</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>x (torch.Tensor): Input tensor.</p>
+</dd>
+<dt>Returns:</dt><dd><p>torch.Tensor: Output tensor.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.models.model.model_predict_batch">
+<span class="sig-prename descclassname"><span class="pre">modalities.models.model.</span></span><span class="sig-name descname"><span class="pre">model_predict_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/models/model.html#model_predict_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.models.model.model_predict_batch" title="Link to this definition"></a></dt>
+<dd><p>Predicts the output for a batch of samples using the given model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch" title="modalities.batch.InferenceResultBatch"><code class="xref py py-class docutils literal notranslate"><span class="pre">InferenceResultBatch</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>batch</strong> (<a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch" title="modalities.batch.DatasetBatch"><em>DatasetBatch</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>model (nn.Module): The model used for prediction.
+batch (DatasetBatch): The batch of samples to be predicted.</p>
+</dd>
+<dt>Returns:</dt><dd><p>InferenceResultBatch: The batch of inference results containing the predicted targets and predictions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="modalities-models-model-factory-module">
+<h2>modalities.models.model_factory module<a class="headerlink" href="#modalities-models-model-factory-module" title="Link to this heading"></a></h2>
+</section>
+<section id="modalities-models-utils-module">
+<h2>modalities.models.utils module<a class="headerlink" href="#modalities-models-utils-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.models">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.models" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.logging_broker.subscriber_impl.html" class="btn btn-neutral float-left" title="modalities.logging_broker.subscriber_impl package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.models.coca.html" class="btn btn-neutral float-right" title="modalities.models.coca package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

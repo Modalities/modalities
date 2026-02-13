@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.utils.mfu &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.utils.mfu</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.utils.mfu</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPModule</span> <span class="k">as</span> <span class="n">FSDP2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP1</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Number</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_total_number_of_trainable_parameters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.typing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPX</span>
+
+<span class="c1"># A100: https://developer.nvidia.com/blog/nvidia-ampere-architecture-in-depth/</span>
+<span class="c1"># H100: https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/</span>
+<span class="c1">#       https://www.nvidia.com/en-us/data-center/h100/</span>
+<span class="c1">#</span>
+<span class="c1"># NOTE: These values are valid for fp16 and bf16 only</span>
+<span class="n">PEAK_PERFORMANCE</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;A100&quot;</span><span class="p">:</span> <span class="mf">312e12</span><span class="p">,</span> <span class="s2">&quot;H100&quot;</span><span class="p">:</span> <span class="mf">989e12</span><span class="p">,</span> <span class="s2">&quot;GH200&quot;</span><span class="p">:</span> <span class="mf">989e12</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="MFUCalculatorABC">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.mfu.MFUCalculatorABC">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MFUCalculatorABC</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Interface for calculating the Model Flops Utilization (MFU).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="MFUCalculatorABC.compute">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.mfu.MFUCalculatorABC.compute">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples_per_second</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the MFU for the given number of samples per second.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_samples_per_second (torch.Tensor): The number of samples per second.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The computed MFU.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Subclasses should implement this method.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_mfu_impl</span><span class="p">(</span>
+        <span class="n">num_samples_per_second</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">theoretical_flops_per_token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">],</span>
+        <span class="n">theoretical_gpu_peak_performance</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the Model Flops Utilization (MFU).</span>
+
+<span class="sd">        compute mfu = throughput * theoretical_flops_per_token / theoretical_gpu_peak_performance</span>
+<span class="sd">        units:  [1] = [tokens/s] * [FLOPs / token]             / [FLOPs / s]</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_samples_per_second (torch.Tensor): The number of samples per second.</span>
+<span class="sd">            sequence_length (int): The length of the sequence.</span>
+<span class="sd">            theoretical_flops_per_token (Optional[Number]): The theoretical number of</span>
+<span class="sd">                floating-point operations per token.</span>
+<span class="sd">            theoretical_gpu_peak_performance (Optional[Number]): The theoretical peak performance of the GPU.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The computed MFU.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            - If either `theoretical_flops_per_token` or `theoretical_gpu_peak_performance` is None,</span>
+<span class="sd">                the function returns -1.0.</span>
+<span class="sd">            - The returned value needs to be a float for EvaluationResultBatch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">theoretical_flops_per_token</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">theoretical_gpu_peak_performance</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># needs to be float for EvaluationResultBatch</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">num_tokens_per_second</span> <span class="o">=</span> <span class="n">num_samples_per_second</span> <span class="o">*</span> <span class="n">sequence_length</span>
+            <span class="k">return</span> <span class="n">num_tokens_per_second</span> <span class="o">*</span> <span class="n">theoretical_flops_per_token</span> <span class="o">/</span> <span class="n">theoretical_gpu_peak_performance</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_theoretical_gpu_peak_performance_single</span><span class="p">(</span><span class="n">precision</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">gpu_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the theoretical peak performance of a single GPU in units FLOPs / s for given GPU type.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            precision (torch.dtype): The precision of the GPU.</span>
+<span class="sd">            gpu_type (str): The type of the GPU.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Number, optional): The theoretical peak performance of the GPU if the precision and GPU type are valid,</span>
+<span class="sd">            otherwise None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">]</span> <span class="ow">and</span> <span class="n">gpu_type</span> <span class="ow">in</span> <span class="n">PEAK_PERFORMANCE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PEAK_PERFORMANCE</span><span class="p">[</span><span class="n">gpu_type</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_theoretical_gpu_peak_performance</span><span class="p">(</span><span class="n">model_parts</span><span class="p">:</span> <span class="n">FSDPX</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">FSDP2</span><span class="p">],</span> <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculates the accumulated theoretical peak performance based on all GPUs, i.e.,</span>
+<span class="sd">        #GPU=world_size, in units FLOPs / s for given gpu type.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_parts (FSDPX | list[FSDP2]): The model or model parts for which</span>
+<span class="sd">                to calculate the theoretical peak performance.</span>
+<span class="sd">            world_size (int): The number of GPUs used in parallel.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Number, optional): The accumulated theoretical peak performance of all GPUs,</span>
+<span class="sd">            or None if it cannot be calculated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_parts</span><span class="p">,</span> <span class="n">FSDP1</span><span class="p">):</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="n">model_parts</span><span class="o">.</span><span class="n">mixed_precision</span><span class="o">.</span><span class="n">param_dtype</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">model_parts</span><span class="o">.</span><span class="n">mixed_precision</span><span class="o">.</span><span class="n">reduce_dtype</span> <span class="o">!=</span> <span class="n">precision</span>
+                <span class="ow">or</span> <span class="n">model_parts</span><span class="o">.</span><span class="n">mixed_precision</span><span class="o">.</span><span class="n">buffer_dtype</span> <span class="o">!=</span> <span class="n">precision</span>
+            <span class="p">):</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not get theoretical GPU peak performance for mixed precision type = </span><span class="si">{</span><span class="n">precision</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_parts</span><span class="p">,</span> <span class="n">FSDP2</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_parts</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;MFU is computed based on the assumption that bf16 precision is used.&quot;</span><span class="p">)</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model should be of type FSDPX, but is </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model_parts</span><span class="p">)</span><span class="si">}</span><span class="s2"> instead.&quot;</span><span class="p">)</span>
+
+        <span class="n">device_name</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_name</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">device_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;NVIDIA A100&quot;</span><span class="p">):</span>
+            <span class="n">single_gpu_peak_performance</span> <span class="o">=</span> <span class="n">MFUCalculatorABC</span><span class="o">.</span><span class="n">_get_theoretical_gpu_peak_performance_single</span><span class="p">(</span>
+                <span class="n">precision</span><span class="p">,</span> <span class="s2">&quot;A100&quot;</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">device_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;NVIDIA H100&quot;</span><span class="p">):</span>
+            <span class="n">single_gpu_peak_performance</span> <span class="o">=</span> <span class="n">MFUCalculatorABC</span><span class="o">.</span><span class="n">_get_theoretical_gpu_peak_performance_single</span><span class="p">(</span>
+                <span class="n">precision</span><span class="p">,</span> <span class="s2">&quot;H100&quot;</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">device_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;NVIDIA GH200&quot;</span><span class="p">):</span>
+            <span class="n">single_gpu_peak_performance</span> <span class="o">=</span> <span class="n">MFUCalculatorABC</span><span class="o">.</span><span class="n">_get_theoretical_gpu_peak_performance_single</span><span class="p">(</span>
+                <span class="n">precision</span><span class="p">,</span> <span class="s2">&quot;GH200&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not get theoretical GPU peak performance for unknown device = </span><span class="si">{</span><span class="n">device_name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">single_gpu_peak_performance</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not get theoretical GPU peak performance for device = </span><span class="si">{</span><span class="n">device_name</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;and mixed precision type = </span><span class="si">{</span><span class="n">precision</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">single_gpu_peak_performance</span> <span class="o">*</span> <span class="n">world_size</span></div>
+
+
+
+<div class="viewcode-block" id="GPT2MFUCalculator">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.mfu.GPT2MFUCalculator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2MFUCalculator</span><span class="p">(</span><span class="n">MFUCalculatorABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class to calculate the Model Flops Utilization (MFU) for a given model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">n_layer</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">model_parts</span><span class="p">:</span> <span class="n">FSDPX</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">FSDP2</span><span class="p">],</span>
+        <span class="n">device_mesh</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">device_mesh</span><span class="o">.</span><span class="n">DeviceMesh</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_num_params</span> <span class="o">=</span> <span class="n">get_total_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model_parts</span><span class="p">,</span> <span class="n">device_mesh</span><span class="o">=</span><span class="n">device_mesh</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_layer</span> <span class="o">=</span> <span class="n">n_layer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_length</span> <span class="o">=</span> <span class="n">sequence_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_embd</span> <span class="o">=</span> <span class="n">n_embd</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theoretical_flops_per_token</span> <span class="o">=</span> <span class="n">GPT2MFUCalculator</span><span class="o">.</span><span class="n">_get_theoretical_flops_per_token</span><span class="p">(</span>
+            <span class="n">num_params</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_params</span><span class="p">,</span>
+            <span class="n">n_layer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_layer</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sequence_length</span><span class="p">,</span>
+            <span class="n">n_embd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_embd</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theoretical_gpu_peak_performance</span> <span class="o">=</span> <span class="n">MFUCalculatorABC</span><span class="o">.</span><span class="n">_get_theoretical_gpu_peak_performance</span><span class="p">(</span>
+            <span class="n">model_parts</span><span class="p">,</span> <span class="n">world_size</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_theoretical_flops_per_token</span><span class="p">(</span><span class="n">num_params</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_layer</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">6</span> <span class="o">*</span> <span class="n">num_params</span> <span class="o">+</span> <span class="mi">12</span> <span class="o">*</span> <span class="n">n_layer</span> <span class="o">*</span> <span class="n">sequence_length</span> <span class="o">*</span> <span class="n">n_embd</span>
+
+<div class="viewcode-block" id="GPT2MFUCalculator.compute">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.mfu.GPT2MFUCalculator.compute">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples_per_second</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the MFU for the given number of samples per second.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_samples_per_second (torch.Tensor): The number of samples per second.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The computed MFU.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">MFUCalculatorABC</span><span class="o">.</span><span class="n">_compute_mfu_impl</span><span class="p">(</span>
+            <span class="n">num_samples_per_second</span><span class="o">=</span><span class="n">num_samples_per_second</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sequence_length</span><span class="p">,</span>
+            <span class="n">theoretical_flops_per_token</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_theoretical_flops_per_token</span><span class="p">,</span>
+            <span class="n">theoretical_gpu_peak_performance</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_theoretical_gpu_peak_performance</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

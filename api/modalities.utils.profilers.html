@@ -1,0 +1,459 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.utils.profilers package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="modalities.utils.benchmarking package" href="modalities.utils.benchmarking.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.utils.html">modalities.utils package</a></li>
+      <li class="breadcrumb-item active">modalities.utils.profilers package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.utils.profilers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-utils-profilers-package">
+<h1>modalities.utils.profilers package<a class="headerlink" href="#modalities-utils-profilers-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.utils.profilers.batch_generator">
+<span id="modalities-utils-profilers-batch-generator-module"></span><h2>modalities.utils.profilers.batch_generator module<a class="headerlink" href="#module-modalities.utils.profilers.batch_generator" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DataTypeEnum">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.batch_generator.</span></span><span class="sig-name descname"><span class="pre">DataTypeEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#DataTypeEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DataTypeEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modalities.config.html#modalities.config.lookup_enum.LookupEnum" title="modalities.config.lookup_enum.LookupEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">LookupEnum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DataTypeEnum.bfloat16">
+<span class="sig-name descname"><span class="pre">bfloat16</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">torch.bfloat16</span></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DataTypeEnum.bfloat16" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DataTypeEnum.float32">
+<span class="sig-name descname"><span class="pre">float32</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">torch.float32</span></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DataTypeEnum.float32" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DataTypeEnum.int64">
+<span class="sig-name descname"><span class="pre">int64</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">torch.int64</span></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DataTypeEnum.int64" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.batch_generator.</span></span><span class="sig-name descname"><span class="pre">DatasetBatchGeneratorIF</span></span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#DatasetBatchGeneratorIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF.get_dataset_batch">
+<span class="sig-name descname"><span class="pre">get_dataset_batch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#DatasetBatchGeneratorIF.get_dataset_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF.get_dataset_batch" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch" title="modalities.batch.DatasetBatch"><code class="xref py py-class docutils literal notranslate"><span class="pre">DatasetBatch</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGenerator">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.batch_generator.</span></span><span class="sig-name descname"><span class="pre">RandomDatasetBatchGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dims</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_val</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#RandomDatasetBatchGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF" title="modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">DatasetBatchGeneratorIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>data_type</strong> (<a class="reference internal" href="#modalities.utils.profilers.batch_generator.DataTypeEnum" title="modalities.utils.profilers.batch_generator.DataTypeEnum"><em>DataTypeEnum</em></a>)</p></li>
+<li><p><strong>min_val</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>max_val</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGenerator.get_dataset_batch">
+<span class="sig-name descname"><span class="pre">get_dataset_batch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#RandomDatasetBatchGenerator.get_dataset_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGenerator.get_dataset_batch" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch" title="modalities.batch.DatasetBatch"><code class="xref py py-class docutils literal notranslate"><span class="pre">DatasetBatch</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.batch_generator.</span></span><span class="sig-name descname"><span class="pre">RandomDatasetBatchGeneratorConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/batch_generator.html#RandomDatasetBatchGeneratorConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>data_type</strong> (<a class="reference internal" href="#modalities.utils.profilers.batch_generator.DataTypeEnum" title="modalities.utils.profilers.batch_generator.DataTypeEnum"><em>DataTypeEnum</em></a>)</p></li>
+<li><p><strong>min_val</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>max_val</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.data_type">
+<span class="sig-name descname"><span class="pre">data_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.utils.profilers.batch_generator.DataTypeEnum" title="modalities.utils.profilers.batch_generator.DataTypeEnum"><span class="pre">DataTypeEnum</span></a></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.data_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.dims">
+<span class="sig-name descname"><span class="pre">dims</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.dims" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.max_val">
+<span class="sig-name descname"><span class="pre">max_val</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.max_val" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.min_val">
+<span class="sig-name descname"><span class="pre">min_val</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.min_val" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.utils.profilers.batch_generator.RandomDatasetBatchGeneratorConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="modalities-utils-profilers-modalities-profiler-module">
+<h2>modalities.utils.profilers.modalities_profiler module<a class="headerlink" href="#modalities-utils-profilers-modalities-profiler-module" title="Link to this heading"></a></h2>
+</section>
+<section id="modalities-utils-profilers-profiler-configs-module">
+<h2>modalities.utils.profilers.profiler_configs module<a class="headerlink" href="#modalities-utils-profilers-profiler-configs-module" title="Link to this heading"></a></h2>
+</section>
+<section id="modalities-utils-profilers-profiler-factory-module">
+<h2>modalities.utils.profilers.profiler_factory module<a class="headerlink" href="#modalities-utils-profilers-profiler-factory-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.utils.profilers.profilers">
+<span id="modalities-utils-profilers-profilers-module"></span><h2>modalities.utils.profilers.profilers module<a class="headerlink" href="#module-modalities.utils.profilers.profilers" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableCombinedProfiler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.profilers.</span></span><span class="sig-name descname"><span class="pre">SteppableCombinedProfiler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profilers</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableCombinedProfiler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableCombinedProfiler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="modalities.utils.profilers.profilers.SteppableProfilerIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">SteppableProfilerIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>profilers</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="modalities.utils.profilers.profilers.SteppableProfilerIF"><em>SteppableProfilerIF</em></a><em>]</em>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableCombinedProfiler.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableCombinedProfiler.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableCombinedProfiler.step" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableKernelProfiler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.profilers.</span></span><span class="sig-name descname"><span class="pre">SteppableKernelProfiler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_wait_steps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_warmup_steps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_active_steps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">profiler_activities</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">profile_memory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">record_shapes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_flops</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_stack</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_modules</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_output_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">summary_output_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableKernelProfiler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableKernelProfiler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="modalities.utils.profilers.profilers.SteppableProfilerIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">SteppableProfilerIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_wait_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_warmup_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_active_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>profiler_activities</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.pytorch.org/docs/stable/profiler.html#torch.profiler.ProfilerActivity" title="(in PyTorch v2.10)"><em>ProfilerActivity</em></a><em>]</em>)</p></li>
+<li><p><strong>profile_memory</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>record_shapes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>with_flops</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>with_stack</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>with_modules</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>trace_output_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>summary_output_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableKernelProfiler.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableKernelProfiler.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableKernelProfiler.step" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableMemoryProfiler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.profilers.</span></span><span class="sig-name descname"><span class="pre">SteppableMemoryProfiler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">memory_snapshot_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_wait_steps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_warmup_steps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_active_steps</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableMemoryProfiler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableMemoryProfiler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="modalities.utils.profilers.profilers.SteppableProfilerIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">SteppableProfilerIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>memory_snapshot_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>num_wait_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_warmup_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_active_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableMemoryProfiler.MEMORY_SNAPSHOT_MAX_ENTRIES">
+<span class="sig-name descname"><span class="pre">MEMORY_SNAPSHOT_MAX_ENTRIES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100000</span></span><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableMemoryProfiler.MEMORY_SNAPSHOT_MAX_ENTRIES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableMemoryProfiler.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableMemoryProfiler.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableMemoryProfiler.step" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableNoProfiler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.profilers.</span></span><span class="sig-name descname"><span class="pre">SteppableNoProfiler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_steps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableNoProfiler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableNoProfiler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="modalities.utils.profilers.profilers.SteppableProfilerIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">SteppableProfilerIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>num_steps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableNoProfiler.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableNoProfiler.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableNoProfiler.step" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableProfilerIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.profilers.</span></span><span class="sig-name descname"><span class="pre">SteppableProfilerIF</span></span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableProfilerIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableProfilerIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.profilers.SteppableProfilerIF.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/profilers.html#SteppableProfilerIF.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.profilers.SteppableProfilerIF.step" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="modalities-utils-profilers-steppable-component-configs-module">
+<h2>modalities.utils.profilers.steppable_component_configs module<a class="headerlink" href="#modalities-utils-profilers-steppable-component-configs-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.utils.profilers.steppable_components">
+<span id="modalities-utils-profilers-steppable-components-module"></span><h2>modalities.utils.profilers.steppable_components module<a class="headerlink" href="#module-modalities.utils.profilers.steppable_components" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.steppable_components.SteppableForwardPass">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.steppable_components.</span></span><span class="sig-name descname"><span class="pre">SteppableForwardPass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_batch_generator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/steppable_components.html#SteppableForwardPass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.steppable_components.SteppableForwardPass" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.utils.profilers.steppable_components_if.SteppableComponentIF" title="modalities.utils.profilers.steppable_components_if.SteppableComponentIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">SteppableComponentIF</span></code></a></p>
+<p>A steppable component that performs a forward pass on the model using batches from the dataset batch generator.
+Optionally computes the loss if a loss function is provided.
+The component is used for profiling.</p>
+<p>Initializes the SteppableForwardPass component.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>model (nn.Module): The model to perform the forward pass on.
+dataset_batch_generator (DatasetBatchGeneratorIF): The dataset batch generator to provide input batches.
+loss_fn (Loss, optional): The loss function to compute the loss. Defaults to None.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>dataset_batch_generator</strong> (<a class="reference internal" href="#modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF" title="modalities.utils.profilers.batch_generator.DatasetBatchGeneratorIF"><em>DatasetBatchGeneratorIF</em></a>)</p></li>
+<li><p><strong>loss_fn</strong> (<a class="reference internal" href="modalities.html#modalities.loss_functions.Loss" title="modalities.loss_functions.Loss"><em>Loss</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>optimizer</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#torch.optim.Optimizer" title="(in PyTorch v2.10)"><em>Optimizer</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.steppable_components.SteppableForwardPass.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/steppable_components.html#SteppableForwardPass.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.steppable_components.SteppableForwardPass.step" title="Link to this definition"></a></dt>
+<dd><p>Performs a single step of the forward pass and computes the loss if a loss function is provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.utils.profilers.steppable_components_if">
+<span id="modalities-utils-profilers-steppable-components-if-module"></span><h2>modalities.utils.profilers.steppable_components_if module<a class="headerlink" href="#module-modalities.utils.profilers.steppable_components_if" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.utils.profilers.steppable_components_if.SteppableComponentIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.utils.profilers.steppable_components_if.</span></span><span class="sig-name descname"><span class="pre">SteppableComponentIF</span></span><a class="reference internal" href="../_modules/modalities/utils/profilers/steppable_components_if.html#SteppableComponentIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.steppable_components_if.SteppableComponentIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.utils.profilers.steppable_components_if.SteppableComponentIF.step">
+<span class="sig-name descname"><span class="pre">step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/utils/profilers/steppable_components_if.html#SteppableComponentIF.step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.utils.profilers.steppable_components_if.SteppableComponentIF.step" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.utils.profilers">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.utils.profilers" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.utils.benchmarking.html" class="btn btn-neutral float-left" title="modalities.utils.benchmarking package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

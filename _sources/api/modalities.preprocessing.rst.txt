@@ -1,0 +1,29 @@
+modalities.preprocessing package
+================================
+
+Submodules
+----------
+
+modalities.preprocessing.create\_chunks module
+----------------------------------------------
+
+.. automodule:: modalities.preprocessing.create_chunks
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.preprocessing.shuffle\_data module
+---------------------------------------------
+
+.. automodule:: modalities.preprocessing.shuffle_data
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.preprocessing
+   :members:
+   :show-inheritance:
+   :undoc-members:

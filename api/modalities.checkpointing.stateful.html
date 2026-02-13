@@ -1,0 +1,560 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing.stateful package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.checkpointing.torch package" href="modalities.checkpointing.torch.html" />
+    <link rel="prev" title="modalities.checkpointing.fsdp package" href="modalities.checkpointing.fsdp.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing.stateful package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.checkpointing.stateful.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-checkpointing-stateful-package">
+<h1>modalities.checkpointing.stateful package<a class="headerlink" href="#modalities-checkpointing-stateful-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.checkpointing.stateful.app_state">
+<span id="modalities-checkpointing-stateful-app-state-module"></span><h2>modalities.checkpointing.stateful.app_state module<a class="headerlink" href="#module-modalities.checkpointing.stateful.app_state" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">AppState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_scheduler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#AppState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.stateful.Stateful" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Stateful</span></code></a></p>
+<p>This is a useful wrapper for checkpointing the application state (i.e., model, optimizer, lr scheduler).
+Since this object is compliant with the Stateful protocol, DCP will automatically call
+state_dict/load_stat_dict as needed in the dcp.save/load APIs.</p>
+<p>Note: We take advantage of this wrapper to call distributed state dict methods on the model
+and optimizer.
+Note: this class has been copied and adapted from
+<a class="reference external" href="https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html">https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html</a></p>
+<p>Initializes the AppState object.</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>model (nn.Module | list[nn.Module]): The model or model parts can be either</dt><dd><p>a non-sharded model, FSDP1 or FSDP2 model.</p>
+</dd>
+</dl>
+<p>optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
+lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a><em>]</em>)</p></li>
+<li><p><strong>optimizer</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#torch.optim.Optimizer" title="(in PyTorch v2.10)"><em>Optimizer</em></a>)</p></li>
+<li><p><strong>lr_scheduler</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html#torch.optim.lr_scheduler.LRScheduler" title="(in PyTorch v2.10)"><em>LRScheduler</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.is_loaded">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">is_loaded</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.is_loaded" title="Link to this definition"></a></dt>
+<dd><p>Returns whether the state dict has been loaded.
+Returns:</p>
+<blockquote>
+<div><p>bool: Flag indicating whether the state dict has been loaded.</p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.load_state_dict">
+<span class="sig-name descname"><span class="pre">load_state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#AppState.load_state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.load_state_dict" title="Link to this definition"></a></dt>
+<dd><p>Loads the state dict into the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>state_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>state_dict (dict[str, Any]): The state dict to load into the AppState object.</p>
+</dd>
+<dt>Raises:</dt><dd><p>RuntimeError: If the state dict has already been loaded.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.lr_scheduler">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">lr_scheduler</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html#torch.optim.lr_scheduler.LRScheduler" title="(in PyTorch v2.10)"><span class="pre">LRScheduler</span></a></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.lr_scheduler" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.model_parts">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">model_parts</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><span class="pre">Module</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.model_parts" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.optimizer">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">optimizer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#torch.optim.Optimizer" title="(in PyTorch v2.10)"><span class="pre">Optimizer</span></a></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.optimizer" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.AppState.state_dict">
+<span class="sig-name descname"><span class="pre">state_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#AppState.state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.AppState.state_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the state dict of the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>dict[str, Any]: The state dict of the AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">LRSchedulerStateRetriever</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#LRSchedulerStateRetriever"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF" title="modalities.checkpointing.stateful.app_state.StateRetrieverIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateRetrieverIF</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.get_state_dict">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#LRSchedulerStateRetriever.get_state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.get_state_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the state dict of the lr scheduler in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the lr scheduler.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, Any]: The state dict of the lr scheduler in the AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.load_state_dict_">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_state_dict_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#LRSchedulerStateRetriever.load_state_dict_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.load_state_dict_" title="Link to this definition"></a></dt>
+<dd><p>Loads the state dict into the lr scheduler in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>state_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the lr scheduler.
+state_dict (dict[str, Any]): The state dict to load into the lr scheduler.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.ModelStateRetriever">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">ModelStateRetriever</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#ModelStateRetriever"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.ModelStateRetriever" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF" title="modalities.checkpointing.stateful.app_state.StateRetrieverIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateRetrieverIF</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.ModelStateRetriever.get_state_dict">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#ModelStateRetriever.get_state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.ModelStateRetriever.get_state_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the flattened state dicts of the model parts in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the model.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, Any]: The state dict of the model in the AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.ModelStateRetriever.load_state_dict_">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_state_dict_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#ModelStateRetriever.load_state_dict_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.ModelStateRetriever.load_state_dict_" title="Link to this definition"></a></dt>
+<dd><p>Loads the state dict into the model in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>state_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the model.
+state_dict (dict[str, Any]): The state dict to load into the model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.OptimizerStateRetriever">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">OptimizerStateRetriever</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#OptimizerStateRetriever"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF" title="modalities.checkpointing.stateful.app_state.StateRetrieverIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateRetrieverIF</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.get_state_dict">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#OptimizerStateRetriever.get_state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.get_state_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the state dict of the optimizer in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the optimizer.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, Any]: The state dict of the optimizer in the AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.load_state_dict_">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_state_dict_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#OptimizerStateRetriever.load_state_dict_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.load_state_dict_" title="Link to this definition"></a></dt>
+<dd><p>Loads the state dict into the optimizer in the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>state_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The app_state object containing the optimizer.
+state_dict (dict[str, Any]): The state dict to load into the optimizer.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StateRetrieverIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">StateRetrieverIF</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#StateRetrieverIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>State retriever interface for loading and getting state dicts of
+models, optimizers and lr schedulers. Other stateful components can be added as needed
+by having the retriever implement this interface.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StateRetrieverIF.get_state_dict">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_state_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#StateRetrieverIF.get_state_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF.get_state_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the state dict of the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The application state object.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</p>
+</dd>
+<dt>Returns:</dt><dd><p>dict[str, Any]: The state dict of the AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StateRetrieverIF.load_state_dict_">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_state_dict_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#StateRetrieverIF.load_state_dict_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StateRetrieverIF.load_state_dict_" title="Link to this definition"></a></dt>
+<dd><p>Loads the state dict into the AppState object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>state_dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The application state object.
+state_dict (dict[str, Any]): The state dict to load into the AppState object.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StatefulComponents">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state.</span></span><span class="sig-name descname"><span class="pre">StatefulComponents</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state.html#StatefulComponents"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StatefulComponents" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StatefulComponents.LR_SCHEDULER">
+<span class="sig-name descname"><span class="pre">LR_SCHEDULER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'lr_scheduler'</span></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StatefulComponents.LR_SCHEDULER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StatefulComponents.MODEL">
+<span class="sig-name descname"><span class="pre">MODEL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'model'</span></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StatefulComponents.MODEL" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state.StatefulComponents.OPTIMIZER">
+<span class="sig-name descname"><span class="pre">OPTIMIZER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'optimizer'</span></span><a class="headerlink" href="#modalities.checkpointing.stateful.app_state.StatefulComponents.OPTIMIZER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.stateful.app_state_factory">
+<span id="modalities-checkpointing-stateful-app-state-factory-module"></span><h2>modalities.checkpointing.stateful.app_state_factory module<a class="headerlink" href="#module-modalities.checkpointing.stateful.app_state_factory" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state_factory.AppStateFactory">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.stateful.app_state_factory.</span></span><span class="sig-name descname"><span class="pre">AppStateFactory</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state_factory.html#AppStateFactory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state_factory.AppStateFactory" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Factory class to create AppState objects.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_dcp_checkpointed_app_state_">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_dcp_checkpointed_app_state_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkpoint_dir_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state_factory.html#AppStateFactory.get_dcp_checkpointed_app_state_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_dcp_checkpointed_app_state_" title="Link to this definition"></a></dt>
+<dd><p>Loads the checkpointed state dict into the raw AppState object
+(i.e., non-checkpoint loaded AppState) in-place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><code class="xref py py-class docutils literal notranslate"><span class="pre">AppState</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_app_state</strong> (<a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>checkpoint_dir_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>raw_app_state (AppState): The raw AppState object.
+checkpoint_dir_path (Path): The path to the checkpoint directory.</p>
+</dd>
+<dt>Raises:</dt><dd><p>RuntimeError: Raises an error if the state dict has already been loaded.</p>
+</dd>
+<dt>Returns:</dt><dd><p>AppState: The AppState object with the loaded state dict.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_raw_app_state">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_raw_app_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_scheduler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/stateful/app_state_factory.html#AppStateFactory.get_raw_app_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_raw_app_state" title="Link to this definition"></a></dt>
+<dd><p>Creates a new (non-checkpoint loaded) AppState object from an instantiated
+model, optimizer, and optional learning rate scheduler.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><code class="xref py py-class docutils literal notranslate"><span class="pre">AppState</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a><em>]</em>)</p></li>
+<li><p><strong>optimizer</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#torch.optim.Optimizer" title="(in PyTorch v2.10)"><em>Optimizer</em></a>)</p></li>
+<li><p><strong>lr_scheduler</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html#torch.optim.lr_scheduler.LRScheduler" title="(in PyTorch v2.10)"><em>LRScheduler</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>model (nn.Module | list[nn.Module]): The model (parts) can be either</dt><dd><p>a non-sharded model, FSDP1 or FSDP2 model.</p>
+</dd>
+</dl>
+<p>optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
+lr_scheduler (Optional[LRScheduler], optional): Lr scheduler used during training. Defaults to None.</p>
+</dd>
+<dt>Returns:</dt><dd><p>AppState: The AppState object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.stateful">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.checkpointing.stateful" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.checkpointing.fsdp.html" class="btn btn-neutral float-left" title="modalities.checkpointing.fsdp package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.checkpointing.torch.html" class="btn btn-neutral float-right" title="modalities.checkpointing.torch package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

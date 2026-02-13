@@ -1,0 +1,356 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.conversion.gpt2.configuration_gpt2 &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.conversion.gpt2.configuration_gpt2</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.conversion.gpt2.configuration_gpt2</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding=utf-8</span>
+<span class="c1"># This code was copied and modified from the Llama implementation of the Hugging Face Transformers library.</span>
+<span class="c1"># The original code can be found at:</span>
+<span class="c1">#   https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/configuration_llama.py</span>
+<span class="c1"># Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># This code is based on EleutherAI&#39;s GPT-NeoX library and the GPT-NeoX</span>
+<span class="c1"># and OPT implementations in this library. It has been modified from its</span>
+<span class="c1"># original forms to accommodate minor architectural differences compared</span>
+<span class="c1"># to GPT-NeoX and OPT used by the Meta AI team that trained the model.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="sd">&quot;&quot;&quot;LLaMA-like GPT2 model configuration&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.configuration_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">PretrainedConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers.modeling_rope_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">rope_config_validation</span>
+
+
+<div class="viewcode-block" id="GPT2Config">
+<a class="viewcode-back" href="../../../../api/modalities.conversion.gpt2.html#modalities.conversion.gpt2.configuration_gpt2.GPT2Config">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPT2Config</span><span class="p">(</span><span class="n">PretrainedConfig</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is the configuration class to store the configuration of a [`GPT2Model`]. It is used to instantiate an GPT2</span>
+<span class="sd">    model according to the specified arguments, defining the model architecture. Instantiating a configuration with the</span>
+<span class="sd">    defaults will yield a similar configuration to that of the LLaMA-7B.</span>
+
+<span class="sd">    Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the</span>
+<span class="sd">    documentation from [`PretrainedConfig`] for more information.</span>
+
+
+<span class="sd">    Args:</span>
+<span class="sd">        vocab_size (`int`, *optional*, defaults to 32000):</span>
+<span class="sd">            Vocabulary size of the GPT2 model. Defines the number of different tokens that can be represented by the</span>
+<span class="sd">            `inputs_ids` passed when calling [`GPT2Model`]</span>
+<span class="sd">        hidden_size (`int`, *optional*, defaults to 4096):</span>
+<span class="sd">            Dimension of the hidden representations.</span>
+<span class="sd">        intermediate_size (`int`, *optional*, defaults to 11008):</span>
+<span class="sd">            Dimension of the MLP representations.</span>
+<span class="sd">        num_hidden_layers (`int`, *optional*, defaults to 32):</span>
+<span class="sd">            Number of hidden layers in the Transformer decoder.</span>
+<span class="sd">        num_attention_heads (`int`, *optional*, defaults to 32):</span>
+<span class="sd">            Number of attention heads for each attention layer in the Transformer decoder.</span>
+<span class="sd">        num_key_value_heads (`int`, *optional*):</span>
+<span class="sd">            This is the number of key_value heads that should be used to implement Grouped Query Attention. If</span>
+<span class="sd">            `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if</span>
+<span class="sd">            `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When</span>
+<span class="sd">            converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed</span>
+<span class="sd">            by meanpooling all the original heads within that group. For more details checkout [this</span>
+<span class="sd">            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to</span>
+<span class="sd">            `num_attention_heads`.</span>
+<span class="sd">        hidden_act (`str` or `function`, *optional*, defaults to `&quot;silu&quot;`):</span>
+<span class="sd">            The non-linear activation function (function or string) in the decoder.</span>
+<span class="sd">        max_position_embeddings (`int`, *optional*, defaults to 2048):</span>
+<span class="sd">            The maximum sequence length that this model might ever be used with.</span>
+<span class="sd">        initializer_range (`float`, *optional*, defaults to 0.02):</span>
+<span class="sd">            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.</span>
+<span class="sd">        rms_norm_eps (`float`, *optional*, defaults to 1e-06):</span>
+<span class="sd">            The epsilon used by the rms normalization layers.</span>
+<span class="sd">        use_cache (`bool`, *optional*, defaults to `True`):</span>
+<span class="sd">            Whether or not the model should return the last key/values attentions (not used by all models). Only</span>
+<span class="sd">            relevant if `config.is_decoder=True`.</span>
+<span class="sd">        pad_token_id (`int`, *optional*):</span>
+<span class="sd">            Padding token id.</span>
+<span class="sd">        bos_token_id (`int`, *optional*, defaults to 1):</span>
+<span class="sd">            Beginning of stream token id.</span>
+<span class="sd">        eos_token_id (`int`, *optional*, defaults to 2):</span>
+<span class="sd">            End of stream token id.</span>
+<span class="sd">        pretraining_tp (`int`, *optional*, defaults to 1):</span>
+<span class="sd">            Experimental feature. Tensor parallelism rank used during pretraining. Please refer to [this</span>
+<span class="sd">            document](https://huggingface.co/docs/transformers/main/perf_train_gpu_many#tensor-parallelism) to</span>
+<span class="sd">            understand more about it. This value is necessary to ensure exact reproducibility of the pretraining</span>
+<span class="sd">            results. Please refer to [this issue](https://github.com/pytorch/pytorch/issues/76232).</span>
+<span class="sd">        tie_word_embeddings (`bool`, *optional*, defaults to `False`):</span>
+<span class="sd">            Whether to tie weight embeddings</span>
+<span class="sd">        rope_theta (`float`, *optional*, defaults to 10000.0):</span>
+<span class="sd">            The base period of the RoPE embeddings.</span>
+<span class="sd">        rope_scaling (`Dict`, *optional*):</span>
+<span class="sd">            Dictionary containing the scaling configuration for the RoPE embeddings. NOTE: if you apply new rope type</span>
+<span class="sd">            and you expect the model to work on longer `max_position_embeddings`, we recommend you to update this value</span>
+<span class="sd">            accordingly.</span>
+<span class="sd">            Expected contents:</span>
+<span class="sd">                `rope_type` (`str`):</span>
+<span class="sd">                    The sub-variant of RoPE to use. Can be one of [&#39;default&#39;, &#39;linear&#39;, &#39;dynamic&#39;, &#39;yarn&#39;, &#39;longrope&#39;,</span>
+<span class="sd">                    &#39;llama3&#39;], with &#39;default&#39; being the original RoPE implementation.</span>
+<span class="sd">                `factor` (`float`, *optional*):</span>
+<span class="sd">                    Used with all rope types except &#39;default&#39;. The scaling factor to apply to the RoPE embeddings. In</span>
+<span class="sd">                    most scaling types, a `factor` of x will enable the model to handle sequences of length x *</span>
+<span class="sd">                    original maximum pre-trained length.</span>
+<span class="sd">                `original_max_position_embeddings` (`int`, *optional*):</span>
+<span class="sd">                    Used with &#39;dynamic&#39;, &#39;longrope&#39; and &#39;llama3&#39;. The original max position embeddings used during</span>
+<span class="sd">                    pretraining.</span>
+<span class="sd">                `attention_factor` (`float`, *optional*):</span>
+<span class="sd">                    Used with &#39;yarn&#39; and &#39;longrope&#39;. The scaling factor to be applied on the attention</span>
+<span class="sd">                    computation. If unspecified, it defaults to value recommended by the implementation, using the</span>
+<span class="sd">                    `factor` field to infer the suggested value.</span>
+<span class="sd">                `beta_fast` (`float`, *optional*):</span>
+<span class="sd">                    Only used with &#39;yarn&#39;. Parameter to set the boundary for extrapolation (only) in the linear</span>
+<span class="sd">                    ramp function. If unspecified, it defaults to 32.</span>
+<span class="sd">                `beta_slow` (`float`, *optional*):</span>
+<span class="sd">                    Only used with &#39;yarn&#39;. Parameter to set the boundary for interpolation (only) in the linear</span>
+<span class="sd">                    ramp function. If unspecified, it defaults to 1.</span>
+<span class="sd">                `short_factor` (`List[float]`, *optional*):</span>
+<span class="sd">                    Only used with &#39;longrope&#39;. The scaling factor to be applied to short contexts (&lt;</span>
+<span class="sd">                    `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden</span>
+<span class="sd">                    size divided by the number of attention heads divided by 2</span>
+<span class="sd">                `long_factor` (`List[float]`, *optional*):</span>
+<span class="sd">                    Only used with &#39;longrope&#39;. The scaling factor to be applied to long contexts (&lt;</span>
+<span class="sd">                    `original_max_position_embeddings`). Must be a list of numbers with the same length as the hidden</span>
+<span class="sd">                    size divided by the number of attention heads divided by 2</span>
+<span class="sd">                `low_freq_factor` (`float`, *optional*):</span>
+<span class="sd">                    Only used with &#39;llama3&#39;. Scaling factor applied to low frequency components of the RoPE</span>
+<span class="sd">                `high_freq_factor` (`float`, *optional*):</span>
+<span class="sd">                    Only used with &#39;llama3&#39;. Scaling factor applied to high frequency components of the RoPE</span>
+<span class="sd">        attention_bias (`bool`, *optional*, defaults to `False`):</span>
+<span class="sd">            Whether to use a bias in the query, key, value and output projection layers during self-attention.</span>
+<span class="sd">        attention_dropout (`float`, *optional*, defaults to 0.0):</span>
+<span class="sd">            The dropout ratio for the attention probabilities.</span>
+<span class="sd">        mlp_bias (`bool`, *optional*, defaults to `False`):</span>
+<span class="sd">            Whether to use a bias in up_proj, down_proj and gate_proj layers in the MLP layers.</span>
+<span class="sd">        head_dim (`int`, *optional*):</span>
+<span class="sd">            The attention head dimension. If None, it will default to hidden_size // num_heads</span>
+
+<span class="sd">    ```python</span>
+<span class="sd">    &gt;&gt;&gt; from transformers import GPT2Model, GPT2Config</span>
+
+<span class="sd">    &gt;&gt;&gt; # Initializing a GPT2 with a llama-7b style configuration</span>
+<span class="sd">    &gt;&gt;&gt; configuration = GPT2Config()</span>
+
+<span class="sd">    &gt;&gt;&gt; # Initializing a model from the llama-7b style configuration</span>
+<span class="sd">    &gt;&gt;&gt; model = GPT2Model(configuration)</span>
+
+<span class="sd">    &gt;&gt;&gt; # Accessing the model configuration</span>
+<span class="sd">    &gt;&gt;&gt; configuration = model.config</span>
+<span class="sd">    ```&quot;&quot;&quot;</span>
+
+    <span class="n">model_type</span> <span class="o">=</span> <span class="s2">&quot;modalities-gpt2&quot;</span>
+    <span class="n">keys_to_ignore_at_inference</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;past_key_values&quot;</span><span class="p">]</span>
+    <span class="c1"># Default tensor parallel plan for base model `GPT2Model`</span>
+    <span class="n">base_model_tp_plan</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;layers.*.self_attn.q_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.self_attn.k_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.self_attn.v_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.self_attn.o_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;rowwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.mlp.gate_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.mlp.up_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;colwise&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;layers.*.mlp.down_proj&quot;</span><span class="p">:</span> <span class="s2">&quot;rowwise&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">vocab_size</span><span class="o">=</span><span class="mi">32000</span><span class="p">,</span>
+        <span class="n">hidden_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span>
+        <span class="n">intermediate_size</span><span class="o">=</span><span class="mi">11008</span><span class="p">,</span>
+        <span class="n">num_hidden_layers</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+        <span class="n">num_attention_heads</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+        <span class="n">num_key_value_heads</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">hidden_act</span><span class="o">=</span><span class="s2">&quot;silu&quot;</span><span class="p">,</span>
+        <span class="n">max_position_embeddings</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span>
+        <span class="n">initializer_range</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">rms_norm_eps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">layer_norm_eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span>
+        <span class="n">layer_norm_bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">layer_norm_elementwise_affine</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">pad_token_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">bos_token_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">eos_token_id</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">pretraining_tp</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">tie_word_embeddings</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">rope_theta</span><span class="o">=</span><span class="mf">10000.0</span><span class="p">,</span>
+        <span class="n">rope_scaling</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">attention_bias</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">attention_dropout</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">mlp_bias</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">head_dim</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">rms_norm_eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;RMSNorm is not supported in GPT2 model.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vocab_size</span> <span class="o">=</span> <span class="n">vocab_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_position_embeddings</span> <span class="o">=</span> <span class="n">max_position_embeddings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span> <span class="o">=</span> <span class="n">hidden_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">intermediate_size</span> <span class="o">=</span> <span class="n">intermediate_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">=</span> <span class="n">num_hidden_layers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_attention_heads</span> <span class="o">=</span> <span class="n">num_attention_heads</span>
+
+        <span class="c1"># for backward compatibility</span>
+        <span class="k">if</span> <span class="n">num_key_value_heads</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">num_key_value_heads</span> <span class="o">=</span> <span class="n">num_attention_heads</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_key_value_heads</span> <span class="o">=</span> <span class="n">num_key_value_heads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hidden_act</span> <span class="o">=</span> <span class="n">hidden_act</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initializer_range</span> <span class="o">=</span> <span class="n">initializer_range</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rms_norm_eps</span> <span class="o">=</span> <span class="n">rms_norm_eps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_eps</span> <span class="o">=</span> <span class="n">layer_norm_eps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_bias</span> <span class="o">=</span> <span class="n">layer_norm_bias</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_elementwise_affine</span> <span class="o">=</span> <span class="n">layer_norm_elementwise_affine</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pretraining_tp</span> <span class="o">=</span> <span class="n">pretraining_tp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_cache</span> <span class="o">=</span> <span class="n">use_cache</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rope_theta</span> <span class="o">=</span> <span class="n">rope_theta</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rope_scaling</span> <span class="o">=</span> <span class="n">rope_scaling</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attention_bias</span> <span class="o">=</span> <span class="n">attention_bias</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attention_dropout</span> <span class="o">=</span> <span class="n">attention_dropout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp_bias</span> <span class="o">=</span> <span class="n">mlp_bias</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">head_dim</span> <span class="o">=</span> <span class="n">head_dim</span> <span class="k">if</span> <span class="n">head_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">hidden_size</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_attention_heads</span>
+        <span class="c1"># Validate the correctness of rotary position embeddings parameters</span>
+        <span class="c1"># BC: if there is a &#39;type&#39; field, copy it it to &#39;rope_type&#39;.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rope_scaling</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;type&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">rope_scaling</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rope_scaling</span><span class="p">[</span><span class="s2">&quot;rope_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rope_scaling</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
+        <span class="n">rope_config_validation</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">pad_token_id</span><span class="o">=</span><span class="n">pad_token_id</span><span class="p">,</span>
+            <span class="n">bos_token_id</span><span class="o">=</span><span class="n">bos_token_id</span><span class="p">,</span>
+            <span class="n">eos_token_id</span><span class="o">=</span><span class="n">eos_token_id</span><span class="p">,</span>
+            <span class="n">tie_word_embeddings</span><span class="o">=</span><span class="n">tie_word_embeddings</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

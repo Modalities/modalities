@@ -1,0 +1,1217 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.dataloader package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.dataloader.preprocessing package" href="modalities.dataloader.preprocessing.html" />
+    <link rel="prev" title="modalities.conversion.gpt2 package" href="modalities.conversion.gpt2.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+      <li class="breadcrumb-item active">modalities.dataloader package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.dataloader.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-dataloader-package">
+<h1>modalities.dataloader package<a class="headerlink" href="#modalities-dataloader-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.dataloader.preprocessing.html">modalities.dataloader.preprocessing package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.dataloader.preprocessing.html#module-modalities.dataloader.preprocessing">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="modalities-dataloader-apply-chat-template-module">
+<h2>modalities.dataloader.apply_chat_template module<a class="headerlink" href="#modalities-dataloader-apply-chat-template-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.dataloader.create_index">
+<span id="modalities-dataloader-create-index-module"></span><h2>modalities.dataloader.create_index module<a class="headerlink" href="#module-modalities.dataloader.create_index" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.create_index.IndexGenerator">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_index.</span></span><span class="sig-name descname"><span class="pre">IndexGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop_faulty_entries</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_index.html#IndexGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_index.IndexGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<blockquote>
+<div><p>Initializes an IndexGenerator object.
+Reads a JSONL file as a binary file, and iterates through it character by character.
+It builds the sample index by tracking the start and end positions of each JSON sample
+based on the positions of newline (</p>
+</div></blockquote>
+<p>) characters.</p>
+<blockquote>
+<div><dl>
+<dt>Args:</dt><dd><p>src_file (Path): Path to a jsonl-file.
+drop_faulty_entries (bool): Allow broken json entries in <cite>src_file</cite> by just skipping them.</p>
+<blockquote>
+<div><p>Otherwise, the index generation fails with an exception.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>src_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>drop_faulty_entries</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.create_index.IndexGenerator.create_index">
+<span class="sig-name descname"><span class="pre">create_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_path_for_index_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_index.html#IndexGenerator.create_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_index.IndexGenerator.create_index" title="Link to this definition"></a></dt>
+<dd><p>Creates an index file where each item in the index represents the start and length of a
+JSON document within a JSONL file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>target_path_for_index_file (Path): The path where the index file will be created.</p>
+</dd>
+<dt>Raises:</dt><dd><p>Exception: If an exception occurs during the indexing process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>target_path_for_index_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="modalities-dataloader-create-instruction-tuning-data-module">
+<h2>modalities.dataloader.create_instruction_tuning_data module<a class="headerlink" href="#modalities-dataloader-create-instruction-tuning-data-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.dataloader.create_packed_data">
+<span id="modalities-dataloader-create-packed-data-module"></span><h2>modalities.dataloader.create_packed_data module<a class="headerlink" href="#module-modalities.dataloader.create_packed_data" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_packed_data.</span></span><span class="sig-name descname"><span class="pre">EmbeddedStreamData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#EmbeddedStreamData"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Initializes an EmbeddedStreamData object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>data_path (Path): The path to the packed data file.
+load_index (bool, optional): Whether to load the index. Defaults to True.</p>
+</dd>
+<dt>Raises:</dt><dd><p>FileNotFoundError: If the packed data file is not found at the specified path.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>load_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES">
+<span class="sig-name descname"><span class="pre">DATA_SECTION_LENGTH_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></span><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData.DATA_SECTION_LENGTH_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData.HEADER_SIZE_IN_BYTES">
+<span class="sig-name descname"><span class="pre">HEADER_SIZE_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">12</span></span><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData.HEADER_SIZE_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES">
+<span class="sig-name descname"><span class="pre">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></span><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData.data">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><span class="pre">ndarray</span></a></span><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData.data" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmbeddedStreamData.index_base">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">index_base</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData.index_base" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.EmptySampleError">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_packed_data.</span></span><span class="sig-name descname"><span class="pre">EmptySampleError</span></span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#EmptySampleError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.EmptySampleError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">RuntimeError</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.PackedDataGenerator">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_packed_data.</span></span><span class="sig-name descname"><span class="pre">PackedDataGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tokenizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eod_token</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">number_of_processes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jq_pattern</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processing_batch_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_samples_queue_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processed_samples_queue_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#PackedDataGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.PackedDataGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Reads in a JSONL file and the corresponding index file and packs the dataset for LLM training.</p>
+<p>Initializes a PackedDataGenerator object.</p>
+<dl>
+<dt>Args:</dt><dd><p>src_path (FilePath): Path to a JSONL file, which holds text data.
+tokenizer (TokenizerWrapper): PretrainedTokenizer object used to tokenize the provided data in <cite>src_path</cite>.
+eod_token (str): End-of-document token.
+number_of_processes (int): Number of processes used for parallel processing.
+jq_pattern (str): jq-pattern applied on every jsonl-entry. Results are afterwards tokenized and packed.
+processing_batch_size (int): Size of the batches that the workers process.
+raw_samples_queue_size (int): Maximum size of the raw samples queue.
+processed_samples_queue_size (int): Maximum size of the processed samples queue.
+index_path (Optional[FilePath]): Path to an index file,</p>
+<blockquote>
+<div><p>which indicates the start character position
+and length of samples given in <cite>src_path</cite>. If not defined, an index file next to <cite>src_path</cite> is picked,
+by replacing its suffix with “.idx”. Defaults to None.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>src_path</strong> (<em>Annotated</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em>, </em><em>PathType</em><em>(</em><em>path_type=file</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>tokenizer</strong> (<a class="reference internal" href="modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper" title="modalities.tokenization.tokenizer_wrapper.TokenizerWrapper"><em>TokenizerWrapper</em></a>)</p></li>
+<li><p><strong>eod_token</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>number_of_processes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>jq_pattern</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>processing_batch_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>raw_samples_queue_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>processed_samples_queue_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>index_path</strong> (<em>Annotated</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em>, </em><em>PathType</em><em>(</em><em>path_type=file</em><em>)</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.PackedDataGenerator.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dst_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#PackedDataGenerator.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.PackedDataGenerator.run" title="Link to this definition"></a></dt>
+<dd><p>Packs data and saves it to (default) dst_path.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>dst_path (Optional[Path]): The destination path to save the packed data.
+If not provided, a default destination path will be used.</p>
+</dd>
+<dt>Raises:</dt><dd><p>ValueError: If the file already exists at the destination path.
+Exception: If an exception occurs during the data packing process.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dst_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em> | </em><em>None</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.join_embedded_stream_data">
+<span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_packed_data.</span></span><span class="sig-name descname"><span class="pre">join_embedded_stream_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2048</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#join_embedded_stream_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.join_embedded_stream_data" title="Link to this definition"></a></dt>
+<dd><p>Joins the embedded stream data into a single file.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>stream_data (list[EmbeddedStreamData]): A list of EmbeddedStreamData objects representing the stream data.
+target_file (Path): The target file to write the joined data to.
+chunk_size (int, optional): The size of each data chunk. Defaults to 2048.</p>
+</dd>
+<dt>Raises:</dt><dd><p>FileExistsError: If the target file already exists.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stream_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.create_packed_data.EmbeddedStreamData" title="modalities.dataloader.create_packed_data.EmbeddedStreamData"><em>EmbeddedStreamData</em></a><em>]</em>)</p></li>
+<li><p><strong>target_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.dataloader.create_packed_data.update_data_length_in_pre_allocated_header">
+<span class="sig-prename descclassname"><span class="pre">modalities.dataloader.create_packed_data.</span></span><span class="sig-name descname"><span class="pre">update_data_length_in_pre_allocated_header</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dst_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/create_packed_data.html#update_data_length_in_pre_allocated_header"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.create_packed_data.update_data_length_in_pre_allocated_header" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dst_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>index_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.dataloader">
+<span id="modalities-dataloader-dataloader-module"></span><h2>modalities.dataloader.dataloader module<a class="headerlink" href="#module-modalities.dataloader.dataloader" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataloader.LLMDataLoader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataloader.</span></span><span class="sig-name descname"><span class="pre">LLMDataLoader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataloader_tag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_sampler</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collate_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pin_memory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop_last</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">worker_init_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiprocessing_context</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefetch_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">persistent_workers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pin_memory_device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataloader.html#LLMDataLoader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataloader.LLMDataLoader" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataLoader</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">_T_co</span></code>]</p>
+<p>LLMDataLoader is a custom DataLoader class that extends the PyTorch DataLoader class.</p>
+<p>Initializes a DataLoader object.</p>
+<dl>
+<dt>Args:</dt><dd><p>dataloader_tag (str): The tag for the dataloader.
+batch_sampler (BatchSampler): The batch sampler used for sampling batches.
+dataset (Dataset[T_co]): The dataset to load the data from.
+batch_size (Optional[int], optional): The number of samples per batch. Defaults to 1.
+sampler (Optional[Sampler | Iterable], optional): The sampler used for sampling data. Defaults to None.
+num_workers (int, optional): The number of worker processes to use for data loading. Defaults to 0.
+collate_fn (Optional[_collate_fn_t], optional): The function used to collate the data samples.</p>
+<blockquote>
+<div><p>Defaults to None.</p>
+</div></blockquote>
+<p>pin_memory (bool, optional): Flag indicating whether to pin the memory. Defaults to False.
+drop_last (bool, optional): Flag indicating whether to drop the last incomplete batch. Defaults to False.
+timeout (float, optional): The timeout value for collecting a batch from workers. Defaults to 0.
+worker_init_fn (Optional[_worker_init_fn_t], optional): The function used to initialize worker processes.</p>
+<blockquote>
+<div><p>Defaults to None.</p>
+</div></blockquote>
+<p>multiprocessing_context ([type], optional): The multiprocessing context to use. Defaults to None.
+generator ([type], optional): The random number generator. Defaults to None.
+prefetch_factor (Optional[int], optional): The number of batches to prefetch. Defaults to None.
+persistent_workers (bool, optional): Flag indicating whether to keep the workers alive</p>
+<blockquote>
+<div><p>between data loading iterations. Defaults to False.</p>
+</div></blockquote>
+<p>pin_memory_device (str, optional): The device to pin the memory to. Defaults to “”.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataloader_tag</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>batch_sampler</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.BatchSampler" title="(in PyTorch v2.10)"><em>BatchSampler</em></a>)</p></li>
+<li><p><strong>dataset</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Dataset" title="(in PyTorch v2.10)"><em>Dataset</em></a><em>[</em><em>_T_co</em><em>]</em>)</p></li>
+<li><p><strong>batch_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>sampler</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler" title="(in PyTorch v2.10)"><em>Sampler</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a>)</p></li>
+<li><p><strong>num_workers</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>collate_fn</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><em>_T</em><em>]</em><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>pin_memory</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>drop_last</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>worker_init_fn</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em><em>, </em><em>None</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>prefetch_factor</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>persistent_workers</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>pin_memory_device</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.dataloader.dataloader.LLMDataLoader.dataloader_tag">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dataloader_tag</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><a class="headerlink" href="#modalities.dataloader.dataloader.LLMDataLoader.dataloader_tag" title="Link to this definition"></a></dt>
+<dd><p>Returns the dataloader tag.</p>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>str: The dataloader tag.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.dataloader_factory">
+<span id="modalities-dataloader-dataloader-factory-module"></span><h2>modalities.dataloader.dataloader_factory module<a class="headerlink" href="#module-modalities.dataloader.dataloader_factory" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataloader_factory.DataloaderFactory">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataloader_factory.</span></span><span class="sig-name descname"><span class="pre">DataloaderFactory</span></span><a class="reference internal" href="../_modules/modalities/dataloader/dataloader_factory.html#DataloaderFactory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataloader_factory.DataloaderFactory" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataloader_factory.DataloaderFactory.get_dataloader">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_dataloader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataloader_tag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_sampler</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">collate_fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pin_memory</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataloader_factory.html#DataloaderFactory.get_dataloader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataloader_factory.DataloaderFactory.get_dataloader" title="Link to this definition"></a></dt>
+<dd><p>Factory method for the instantiation of LLMDataLoader.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataloader.LLMDataLoader" title="modalities.dataloader.dataloader.LLMDataLoader"><code class="xref py py-class docutils literal notranslate"><span class="pre">LLMDataLoader</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>dataloader_tag</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>dataset</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Dataset" title="(in PyTorch v2.10)"><em>Dataset</em></a>)</p></li>
+<li><p><strong>batch_sampler</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.BatchSampler" title="(in PyTorch v2.10)"><em>BatchSampler</em></a>)</p></li>
+<li><p><strong>collate_fn</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a>)</p></li>
+<li><p><strong>num_workers</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>pin_memory</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>dataloader_tag (str): Tag for the dataloader
+dataset (Dataset): Dataset to be used
+batch_sampler (BatchSampler): batch sampler for batch-wise sampling from the dataset
+collate_fn (Callable): Callable for shaping the batch
+num_workers (int): Number of workers for the dataloader
+pin_memory (bool): Flag indicating whether to pin memory</p>
+</dd>
+<dt>Returns:</dt><dd><p>LLMDataLoader: Instance of LLMDataLoader</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.dataset">
+<span id="modalities-dataloader-dataset-module"></span><h2>modalities.dataloader.dataset module<a class="headerlink" href="#module-modalities.dataloader.dataset" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.CombinedDataset">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">CombinedDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">datasets</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#CombinedDataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.CombinedDataset" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></p>
+<p>Combines multiple datasets into one large dataset at runtime.</p>
+<p>Note: When using this class to combine multiple <a href="#id1"><span class="problematic" id="id2">`</span></a>PackedMemMapDataset`s, each packed sample
+is packed from a single dataset (i.e., the samples are not mixed between datasets).
+In the Dataloader, a batch will still contain packed samples from different datasets.</p>
+<p>Initializes the CombinedDataset object, combining multiple datasets.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>datasets (list[Dataset]): A list of datasets to combine.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>datasets</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><em>Dataset</em></a><em>]</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.Dataset">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">Dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#Dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.Dataset" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Dataset" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></p>
+<p>Dataset class.</p>
+<p>Initializes a Dataset object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>raw_data_path (Path): The path to the raw data.
+sample_key (str): The key used to access a sample in the dataset.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<em>Path</em>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummyDataset">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">DummyDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_definition</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#DummyDataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.DummyDataset" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></p>
+<p>DummyDataset class.</p>
+<p>Initializes a DummyDataset object with the given number of samples and sample definition.
+When calling the __getitem__ method, the dataset will return a random sample based on the sample definition.</p>
+<dl>
+<dt>Args:</dt><dd><p>num_samples (int): The number of samples in the dataset.
+sample_definition (tuple[DummySampleConfig]): A list of tuples defining the dataset output.</p>
+<blockquote>
+<div><p>Each touple contains the sample key, shape and data type.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>sample_definition</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.dataset.DummySampleConfig" title="modalities.dataloader.dataset.DummySampleConfig"><em>DummySampleConfig</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummyDatasetConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">DummyDatasetConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#DummyDatasetConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.DummyDatasetConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>DummyDatasetConfig is a configuration class for defining a dummy dataset.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>num_samples (int): The number of samples in the dataset.
+sample_definition (list[DummySampleConfig]): The list of sample definitions in the dataset.</p>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>sample_definition</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.dataset.DummySampleConfig" title="modalities.dataloader.dataset.DummySampleConfig"><em>DummySampleConfig</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummyDatasetConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummyDatasetConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummyDatasetConfig.num_samples">
+<span class="sig-name descname"><span class="pre">num_samples</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#modalities.dataloader.dataset.DummyDatasetConfig.num_samples" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummyDatasetConfig.sample_definition">
+<span class="sig-name descname"><span class="pre">sample_definition</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#modalities.dataloader.dataset.DummySampleConfig" title="modalities.dataloader.dataset.DummySampleConfig"><span class="pre">DummySampleConfig</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummyDatasetConfig.sample_definition" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">DummySampleConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#DummySampleConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>DummySampleConfig class represents the configuration for a dummy sample.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>sample_key (str): The key of the sample.
+sample_shape (tuple[int, …]): The shape of the sample.
+sample_type (DummySampleDataType): The type of the sample.</p>
+</dd>
+</dl>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>sample_shape</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>...</em><em>]</em>)</p></li>
+<li><p><strong>sample_type</strong> (<a class="reference internal" href="#modalities.dataloader.dataset.DummySampleDataType" title="modalities.dataloader.dataset.DummySampleDataType"><em>DummySampleDataType</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleConfig.sample_key">
+<span class="sig-name descname"><span class="pre">sample_key</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleConfig.sample_key" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleConfig.sample_shape">
+<span class="sig-name descname"><span class="pre">sample_shape</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleConfig.sample_shape" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleConfig.sample_type">
+<span class="sig-name descname"><span class="pre">sample_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#modalities.dataloader.dataset.DummySampleDataType" title="modalities.dataloader.dataset.DummySampleDataType"><span class="pre">DummySampleDataType</span></a></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleConfig.sample_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleDataType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">DummySampleDataType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#DummySampleDataType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleDataType" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>DummySampleDataType is an enumeration class that represents the data types for dummy samples.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>FLOAT (str): Represents the float data type.
+INT (str): Represents the int data type.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleDataType.FLOAT">
+<span class="sig-name descname"><span class="pre">FLOAT</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'float'</span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleDataType.FLOAT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.DummySampleDataType.INT">
+<span class="sig-name descname"><span class="pre">INT</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'int'</span></span><a class="headerlink" href="#modalities.dataloader.dataset.DummySampleDataType.INT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.MemMapDataset">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">MemMapDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tokenizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jq_pattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.text'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#MemMapDataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.MemMapDataset" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></p>
+<p>Initializes the MemMapDataset object that represents a PyTorch Dataset with mmap support.</p>
+<dl>
+<dt>Args:</dt><dd><p>raw_data_path (Path): Path to a JSONL file, which holds text data.
+tokenizer (TokenizerWrapper): The tokenizer object that is required to tokenize text data.
+sample_key (str): The key to access the sample in the BatchEncoding.
+index_path (Optional[Path], optional): The path to the index file which indicates</p>
+<blockquote>
+<div><p>the start character/byte position of documents. Defaults to None.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>jq_pattern (str, optional): The jq pattern to filter the data. Results are afterwards tokenized and packed.</dt><dd><p>Defaults to “.text”.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<em>Path</em>)</p></li>
+<li><p><strong>tokenizer</strong> (<a class="reference internal" href="modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper" title="modalities.tokenization.tokenizer_wrapper.TokenizerWrapper"><em>TokenizerWrapper</em></a>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>index_path</strong> (<em>Optional</em><em>[</em><em>Path</em><em>]</em>)</p></li>
+<li><p><strong>jq_pattern</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">PackedMemMapDatasetBase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#PackedMemMapDatasetBase"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></p>
+<p>PackedMemMapDatasetBase class.</p>
+<p>Initializes the PackedMemMapDatasetBase object.</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>raw_data_path (Path): Path to a packed binary file (<a href="#id3"><span class="problematic" id="id4">*</span></a>.pbin).</dt><dd><p>Use <cite>modalities data pack_encoded_data</cite> to create one based on a JSONL-file.</p>
+</dd>
+</dl>
+<p>sample_key (str): The key to access the sample in the BatchEncoding.
+load_index (bool, optional): Flag indicating whether to load the index. Defaults to True.</p>
+</dd>
+<dt>Raises:</dt><dd><p>RuntimeError: If the token representation with the given size is not supported.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+<dt>Note:</dt><dd><dl class="simple">
+<dt>TODO: sample_key should support multi-modal features using separately encoded inputs,</dt><dd><p>this needs to get replaced with a list of sample keys!</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<em>Path</em>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>load_index</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.DATA_SECTION_LENGTH_IN_BYTES">
+<span class="sig-name descname"><span class="pre">DATA_SECTION_LENGTH_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.DATA_SECTION_LENGTH_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.HEADER_SIZE_IN_BYTES">
+<span class="sig-name descname"><span class="pre">HEADER_SIZE_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">12</span></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.HEADER_SIZE_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES">
+<span class="sig-name descname"><span class="pre">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.np_dtype_of_tokens_on_disk_from_bytes">
+<span class="sig-name descname"><span class="pre">np_dtype_of_tokens_on_disk_from_bytes</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{1:</span> <span class="pre">dtype('uint8'),</span> <span class="pre">2:</span> <span class="pre">dtype('&lt;u2'),</span> <span class="pre">4:</span> <span class="pre">dtype('&lt;u4')}</span></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.np_dtype_of_tokens_on_disk_from_bytes" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.token_size_in_bytes">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">token_size_in_bytes</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.token_size_in_bytes" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetBase.type_converter_for_torch">
+<span class="sig-name descname"><span class="pre">type_converter_for_torch</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{1:</span> <span class="pre">&lt;class</span> <span class="pre">'numpy.uint8'&gt;,</span> <span class="pre">2:</span> <span class="pre">&lt;class</span> <span class="pre">'numpy.int32'&gt;,</span> <span class="pre">4:</span> <span class="pre">&lt;class</span> <span class="pre">'numpy.int64'&gt;}</span></span><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase.type_converter_for_torch" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetContinuous">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">PackedMemMapDatasetContinuous</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reuse_last_target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">load_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#PackedMemMapDatasetContinuous"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetContinuous" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase" title="modalities.dataloader.dataset.PackedMemMapDatasetBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackedMemMapDatasetBase</span></code></a></p>
+<p>PackedMemMapDatasetContinuous class.</p>
+<p>Initializes a Dataset object for continuous packed data. If <cite>reuse_last_target</cite> is True,
+the last target token of one sample is reused as the first input token of the next sample,
+creating an overlap of one token between samples (recommended for pre-training).
+If <cite>reuse_last_target</cite> is False, there is no overlap:
+Each sample is a distinct block, and the first token of each sample is never used as a target
+(recommended for instruction tuning).</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>raw_data_path (Path): Path to a packed binary file (<a href="#id5"><span class="problematic" id="id6">*</span></a>.pbin).</dt><dd><p>Use <cite>modalities data pack_encoded_data</cite> to create one based on a JSONL-file.</p>
+</dd>
+</dl>
+<p>sample_key (str): The key to access the sample in the BatchEncoding.
+block_size (int): The size of the block.
+load_index (bool, optional): Flag indicating whether to load the index.</p>
+<blockquote>
+<div><p>This is only needed for debugging purposes to index the original documents.
+The continuous packing does not need to load the index and should be
+deactivated as it significantly increases the instantiation time. Defaults to False.</p>
+</div></blockquote>
+<dl>
+<dt>reuse_last_target (bool, optional): Whether to reuse the last target token between samples. Default: True.</dt><dd><p>In pre-training, setting this to True enables overlapping samples:
+The last target token of one sample becomes the first input token of the next sample,
+maximizing data throughput.
+For instruction tuning (IT), where sequences are often short and may end with special tokens
+(e.g., PAD or EOS), set this to False to avoid overlap:
+Each token is used only once as a target and never reused as the start of the next sample.</p>
+<p>False: No overlap; each sample is a distinct block of tokens (recommended for instruction tuning).
+True: Overlap by one token;</p>
+<blockquote>
+<div><p>each token (except the very first and last) is both a sample and a target
+(recommended for pre-training).</p>
+</div></blockquote>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<em>Path</em>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>block_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>reuse_last_target</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>load_index</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset.PackedMemMapDatasetMegatron">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset.</span></span><span class="sig-name descname"><span class="pre">PackedMemMapDatasetMegatron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset.html#PackedMemMapDatasetMegatron"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset.PackedMemMapDatasetMegatron" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.dataset.PackedMemMapDatasetBase" title="modalities.dataloader.dataset.PackedMemMapDatasetBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackedMemMapDatasetBase</span></code></a></p>
+<p>Initializes the PackedMemMapDatasetBase object.</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>raw_data_path (Path): Path to a packed binary file (<a href="#id7"><span class="problematic" id="id8">*</span></a>.pbin).</dt><dd><p>Use <cite>modalities data pack_encoded_data</cite> to create one based on a JSONL-file.</p>
+</dd>
+</dl>
+<p>sample_key (str): The key to access the sample in the BatchEncoding.
+load_index (bool, optional): Flag indicating whether to load the index. Defaults to True.</p>
+</dd>
+<dt>Raises:</dt><dd><p>RuntimeError: If the token representation with the given size is not supported.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+<dt>Note:</dt><dd><dl class="simple">
+<dt>TODO: sample_key should support multi-modal features using separately encoded inputs,</dt><dd><p>this needs to get replaced with a list of sample keys!</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<em>Path</em>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>block_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.dataset_factory">
+<span id="modalities-dataloader-dataset-factory-module"></span><h2>modalities.dataloader.dataset_factory module<a class="headerlink" href="#module-modalities.dataloader.dataset_factory" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.dataset_factory.</span></span><span class="sig-name descname"><span class="pre">DatasetFactory</span></span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>DatasetFactory for building the different dataset types.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_combined_dataset">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_combined_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">datasets</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_combined_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_combined_dataset" title="Link to this definition"></a></dt>
+<dd><p>Factory method for creating a combined datset .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>datasets</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.dataset.Dataset" title="modalities.dataloader.dataset.Dataset"><em>Dataset</em></a><em>]</em>)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>datasets (list[Dataset]): List of datasets to combine.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Dataset: CombinedDataset object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_dummy_dataset">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_dummy_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_definition</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_dummy_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_dummy_dataset" title="Link to this definition"></a></dt>
+<dd><p>Returns a DummyDataset object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataset.DummyDataset" title="modalities.dataloader.dataset.DummyDataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">DummyDataset</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>sample_definition</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference internal" href="#modalities.dataloader.dataset.DummySampleConfig" title="modalities.dataloader.dataset.DummySampleConfig"><em>DummySampleConfig</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><p>num_samples (int): The number of samples the dataset should generate.
+sample_definition (tuple[DummySampleConfig]): A list of tuples defining the dataset output.</p>
+<blockquote>
+<div><p>Each tuple contains the sample key, shape and data type.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>DummyDataset: The generated DummyDataset object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_mem_map_dataset">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_mem_map_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tokenizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jq_pattern</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.text'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_mem_map_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_mem_map_dataset" title="Link to this definition"></a></dt>
+<dd><p>Returns a MemMapDataset object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataset.MemMapDataset" title="modalities.dataloader.dataset.MemMapDataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemMapDataset</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>tokenizer</strong> (<em>PythonBackend</em>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>index_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>jq_pattern</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>raw_data_path (Path): The path to the raw data.
+tokenizer (PreTrainedTokenizer): The tokenizer used to tokenize the data.
+sample_key (str): The key used to retrieve the samples from the dataset.
+index_path (Optional[Path], optional): The path to the index file. Defaults to None.
+jq_pattern (str, optional): The pattern used to extract the text from the data. Defaults to “.text”.</p>
+</dd>
+<dt>Returns:</dt><dd><p>MemMapDataset: The MemMapDataset object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_packed_mem_map_dataset_continuous">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_packed_mem_map_dataset_continuous</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reuse_last_target</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_packed_mem_map_dataset_continuous"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_packed_mem_map_dataset_continuous" title="Link to this definition"></a></dt>
+<dd><p>Initializes a PackedMemMapDatasetContinuous object. If <cite>reuse_last_target</cite> is True,
+the last target token of one sample is reused as the first input token of the next sample,
+creating an overlap of one token between samples (recommended for pre-training).
+If <cite>reuse_last_target</cite> is False, there is no overlap:
+Each sample is a distinct block, and the first token of each sample is never used as a target
+(recommended for instruction tuning).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataset.PackedMemMapDatasetContinuous" title="modalities.dataloader.dataset.PackedMemMapDatasetContinuous"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackedMemMapDatasetContinuous</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>sequence_length</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>reuse_last_target</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>raw_data_path (Path): The path to the raw data.
+sequence_length (int): The length of each sequence.
+sample_key (str): The key used to retrieve the samples from the dataset.
+reuse_last_target (bool): Whether to reuse the last target.</p>
+</dd>
+<dt>Returns:</dt><dd><p>PackedMemMapDatasetContinuous: The packed memory-mapped dataset.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_packed_mem_map_dataset_megatron">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_packed_mem_map_dataset_megatron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_packed_mem_map_dataset_megatron"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_packed_mem_map_dataset_megatron" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.dataloader.dataset.PackedMemMapDatasetMegatron" title="modalities.dataloader.dataset.PackedMemMapDatasetMegatron"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackedMemMapDatasetMegatron</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>sequence_length</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>sample_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.dataset_factory.DatasetFactory.get_raw_index">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_raw_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_index_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/dataset_factory.html#DatasetFactory.get_raw_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.dataset_factory.DatasetFactory.get_raw_index" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>raw_index_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.filter_packed_data">
+<span id="modalities-dataloader-filter-packed-data-module"></span><h2>modalities.dataloader.filter_packed_data module<a class="headerlink" href="#module-modalities.dataloader.filter_packed_data" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.dataloader.filter_packed_data.filter_dataset">
+<span class="sig-prename descclassname"><span class="pre">modalities.dataloader.filter_packed_data.</span></span><span class="sig-name descname"><span class="pre">filter_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/filter_packed_data.html#filter_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.filter_packed_data.filter_dataset" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>src_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>dst_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>filter_func</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><em>ndarray</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>, </em><em>...</em><em>]</em><em>, </em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.dtype.html#numpy.dtype" title="(in NumPy v2.4)"><em>dtype</em></a><em>[</em><em>int64</em><em>]</em><em>]</em><em>]</em><em>]</em><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<p>Filters the dataset based on a given filter function and writes the filtered data to the destination path.
+Args:</p>
+<blockquote>
+<div><p>src_path (Path): The path to the source dataset to filter.
+dst_path (Path): The path where the filtered dataset will be written.
+filter_func (Callable[[tuple[int, dict[str, NDArray[<a href="#id9"><span class="problematic" id="id10">np.int_</span></a>]]]], bool]):</p>
+<blockquote>
+<div><p>A function that takes a sample index and its content and returns
+True if the sample should be included, False otherwise.</p>
+</div></blockquote>
+</div></blockquote>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader.large_file_lines_reader">
+<span id="modalities-dataloader-large-file-lines-reader-module"></span><h2>modalities.dataloader.large_file_lines_reader module<a class="headerlink" href="#module-modalities.dataloader.large_file_lines_reader" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.large_file_lines_reader.BaseReader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.large_file_lines_reader.</span></span><span class="sig-name descname"><span class="pre">BaseReader</span></span><a class="reference internal" href="../_modules/modalities/dataloader/large_file_lines_reader.html#BaseReader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.large_file_lines_reader.BaseReader" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.large_file_lines_reader.LargeFileLinesReader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.large_file_lines_reader.</span></span><span class="sig-name descname"><span class="pre">LargeFileLinesReader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'utf-8'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_sample_length_from_index</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/large_file_lines_reader.html#LargeFileLinesReader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.large_file_lines_reader.LargeFileLinesReader" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.dataloader.large_file_lines_reader.BaseReader" title="modalities.dataloader.large_file_lines_reader.BaseReader"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseReader</span></code></a></p>
+<p>LargeFileLinesReader class that read lines from a large file efficiently.</p>
+<p>Initializes a LargeFileLinesReader object.</p>
+<dl>
+<dt>Args:</dt><dd><p>raw_data_path (Path): Path to a jsonl file, which holds text data.
+index_path (Optional[Path]): Path to an index file, which indicates the start character/byte position</p>
+<blockquote>
+<div><p>and length of samples given in <cite>raw_data_path</cite>.
+If not defined, an index next to <cite>raw_data_path</cite> is picked,
+by replacing its suffix with “.idx”.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>encoding (Optional[str]): The encoding of the file (default: “utf-8”).</dt><dd><p>If encoding is None, the raw data is read as bytes.</p>
+</dd>
+<dt>use_sample_length_from_index (bool): If True, the sample length is taken from the index file</dt><dd><p>i.e., the (offset, sample_length) pairs. If False, the sample length is calculated
+as the difference between the starting point of the next and the current sample.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>index_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>encoding</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>use_sample_length_from_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.large_file_lines_reader.LargeFileLinesReader.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/large_file_lines_reader.html#LargeFileLinesReader.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.large_file_lines_reader.LargeFileLinesReader.close" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.dataloader.large_file_lines_reader.LargeFileLinesReader.default_index_path">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">default_index_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/large_file_lines_reader.html#LargeFileLinesReader.default_index_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.large_file_lines_reader.LargeFileLinesReader.default_index_path" title="Link to this definition"></a></dt>
+<dd><p>Returns the default index path for the given raw data path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_data_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+<li><p><strong>index_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>raw_data_path (Path): The path to the raw data file.
+index_path (Optional[Path]): The path to the index file (default: None).</p>
+</dd>
+<dt>Returns:</dt><dd><p>Path: The default index path.</p>
+</dd>
+<dt>Note:</dt><dd><dl class="simple">
+<dt>If <cite>index_path</cite> is not provided, the default index path is generated by</dt><dd><p>appending the extension “.idx” to the stem of the <cite>raw_data_path</cite>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="modalities-dataloader-sampler-factory-module">
+<h2>modalities.dataloader.sampler_factory module<a class="headerlink" href="#modalities-dataloader-sampler-factory-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.dataloader.samplers">
+<span id="modalities-dataloader-samplers-module"></span><h2>modalities.dataloader.samplers module<a class="headerlink" href="#module-modalities.dataloader.samplers" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.dataloader.samplers.ResumableDistributedSampler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.dataloader.samplers.</span></span><span class="sig-name descname"><span class="pre">ResumableDistributedSampler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rank</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_replicas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epoch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop_last</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_num_global_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/dataloader/samplers.html#ResumableDistributedSampler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.dataloader.samplers.ResumableDistributedSampler" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sampler</span></code></a>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">T_co</span></code>]</p>
+<p>Sampler that restricts data loading to a subset of the dataset.
+We adopted this class from pytorch’s DistributedSampler class and added the ability to resume from a specific index.
+source: <a class="reference external" href="https://github.com/pytorch/pytorch/blob/main/torch/utils/data/distributed.py">https://github.com/pytorch/pytorch/blob/main/torch/utils/data/distributed.py</a></p>
+<p>It is especially useful in conjunction with
+<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html#torch.nn.parallel.DistributedDataParallel" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.parallel.DistributedDataParallel</span></code></a>. In such a case, each
+process can pass a <code class="xref py py-class docutils literal notranslate"><span class="pre">DistributedSampler</span></code> instance as a
+<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataLoader</span></code></a> sampler, and load a subset of the
+original dataset that is exclusive to it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Dataset is assumed to be of constant size and that any instance of it always
+returns the same elements in the same order.</p>
+</div>
+<p>Instantiates a distributed and resumable Sampler object.</p>
+<dl>
+<dt>Args:</dt><dd><p>dataset (Dataset): The dataset to sample from.
+rank (int): The global rank of the current process.
+num_replicas (int, optional): Number of replicas.</p>
+<blockquote>
+<div><p>This usually equals the world size. Defaults to None.</p>
+</div></blockquote>
+<p>epoch (int, optional): Current epoch. Defaults to 0.
+shuffle (bool, optional): Boolean flag whether to shuffle the data. Defaults to False.
+seed (int, optional): Seed for the shuffling. Defaults to 0.
+drop_last (bool, optional): Boolean flag indicating whether to drop the last samples</p>
+<blockquote>
+<div><p>that cannot be distributed over all ranks (i.e., maximum world size - samples).
+If drop_last is false padding is applied for these samples, by resampling the initial samples.
+Defaults to False.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>skip_num_global_samples (int, optional): Number of samples to skip, e.g., due to warmstart.</dt><dd><p>Defaults to 0.</p>
+</dd>
+</dl>
+</dd>
+<dt>Raises:</dt><dd><p>RuntimeError: Requires distributed package to be available if num_replicas is None.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Dataset" title="(in PyTorch v2.10)"><em>Dataset</em></a>)</p></li>
+<li><p><strong>rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_replicas</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>epoch</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>shuffle</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>drop_last</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>skip_num_global_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.dataloader">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.dataloader" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.conversion.gpt2.html" class="btn btn-neutral float-left" title="modalities.conversion.gpt2 package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.dataloader.preprocessing.html" class="btn btn-neutral float-right" title="modalities.dataloader.preprocessing package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

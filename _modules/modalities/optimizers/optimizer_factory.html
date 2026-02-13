@@ -1,0 +1,415 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.optimizers.optimizer_factory &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.optimizers.optimizer_factory</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.optimizers.optimizer_factory</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPModule</span> <span class="k">as</span> <span class="n">FSDP2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP1</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">DTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Adam</span><span class="p">,</span> <span class="n">AdamW</span><span class="p">,</span> <span class="n">Optimizer</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDP1CheckpointLoadingIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptimizerError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">NNModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_local_number_of_trainable_parameters</span><span class="p">,</span> <span class="n">print_rank_0</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.typing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPX</span>
+
+<span class="n">OptimizerGroups</span> <span class="o">=</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]]</span>
+
+
+<div class="viewcode-block" id="OptimizerFactory">
+<a class="viewcode-back" href="../../../api/modalities.optimizers.html#modalities.optimizers.optimizer_factory.OptimizerFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OptimizerFactory</span><span class="p">:</span>
+<div class="viewcode-block" id="OptimizerFactory.get_adam">
+<a class="viewcode-back" href="../../../api/modalities.optimizers.html#modalities.optimizers.optimizer_factory.OptimizerFactory.get_adam">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_adam</span><span class="p">(</span>
+        <span class="n">lr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">betas</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">foreach</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fused</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optimizer</span><span class="p">:</span>
+        <span class="n">optimizer_groups</span> <span class="o">=</span> <span class="n">get_optimizer_groups</span><span class="p">(</span><span class="n">wrapped_model</span><span class="p">,</span> <span class="n">weight_decay</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">)</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">Adam</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">optimizer_groups</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="n">eps</span><span class="p">,</span> <span class="n">foreach</span><span class="o">=</span><span class="n">foreach</span><span class="p">,</span> <span class="n">fused</span><span class="o">=</span><span class="n">fused</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">optimizer</span></div>
+
+
+<div class="viewcode-block" id="OptimizerFactory.get_adam_w">
+<a class="viewcode-back" href="../../../api/modalities.optimizers.html#modalities.optimizers.optimizer_factory.OptimizerFactory.get_adam_w">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_adam_w</span><span class="p">(</span>
+        <span class="n">lr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">betas</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">foreach</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fused</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optimizer</span><span class="p">:</span>
+        <span class="n">optimizer_groups</span> <span class="o">=</span> <span class="n">get_optimizer_groups</span><span class="p">(</span><span class="n">wrapped_model</span><span class="p">,</span> <span class="n">weight_decay</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">)</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">AdamW</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">optimizer_groups</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="n">eps</span><span class="p">,</span> <span class="n">foreach</span><span class="o">=</span><span class="n">foreach</span><span class="p">,</span> <span class="n">fused</span><span class="o">=</span><span class="n">fused</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">optimizer</span></div>
+
+
+<div class="viewcode-block" id="OptimizerFactory.get_fsdp1_checkpointed_optimizer_">
+<a class="viewcode-back" href="../../../api/modalities.optimizers.html#modalities.optimizers.optimizer_factory.OptimizerFactory.get_fsdp1_checkpointed_optimizer_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fsdp1_checkpointed_optimizer_</span><span class="p">(</span>
+        <span class="n">checkpoint_loading</span><span class="p">:</span> <span class="n">FSDP1CheckpointLoadingIF</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">FSDP1</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optimizer</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads an FSDP1-checkpointed optimizer from a checkpoint file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_loading (FSDP1CheckpointLoadingIF): The FDSP1 checkpoint loading strategy.</span>
+<span class="sd">            checkpoint_path (Path): The path to the checkpoint file.</span>
+<span class="sd">            wrapped_model (FSDP1): The FSDP1 model associated with the optimizer.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer to load the checkpoint into.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optimizer: The optimizer loaded from the checkpoint.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">checkpoint_loading</span><span class="o">.</span><span class="n">load_optimizer_checkpoint_</span><span class="p">(</span>
+            <span class="n">file_path</span><span class="o">=</span><span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">wrapped_model</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">optimizer</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="get_optimizer_groups">
+<a class="viewcode-back" href="../../../api/modalities.optimizers.html#modalities.optimizers.optimizer_factory.get_optimizer_groups">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_optimizer_groups</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">FSDP</span><span class="p">,</span> <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">OptimizerGroups</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    divide model parameters into optimizer groups (with or without weight decay)</span>
+
+<span class="sd">    inspired by:</span>
+<span class="sd">    - https://github.com/pytorch/pytorch/issues/101343</span>
+<span class="sd">    - https://github.com/karpathy/nanoGPT</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">weight_decay</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight_decay_groups_excluded</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># there will be 1 optimizer group, i.e. all parameters have the same weight decay</span>
+        <span class="n">optimizer_groups</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()),</span> <span class="s2">&quot;weight_decay&quot;</span><span class="p">:</span> <span class="n">weight_decay</span><span class="p">}]</span>
+        <span class="n">optimizer_groups_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># there will be N optimizer groups, i.e. one for each model parameter group</span>
+        <span class="n">_check_existence_of_weight_decay_groups_excluded</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">)</span>
+        <span class="n">optimizer_groups</span><span class="p">,</span> <span class="n">optimizer_groups_names</span> <span class="o">=</span> <span class="n">_create_optimizer_groups</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">weight_decay</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span>
+        <span class="p">)</span>
+
+    <span class="n">_assert_completeness_of_optimizer_groups</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer_groups</span><span class="p">)</span>
+    <span class="n">_print_optimizer_groups_overview</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">,</span> <span class="n">optimizer_groups_names</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">optimizer_groups</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_existence_of_weight_decay_groups_excluded</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    checks the existence of all groups</span>
+<span class="sd">    that are to be excluded from weight decay</span>
+
+<span class="sd">    Example GPT2:</span>
+<span class="sd">        weight_decay_groups = {</span>
+<span class="sd">            &quot;linear&quot;: [&quot;.attn&quot;, &quot;.mlp&quot;, &quot;.lm_head.weight&quot;],</span>
+<span class="sd">            &quot;embedding&quot;: [&quot;.wte&quot;, &quot;.wpe&quot;], &quot;layernorm&quot;: [&quot;.*_norm&quot;]]</span>
+<span class="sd">        }</span>
+<span class="sd">        weight_decay_groups_excluded = [&quot;embedding&quot;, &quot;layernorm&quot;]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># FSDP 1</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;module&quot;</span><span class="p">):</span>
+        <span class="n">nn_model</span><span class="p">:</span> <span class="n">NNModel</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">module</span>
+    <span class="c1"># FSDP 2</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">nn_model</span> <span class="o">=</span> <span class="n">model</span>
+    <span class="n">weight_decay_groups</span> <span class="o">=</span> <span class="n">nn_model</span><span class="o">.</span><span class="n">weight_decay_groups</span>
+    <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">weight_decay_groups_excluded</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">group</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">weight_decay_groups</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;optimizer_factory&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;group = </span><span class="si">{</span><span class="n">group</span><span class="si">}</span><span class="s2"> specified in weight_decay_groups_excluded is not &quot;</span>
+                <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;in models optimizer_module_groups = </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">weight_decay_groups</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;(This might be due to pipeline parallelism and is not necessarily an error.)&quot;</span>
+            <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_create_optimizer_groups</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">FSDPX</span><span class="p">,</span> <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">OptimizerGroups</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create optimizer groups of parameters with different weight decays that are to be used in Adam or AdamW</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># FSDP 1</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP1</span><span class="p">):</span>
+        <span class="n">nn_model</span><span class="p">:</span> <span class="n">NNModel</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">module</span>
+        <span class="n">weight_decay_groups</span> <span class="o">=</span> <span class="n">nn_model</span><span class="o">.</span><span class="n">weight_decay_groups</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">parameter</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">parameter</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">}</span>
+
+    <span class="c1"># FSDP 2</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP2</span><span class="p">):</span>
+        <span class="n">nn_model</span> <span class="o">=</span> <span class="n">model</span>
+        <span class="n">weight_decay_groups</span> <span class="o">=</span> <span class="n">nn_model</span><span class="o">.</span><span class="n">weight_decay_groups</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="n">param</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">param</span><span class="o">.</span><span class="n">requires_grad</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">DTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="n">param</span><span class="o">.</span><span class="n">to_local</span><span class="p">()</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">}</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">OptimizerError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;model </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2"> is not an instance of FSDP1 or FSDP2. &quot;</span> <span class="s2">&quot;Please use the correct model type.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="kc">False</span>
+    <span class="p">):</span>  <span class="c1"># This is for debugging only, and may serve as a convenient helper tool during the development of new models</span>
+        <span class="n">_print_params</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">OptimizerError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;model </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2"> has no parameters with requires_grad=True (i.e., no traininable parameters).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">optimizer_groups</span> <span class="o">=</span> <span class="n">_build_optimizer_groups_via_weight_decay_split</span><span class="p">(</span>
+        <span class="n">weight_decay</span><span class="p">,</span> <span class="n">weight_decay_groups_excluded</span><span class="p">,</span> <span class="n">weight_decay_groups</span><span class="p">,</span> <span class="n">params</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">optimizer_groups</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;with_weight_decay&quot;</span><span class="p">,</span> <span class="s2">&quot;without_weight_decay&quot;</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_optimizer_groups_via_weight_decay_split</span><span class="p">(</span>
+    <span class="n">weight_decay</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">weight_decay_groups_excluded</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">weight_decay_groups</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OptimizerGroups</span><span class="p">:</span>
+    <span class="n">params_per_weight_decay_groups</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">_filter_params_for_weight_decay_group</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">regex_expressions</span><span class="o">=</span><span class="n">weight_decay_groups</span><span class="p">[</span><span class="n">group</span><span class="p">]),</span>
+            <span class="s2">&quot;exclude&quot;</span><span class="p">:</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">weight_decay_groups_excluded</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">weight_decay_groups</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="p">]</span>
+
+    <span class="c1"># combine all parameter lists into two optimizer groups, one with and one without weight decay</span>
+    <span class="n">optimizer_groups</span><span class="p">:</span> <span class="n">OptimizerGroups</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">((</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params_per_weight_decay_groups</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="p">[</span><span class="s2">&quot;exclude&quot;</span><span class="p">]),</span> <span class="p">[]),</span>
+            <span class="s2">&quot;weight_decay&quot;</span><span class="p">:</span> <span class="n">weight_decay</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">((</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params_per_weight_decay_groups</span> <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="s2">&quot;exclude&quot;</span><span class="p">]),</span> <span class="p">[]),</span>
+            <span class="s2">&quot;weight_decay&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;params&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s2">&quot;params&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">OptimizerError</span><span class="p">(</span>
+            <span class="s2">&quot;One of the optimizer groups has zero parameters. &quot;</span>
+            <span class="s2">&quot;This indicates that the weight_decay_groups_excluded configuration is not compatible &quot;</span>
+            <span class="s2">&quot;with the configured pipeline stages.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">optimizer_groups</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_filter_params_for_weight_decay_group</span><span class="p">(</span>
+    <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">]],</span> <span class="n">regex_expressions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    filter parameters by their name.</span>
+<span class="sd">    a parameter is kept if and only if it contains at least one of the regex expressions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">parameter</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">([</span><span class="nb">bool</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">regex_expression</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">regex_expression</span> <span class="ow">in</span> <span class="n">regex_expressions</span><span class="p">])</span>
+    <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_print_params</span><span class="p">(</span><span class="n">params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    for debugging only</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+        <span class="n">print_rank_0</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_print_optimizer_groups_overview</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">:</span> <span class="n">OptimizerGroups</span><span class="p">,</span> <span class="n">optimizer_groups_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    for each optimizer group, the following is printed:</span>
+<span class="sd">        - the number of modules</span>
+<span class="sd">        - the number of parameters</span>
+<span class="sd">        - the weight decay</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">optimizer_groups_names</span><span class="p">)</span>
+    <span class="n">num_modules_all</span><span class="p">,</span> <span class="n">num_params_all</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="n">print_rank_0</span><span class="p">(</span><span class="s2">&quot;=&gt; optimizer groups:&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">optimizer_group</span><span class="p">,</span> <span class="n">optimizer_group_name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">optimizer_groups</span><span class="p">,</span> <span class="n">optimizer_groups_names</span><span class="p">):</span>
+        <span class="n">num_modules</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">optimizer_group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">])</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">parameter</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">optimizer_group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">])</span>
+        <span class="n">print_rank_0</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">optimizer_group_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">num_modules</span><span class="si">}</span><span class="s2"> modules with </span><span class="si">{</span><span class="n">num_params</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> parameters): &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;weight_decay = </span><span class="si">{</span><span class="n">optimizer_group</span><span class="p">[</span><span class="s1">&#39;weight_decay&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">num_modules_all</span> <span class="o">+=</span> <span class="n">num_modules</span>
+        <span class="n">num_params_all</span> <span class="o">+=</span> <span class="n">num_params</span>
+    <span class="n">print_rank_0</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;=&gt; all (</span><span class="si">{</span><span class="n">num_modules_all</span><span class="si">}</span><span class="s2"> modules with </span><span class="si">{</span><span class="n">num_params_all</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> parameters)&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_assert_completeness_of_optimizer_groups</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">optimizer_groups</span><span class="p">:</span> <span class="n">OptimizerGroups</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    checks that the number of parameters in the optimizer groups</span>
+<span class="sd">    sum up to the total number of model parameters as expected</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">num_params_check</span> <span class="o">=</span> <span class="n">get_local_number_of_trainable_parameters</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP1</span><span class="p">):</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">optimizer_group</span> <span class="ow">in</span> <span class="n">optimizer_groups</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">optimizer_group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">FSDP2</span><span class="p">):</span>
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">to_local</span><span class="p">()</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">DTensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">optimizer_group</span> <span class="ow">in</span> <span class="n">optimizer_groups</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">optimizer_group</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">OptimizerError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="si">}</span><span class="s2"> is not an instance of FSDP1 or FSDP2. Please use the correct model type.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_params</span> <span class="o">!=</span> <span class="n">num_params_check</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">OptimizerError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;ERROR! Inconsistent number of parameters (found </span><span class="si">{</span><span class="n">num_params</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;should be </span><span class="si">{</span><span class="n">num_params_check</span><span class="si">}</span><span class="s2">) after split into optimizer parameter groups.&quot;</span>
+        <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

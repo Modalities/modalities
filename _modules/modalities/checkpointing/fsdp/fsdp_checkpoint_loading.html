@@ -1,0 +1,275 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing.fsdp.fsdp_checkpoint_loading &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing.fsdp.fsdp_checkpoint_loading</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.checkpointing.fsdp.fsdp_checkpoint_loading</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed.checkpoint</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dcp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShardingStrategy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optimizer</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">DistributedCheckpointLoadingIF</span><span class="p">,</span> <span class="n">FSDP1CheckpointLoadingIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.stateful.app_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">AppState</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.env_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedPrecisionSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+
+<div class="viewcode-block" id="FSDP1CheckpointLoading">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP1CheckpointLoading</span><span class="p">(</span><span class="n">FSDP1CheckpointLoadingIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;FSDP1 checkpoint loading class.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">block_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">mixed_precision_settings</span><span class="p">:</span> <span class="n">MixedPrecisionSettings</span><span class="p">,</span>
+        <span class="n">sharding_strategy</span><span class="p">:</span> <span class="n">ShardingStrategy</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the FSDP1CheckpointLoading object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            global_rank (int): The global rank of the process.</span>
+<span class="sd">            block_names (list[str]): The names of the blocks.</span>
+<span class="sd">            mixed_precision_settings (MixedPrecisionSettings): The settings for mixed precision.</span>
+<span class="sd">            sharding_strategy (ShardingStrategy): The sharding strategy.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">=</span> <span class="n">global_rank</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block_names</span> <span class="o">=</span> <span class="n">block_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mixed_precision_settings</span> <span class="o">=</span> <span class="n">mixed_precision_settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sharding_strategy</span> <span class="o">=</span> <span class="n">sharding_strategy</span>
+
+    <span class="c1"># Ensures reduced memory footprint and avoids side-effects</span>
+<div class="viewcode-block" id="FSDP1CheckpointLoading.load_model_checkpoint">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading.load_model_checkpoint">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_model_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads the checkpoint as full state dict into the model on rank 0.</span>
+<span class="sd">        After loading the model to CPU RAM, the model is wrapped with FSDP and sharded</span>
+<span class="sd">        across the ranks according to the sharding strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module): The model to load the checkpoint into.</span>
+<span class="sd">            file_path (Path): The path to the checkpoint file.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            nn.Module: The model wrapped with FSDP and sharded according to the sharding strategy.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading model checkpoint from </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="c1"># load model</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># load model on rank 0 into CPU RAM</span>
+            <span class="n">model_state</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">model_state</span><span class="p">)</span>
+
+        <span class="c1"># TODO nasty workaround to prevent circular imports</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">modalities.models.model_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelFactory</span>
+
+        <span class="n">fsdp_model</span> <span class="o">=</span> <span class="n">ModelFactory</span><span class="o">.</span><span class="n">get_fsdp1_wrapped_model</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">sync_module_states</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">block_names</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">block_names</span><span class="p">,</span>
+            <span class="n">mixed_precision_settings</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mixed_precision_settings</span><span class="p">,</span>
+            <span class="n">sharding_strategy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sharding_strategy</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model checkpoint loaded on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">fsdp_model</span></div>
+
+
+<div class="viewcode-block" id="FSDP1CheckpointLoading.load_optimizer_checkpoint_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading.load_optimizer_checkpoint_">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_optimizer_checkpoint_</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">FSDP</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads the checkpoint as full state dict into the optimizer on rank 0 (in-place)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).</span>
+<span class="sd">            model (FSDP): The FSDP-wrapped model.</span>
+<span class="sd">            file_path (Path): The path to the checkpoint file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading optimizer checkpoint from </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="c1"># NOTE: model must be FSDP-wrapped model!</span>
+        <span class="c1"># load optimizer</span>
+        <span class="n">full_optimizer_state_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># load full optimizer state dict to rank 0 (CPU RAM)</span>
+            <span class="n">full_optimizer_state_dict</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+
+        <span class="c1"># distribute the optimizer state dict from rank 0 to all the other ranks</span>
+        <span class="n">sharded_optimizer_state_dict</span> <span class="o">=</span> <span class="n">FSDP</span><span class="o">.</span><span class="n">scatter_full_optim_state_dict</span><span class="p">(</span>
+            <span class="n">full_optim_state_dict</span><span class="o">=</span><span class="n">full_optimizer_state_dict</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">sharded_optimizer_state_dict</span><span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Optimizer checkpoint loaded on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DCPCheckpointLoading">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.DCPCheckpointLoading">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DCPCheckpointLoading</span><span class="p">(</span><span class="n">DistributedCheckpointLoadingIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distributed checkpoint loading interface for loading PyTorch models and optimizer checkpoints.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the DCPCheckpointLoading object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            global_rank (int): The global rank of the process.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_global_rank</span> <span class="o">=</span> <span class="n">global_rank</span>
+
+<div class="viewcode-block" id="DCPCheckpointLoading.load_checkpoint_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.DCPCheckpointLoading.load_checkpoint_">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_checkpoint_</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">checkpoint_dir_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the distributed checkpoint from the specified directory path.</span>
+<span class="sd">        NOTE: The model in the app_state must be already FSDP-wrapped.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The application state with the model and optimizer.</span>
+<span class="sd">            checkpoint_directory_path (Path): The directory path to the distributed checkpoint.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading distributed checkpoint on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_global_rank</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">dcp</span><span class="o">.</span><span class="n">load</span><span class="p">(</span>
+            <span class="n">state_dict</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;app&quot;</span><span class="p">:</span> <span class="n">app_state</span><span class="p">},</span>
+            <span class="n">checkpoint_id</span><span class="o">=</span><span class="n">checkpoint_dir_path</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Distributed checkpoint loaded on rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_global_rank</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
