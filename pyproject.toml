@@ -1,16 +1,17 @@
 [project]
 name = "modalities"
 version = "0.5.0"
-requires-python = ">=3.10,<=3.13"
+requires-python = ">=3.10,<3.14"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
     "numpy",
-    "torch",
+    "torch<2.11.0",
+    "ninja",
     "packaging",
     "tqdm",
     "pyyaml",
-    "transformers",
+    "transformers<5.0.0",
     "datasets",
     "protobuf",
     "SentencePiece",
@@ -24,6 +25,7 @@ dependencies = [
     "matplotlib",
     "wandb",
     "einops>=0.7.0",
+    "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'",
     "debugpy",  # For VSCode debugging support
 ]
 
@@ -42,6 +44,12 @@ modalities = "modalities.__main__:main"
 [build-system]
 requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [
+    { requirement = "torch", match-runtime = true },
+    { requirement = "ninja", match-runtime = true },
+]
 
 [tool.black]
 target-version = ["py310"]
