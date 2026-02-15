@@ -4,7 +4,7 @@
 
 
 <div align="center">
-    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.13-blue" alt="Python Versions">
     <a href="https://pytorch.org/">
     <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
@@ -36,63 +36,54 @@ There are multiple ways to install Modalities. If you want to use the latest nig
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
-In any case, you need to install pytorch, ninja and flash-attention **beforehand**. This is because the build and installation process of flash attention requires PyTorch to be installed beforehand and flash attention to be installed with no build isolation. Until they improve this, we therefore have to run the following commands **before** installing Modalities.
+It is recommended to install Modalities via uv or install PyTorch, psutil and Ninja **beforehand** and then install Flash-attention manually (with no build isolation) if it is required.
 
-Note: For using pipeline parallelism, pytorch version 2.10 (currently nightly) or higher and a corresponding flash attention version (if required) must be installed instead.
+### Option 1: From source via uv
 
 ```sh
-# create and activate a conda environment (optional, but good practice)
-conda create -n modalities python=3.11
+# Get uv (tested with uv version 0.9.13)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+uv sync
+source .venv/bin/activate
+
+# For developers: use [tests,linting] and install pre-commit hooks
+uv sync --extra tests --extra linting
+pre-commit install --install-hooks
+```
+
+### Option 2: Using pip and manual installation of dependencies
+
+```sh
+# Create and activate a venv or conda environment, e.g.:
+conda create -n modalities python=3.13
 conda activate modalities
 
-# install PyTorch, Ninja and Flash Attention (mandatory)
-pip install torch==2.7.1
-pip install ninja     # Lowers compilation time of flash attention significantly 
-pip install flash-attn==2.8.0.post2 --no-build-isolation
+# Install PyTorch, psutil, Ninja and Flash Attention
+pip install "torch<2.11.0"
+pip install psutil ninja  # Ninja lowers compilation time of flash attention significantly 
+pip install flash-attn==2.8.3 --no-build-isolation
 ```
 
-### Option 1: Installation from source
-
-Either clone the repository via
-```sh
-git clone git@github.com:Modalities/modalities.git
-```
-or download the repository as a zip file and extract it.
-```
-wget https://github.com/Modalities/modalities/archive/refs/heads/main.zip
-unzip main.zip
-```
-
-Afterwards, Modalities can be installed via
-
-```sh
-cd modalities
-pip install -e . 
-```
-
-### Option 2: Installation via pip
-
-To install Modalities via pip, run
+#### Option 2a: Install [pypi package](https://pypi.org/project/modalities/)
 
 ```sh
 pip install modalities
 ```
 
-### Option 3: Feature Complete via UV
+#### Option 2b: Install from source
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --seed --python 3.11 --prompt modalities
-source .venv/bin/activate
-uv pip install torch==2.7.1
-uv pip install ninja
-uv pip install --no-build-isolation flash-attn==2.8.0.post2
-# for developer: use [tests,linting] and install pre-commit hooks
-uv pip install -e .[tests,linting]
+git clone git@github.com:Modalities/modalities.git
+cd modalities
+pip install -e .
+
+# For developers: use [tests,linting] and install pre-commit hooks
+pip install -e .[tests,linting]
 pre-commit install --install-hooks
 ```
 
-### Option 4: Containerized Setup via Singularity / Apptainer
+### Option 3: Containerized Setup via Singularity / Apptainer
 
 If you prefer an isolated, reproducible environment or you are deploying to an HPC center that already supports Apptainer / Singularity, you can build and run Modalities using the provided `modalities.def` file in the container folder.
 
@@ -279,7 +270,7 @@ In the following, we list the most important features of Modalities.
 | Flash Attention                    | supported | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models.                                                             |
 | Tensor Parallelism                 | supported | Implementing vertical model sharding, as an efficient model parallelism technique                                                                                                                                                                              |
 | Sequence Parallelism               | supported | Variant of Tensor Parallelism that shard on the sequence dimension                                                                                                                                                                                             |
-| Pipeline Parallelism               | supported | Beta-level support for schedules such as GPipe, (interleaved) 1F1B and DualPipe.                                                                                                                                                                     |
+| Pipeline Parallelism               | supported | Beta-level support for schedules such as GPipe, (interleaved) 1F1B and DualPipe.                                                                                                                                                                               |
 | FSDP 2                             | supported | Improved version of the original FSDP                                                                                                                                                                                                                          |
 | Torch Compile                      | supported | Speeds up tensor operations by JIT compiling tensor operations into optimized kernels                                                                                                                                                                          |
 | Deferred Initialisation            | supported | Instead of instantiating the model in CPU RAM, the modules are instantiated as fake tensors and operations are recorded. Once sharded (e.g., via FSDP), each rank only instantiates the local tensors by replaying the tensor operations.                      |
@@ -307,11 +298,11 @@ In the following, we list the most important features of Modalities.
 
 ### Reproducibility & Extensibility Features
 
-| Name                                | Status    | Description                                                                                                                                                                                                        |
-|-------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Self-contained Configurations       | supported | Every experiment configuration fully specifies all components, hyperparameters, and seeds, ensuring that experiments are reproducible by design without requiring external context or hidden state.                |
-| Registry for Custom Components      | supported | Modalities uses a registry-based architecture where all components implement generic interfaces, enabling seamless replacement or extension with (custom) modules at runtime.                                      |
-| Generic Benchmarking                | supported | Supports systematic grid searches over arbitrary parameters to benchmark throughput, memory footprint, and downstream performance across model, data, and system configurations.                                   |
+| Name                           | Status    | Description                                                                                                                                                                                         |
+|--------------------------------|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Self-contained Configurations  | supported | Every experiment configuration fully specifies all components, hyperparameters, and seeds, ensuring that experiments are reproducible by design without requiring external context or hidden state. |
+| Registry for Custom Components | supported | Modalities uses a registry-based architecture where all components implement generic interfaces, enabling seamless replacement or extension with (custom) modules at runtime.                       |
+| Generic Benchmarking           | supported | Supports systematic grid searches over arbitrary parameters to benchmark throughput, memory footprint, and downstream performance across model, data, and system configurations.                    |
 
 
 
