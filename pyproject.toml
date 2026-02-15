@@ -11,7 +11,7 @@ dependencies = [
     "packaging",
     "tqdm",
     "pyyaml",
-    "transformers<5.0.0",
+    "transformers>=4.57.4,<5.0.0",
     "datasets",
     "protobuf",
     "SentencePiece",
@@ -36,7 +36,6 @@ Issues = "https://github.com/Modalities/modalities/issues"
 [project.optional-dependencies]
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
-install_helper = ["ninja"]
 
 [project.scripts]
 modalities = "modalities.__main__:main"

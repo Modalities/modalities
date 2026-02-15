@@ -4,7 +4,7 @@
 
 
 <div align="center">
-    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.13-blue" alt="Python Versions">
     <a href="https://pytorch.org/">
     <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
