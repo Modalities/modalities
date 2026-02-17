@@ -1,7 +1,6 @@
 import math
 import os
 import pickle
-from itertools import repeat
 from pathlib import Path
 from typing import BinaryIO
 
@@ -82,30 +81,56 @@ class TokenizedFileWriter:
     def _write_data_segment(
         file_descriptor: BinaryIO, token_data: list[np.ndarray], token_size_in_bytes: int, write_batch_size: int
     ) -> list[tuple[int, int]]:
-        def encoded_token_to_bytes(encoded_token: int, token_size_in_bytes: int) -> bytes:
-            # Converts an token_ids to its byte representation.
-            try:
-                token_bytes = encoded_token.to_bytes(token_size_in_bytes, byteorder="little", signed=False)
-            except OverflowError as e:
-                raise ValueError(f"Token {encoded_token} cannot be represented by {token_size_in_bytes} bytes.") from e
-            return token_bytes
+        # Fast path: vectorized cast + tobytes (no per-token Python work).
+        # Preserves little-endian unsigned representation and overflow checks.
 
-        samples = []
-        index_list = []
+        if token_size_in_bytes == 1:
+            dtype = np.dtype("u1")
+        elif token_size_in_bytes == 2:
+            dtype = np.dtype("<u2")  # force little-endian
+        elif token_size_in_bytes == 4:
+            dtype = np.dtype("<u4")  # force little-endian
+        else:
+            raise ValueError("Currently only support token byte sizes of 1, 2, and 4.")
+
+        max_allowed = (1 << (8 * token_size_in_bytes)) - 1
+
+        samples: list[bytes] = []
+        index_list: list[tuple[int, int]] = []
         curr_offset = 0
+        pending = 0
+
         for sample_tokens in token_data:
-            # convert token_ids to byte representation
-            sample_token_byte_string = b"".join(
-                map(encoded_token_to_bytes, sample_tokens.tolist(), repeat(token_size_in_bytes))
-            )
+            arr = np.asarray(sample_tokens)
+
+            # ---- Overflow / range check (preserves original semantics) ----
+            if arr.size:
+                min_val = int(arr.min())
+                max_val = int(arr.max())
+                if min_val < 0 or max_val > max_allowed:
+                    raise ValueError(
+                        f"Token values out of range for {token_size_in_bytes} bytes: "
+                        f"min={min_val}, max={max_val}, allowed=[0, {max_allowed}]"
+                    )
+            # ----------------------------------------------------------------
+
+            # Cast to correct unsigned little-endian dtype
+            arr = np.asarray(arr, dtype=dtype, order="C")
+            sample_token_byte_string = arr.tobytes(order="C")
+
             samples.append(sample_token_byte_string)
             index_list.append((curr_offset, len(sample_token_byte_string)))
             curr_offset += len(sample_token_byte_string)
-            if len(samples) % write_batch_size == 0:
+
+            pending += 1
+            if pending >= write_batch_size:
                 file_descriptor.write(b"".join(samples))
-                samples = []
+                samples.clear()
+                pending = 0
+
         if len(samples) > 0:
             file_descriptor.write(b"".join(samples))
+
         return index_list
 
     @staticmethod
