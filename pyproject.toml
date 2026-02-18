@@ -6,7 +6,6 @@ description = "Modalities, a PyTorch-native framework for distributed and reprod
 readme = "README.md"
 dependencies = [
     "numpy",
-    "torch<2.11.0",
     "ninja",
     "packaging",
     "tqdm",
@@ -33,16 +32,60 @@ dependencies = [
 Homepage = "https://github.com/Modalities/modalities"
 Issues = "https://github.com/Modalities/modalities/issues"
 
-[project.optional-dependencies]
-linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov", "debugpy"]
-
 [project.scripts]
 modalities = "modalities.__main__:main"
 
 [build-system]
 requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+linting = ["pre-commit"]
+tests = ["pytest", "pytest-cov", "debugpy"]
+
+cpu = ["torch>=2.10,<2.11.0"]
+cu126 = ["torch>=2.10,<2.11.0"]
+cu128 = ["torch>=2.10,<2.11.0"]
+cu130 = ["torch>=2.10,<2.11.0"]
+
+[tool.uv]
+conflicts = [
+  [
+    { extra = "cpu" },
+    { extra = "cu126" },
+    { extra = "cu128" },
+    { extra = "cu130" },
+  ],
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu128", extra = "cu128" },
+  { index = "pytorch-cu130", extra = "cu130" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
 
 [tool.uv.extra-build-dependencies]
 flash-attn = [
