@@ -42,10 +42,22 @@ build-backend = "setuptools.build_meta"
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
 
-cpu = ["torch>=2.10,<2.11.0"]
-cu126 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
-cu128 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
-cu130 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
+cpu = ["torch>=2.10,<2.11.0", "torchvision"]
+cu126 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
+cu128 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
+cu130 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
 
 [tool.uv]
 conflicts = [
