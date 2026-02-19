@@ -24,7 +24,6 @@ dependencies = [
     "matplotlib",
     "wandb",
     "einops>=0.7.0",
-    "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'",
     "debugpy",  # For VSCode debugging support
 ]
 
@@ -44,9 +43,9 @@ linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
 
 cpu = ["torch>=2.10,<2.11.0"]
-cu126 = ["torch>=2.10,<2.11.0"]
-cu128 = ["torch>=2.10,<2.11.0"]
-cu130 = ["torch>=2.10,<2.11.0"]
+cu126 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
+cu128 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
+cu130 = ["torch>=2.10,<2.11.0", "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"]
 
 [tool.uv]
 conflicts = [
