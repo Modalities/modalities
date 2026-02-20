@@ -44,11 +44,11 @@ It is recommended to install Modalities via uv or install PyTorch, psutil and Ni
 # Get uv (tested with uv version 0.9.13)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-uv sync
+uv sync --extra [cpu|cu126|cu128|cu130]  # Get CUDA version via nvidia-smi
 source .venv/bin/activate
 
 # For developers: use [tests,linting] and install pre-commit hooks
-uv sync --extra tests --extra linting
+uv sync --extra [cpu|cu126|cu128|cu130] --extra tests --extra linting
 pre-commit install --install-hooks
 ```
 
@@ -60,7 +60,7 @@ conda create -n modalities python=3.13
 conda activate modalities
 
 # Install PyTorch, psutil, Ninja and Flash Attention
-pip install "torch<2.11.0"
+pip install "torch<2.11.0"  # Or appropriate version for your CUDA setup.
 pip install psutil ninja  # Ninja lowers compilation time of flash attention significantly 
 pip install flash-attn==2.8.3 --no-build-isolation
 ```
