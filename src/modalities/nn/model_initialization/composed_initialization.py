@@ -2,9 +2,10 @@ from typing import Optional
 
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from torch.distributed.device_mesh import DeviceMesh
 from typing_extensions import Annotated
 
-from modalities.config.pydantic_if_types import PydanticModelInitializationIFType
+from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticModelInitializationIFType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
 from modalities.nn.model_initialization.parameter_name_filters import (
@@ -12,6 +13,7 @@ from modalities.nn.model_initialization.parameter_name_filters import (
     SupportWeightInitModels,
     WeightInitTypes,
 )
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank, has_parallelism_method
 
 
 class ModelInitializerWrapperConfig(BaseModel):
@@ -30,6 +32,8 @@ class ComposedModelInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    seed: Optional[int] = None
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
@@ -100,6 +104,8 @@ class ComposedInitializationRoutines:
         std: float | str,
         hidden_dim: Optional[int] = None,
         num_layers: int = None,
+        device_mesh: Optional[DeviceMesh] = None,
+        seed: Optional[int] = None,
     ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
@@ -114,16 +120,28 @@ class ComposedInitializationRoutines:
                 Defaults to None.
             num_layers (int, optional): Number of layers in the model (required for scaled and scaled_embed only).
                 Defaults to None.
+            device_mesh (Optional[DeviceMesh], optional): Device mesh used for parallelization.
+            seed (Optional[int], optional): Seed for random initialization. Defaults to None.
 
         Returns:
             ModelInitializationIF: The Weight Initializer performing the initialization as specified.
         """
+        # Set different random seed for each PP rank to ensure diversity
+        if seed is not None and has_parallelism_method(
+            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
+        ):
+            seed += get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
+
         model_initializers = []
 
         # plain
         plain_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.PLAIN]
         plain_init = InitializationRoutines.get_plain_initialization(
-            mean=mean, std=std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
+            mean=mean,
+            std=std,
+            hidden_dim=hidden_dim,
+            parameter_name_regexes=plain_parameter_name_regexes,
+            seed=seed,
         )
         working_std = plain_init.std
         model_initializers.append(plain_init)
@@ -136,6 +154,7 @@ class ComposedInitializationRoutines:
                 std=working_std,
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
+                seed=seed,
             )
             model_initializers.append(scaled_init)
 
@@ -143,7 +162,9 @@ class ComposedInitializationRoutines:
             # scaled embed
             scaled_embed_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED_EMBED]
             scaled_embed_init = InitializationRoutines.get_scaled_embed_initialization(
-                mean=mean, parameter_name_regexes=scaled_embed_parameter_name_regexes
+                mean=mean,
+                parameter_name_regexes=scaled_embed_parameter_name_regexes,
+                seed=seed,
             )
             model_initializers.append(scaled_embed_init)
 
