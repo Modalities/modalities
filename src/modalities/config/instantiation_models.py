@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
@@ -27,6 +28,8 @@ from modalities.dataloader.dataset import Dataset
 from modalities.util import warn_rank_0
 from modalities.utils.profilers.profilers import SteppableNoProfiler
 
+logger = logging.getLogger(__name__)
+
 
 class CudaEnvSettings(BaseModel):
     local_rank: Annotated[int, Field(strict=True, ge=0)]
@@ -46,6 +49,7 @@ class ConsistencyEnforcement(BaseModel):
     enforce_last_step_logged: bool = True
     enforce_last_step_evaluated: bool = True
     enforce_last_step_checkpointed: bool = True
+    enforce_enough_tokens_in_dataset: bool = True
 
 
 class Intervals(BaseModel):
@@ -192,15 +196,14 @@ class TrainingComponentsInstantiationModel(BaseModel):
 
     @model_validator(mode="after")
     def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel":
-        if (
-            len(self.train_dataset) * self.settings.step_profile.sequence_length
-            < self.settings.training_target.num_target_tokens
-        ):
-            raise ValueError(
-                "Not enough tokens in the dataset. "
-                f"Actual: {len(self.train_dataset) * self.settings.step_profile.sequence_length}, "
-                f"Expected: >={self.settings.training_target.num_target_tokens}"
-            )
+        dataset_tokens = len(self.train_dataset) * self.settings.step_profile.sequence_length
+        expected_tokens = self.settings.training_target.num_target_tokens
+        if dataset_tokens < expected_tokens:
+            msg = f"Not enough tokens in dataset. Actual: {dataset_tokens}, Expected: >={expected_tokens}"
+            if self.settings.consistency_enforcement.enforce_enough_tokens_in_dataset:
+                raise ValueError(msg)
+            else:
+                logger.warning(msg)
         return self
 
 
