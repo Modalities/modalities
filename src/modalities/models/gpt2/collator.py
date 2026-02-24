@@ -50,7 +50,7 @@ class GPT2LLMCollateFn(CollateFnIF):
         targets = {self.target_key: sample_tensor[:, 1:]}
         if self.sub_seq_lengths_key is not None:
             # Determine sub sequence lengths by finding the eos tokens in each sequence in the batch.
-            sub_seq_lengths = self._compute_sub_sequence_lengths_for_each_sequence(sample_tensor)
+            sub_seq_lengths = self._compute_sub_sequence_lengths_for_each_sequence(samples[self.sample_key])
             samples[self.sub_seq_lengths_key] = sub_seq_lengths
         return DatasetBatch(targets=targets, samples=samples)
 
