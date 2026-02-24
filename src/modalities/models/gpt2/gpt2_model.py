@@ -373,6 +373,7 @@ class GPT2LLMConfig(BaseModel):
     use_weight_tying: bool
     seed: Optional[int] = None
     enforce_swiglu_hidden_dim_multiple_of: int = 256
+    sub_seq_lengths_key: str | None = None
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":

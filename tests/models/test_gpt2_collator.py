@@ -17,12 +17,12 @@ def test_gpt2_collate_shifts_samples_and_targets():
     assert result.targets["labels"].tolist() == [[2, 3, 4], [6, 7, 8]]
 
 
-def test_gpt2_collate_sub_seq_lengths_without_eod():
+def test_gpt2_collate_sub_seq_lengths_without_eos():
     collator = GPT2LLMCollateFn(
         sample_key="input_ids",
         target_key="labels",
         sub_seq_lengths_key="sub_seq_lengths",
-        eod_token_id=99,
+        eos_token_id=99,
     )
     batch = [
         {"input_ids": torch.tensor([10, 11, 12, 13, 14])},
@@ -34,12 +34,12 @@ def test_gpt2_collate_sub_seq_lengths_without_eod():
     assert result.samples["sub_seq_lengths"] == [[5], [5]]
 
 
-def test_gpt2_collate_sub_seq_lengths_with_eod():
+def test_gpt2_collate_sub_seq_lengths_with_eos():
     collator = GPT2LLMCollateFn(
         sample_key="input_ids",
         target_key="labels",
         sub_seq_lengths_key="sub_seq_lengths",
-        eod_token_id=99,
+        eos_token_id=99,
     )
     batch = [
         {"input_ids": torch.tensor([1, 99, 2, 3, 99])},
@@ -51,12 +51,12 @@ def test_gpt2_collate_sub_seq_lengths_with_eod():
     assert result.samples["sub_seq_lengths"] == [[2, 3], [4, 1]]
 
 
-def test_gpt2_collate_sub_seq_lengths_with_eod_and_padding():
+def test_gpt2_collate_sub_seq_lengths_with_eos_and_padding():
     collator = GPT2LLMCollateFn(
         sample_key="input_ids",
         target_key="labels",
         sub_seq_lengths_key="sub_seq_lengths",
-        eod_token_id=99,
+        eos_token_id=99,
         padding_token_id=0,
     )
     batch = [
@@ -74,7 +74,7 @@ def test_gpt2_collate_sub_seq_lengths_adds_tail_when_not_padding():
         sample_key="input_ids",
         target_key="labels",
         sub_seq_lengths_key="sub_seq_lengths",
-        eod_token_id=5,
+        eos_token_id=5,
         padding_token_id=0,
     )
     batch = [{"input_ids": torch.tensor([1, 5, 9, 8])}]
@@ -84,12 +84,12 @@ def test_gpt2_collate_sub_seq_lengths_adds_tail_when_not_padding():
     assert result.samples["sub_seq_lengths"] == [[2, 2]]
 
 
-def test_gpt2_collate_raises_when_sequence_starts_with_padding_and_no_eod():
+def test_gpt2_collate_raises_when_sequence_starts_with_padding_and_no_eos():
     collator = GPT2LLMCollateFn(
         sample_key="input_ids",
         target_key="labels",
         sub_seq_lengths_key="sub_seq_lengths",
-        eod_token_id=99,
+        eos_token_id=99,
         padding_token_id=0,
     )
     batch = [{"input_ids": torch.tensor([0, 1, 2, 3])}]

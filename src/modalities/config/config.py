@@ -444,15 +444,15 @@ class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
     sub_seq_lengths_key: str | None = None
-    eod_token_id: int | None = None
+    eos_token_id: int | None = None
     padding_token_id: int | None = None
 
     @model_validator(mode="before")
-    def check_sub_seq_lengths_and_eod_token(cls, values):
+    def check_sub_seq_lengths_and_eos_token(cls, values):
         sub_seq_lengths_key = values.get("sub_seq_lengths_key")
-        eod_token_id = values.get("eod_token_id")
-        if (sub_seq_lengths_key is None) != (eod_token_id is None):
-            raise ValueError("Either both or neither of sub_seq_lengths_key and eod_token_id must be provided.")
+        eos_token_id = values.get("eos_token_id")
+        if (sub_seq_lengths_key is None) != (eos_token_id is None):
+            raise ValueError("Either both or neither of sub_seq_lengths_key and eos_token_id must be provided.")
         return values
 
     @model_validator(mode="before")
