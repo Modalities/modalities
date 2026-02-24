@@ -591,21 +591,31 @@ class CausalSelfAttention(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor, int]:
         """
         Compute unpadded indices and cumulative sequence lengths for concatenated sequences.
-        Given a batch of per-subsequence lengths in `attention_mask_in_length`, this
-        builds a boolean mask over the maximum sequence length, extracts flattened
-        indices of valid (unpadded) tokens, and returns cumulative sequence lengths
-        (CU) along with the maximum subsequence length in the batch.
+
+        This helper operates on a batched tensor of sequence indicators and produces:
+        a flattened index tensor of all valid (unpadded) positions, the cumulative
+        sequence lengths over those positions, and the maximum sequence length in
+        the batch.
+
         Args:
-            attention_mask_in_length (torch.Tensor): Tensor of shape (num_subsequences,)
-                containing the lengths of each subsequence in the concatenated batch.
+            attention_mask_in_length (torch.Tensor): A 2D tensor of shape
+                (batch_size, max_seq_len). Non-zero entries indicate valid (unpadded)
+                positions for each sequence in the batch; zero entries indicate padding.
+
         Returns:
             tuple[torch.Tensor, torch.Tensor, int]:
-                - indices: 1D tensor of flattened indices for all valid (unpadded) tokens.
+                - indices: 1D tensor of flattened indices for all valid (unpadded)
+                  tokens in the batch (indexing into a tensor of shape
+                  (batch_size * max_seq_len,)).
                 - cu_seqlens: 1D int32 tensor of cumulative sequence lengths with a
-                  leading zero (shape: num_subsequences + 1).
-                - max_seqlen_in_batch: Maximum subsequence length as an int.
+                  leading zero (shape: num_valid_tokens + 1), suitable for variable-
+                  length attention utilities.
+                - max_seqlen_in_batch: Maximum number of valid (unpadded) tokens in
+                  any sequence in the batch, as an int.
+
         Raises:
-            ValueError: If no subsequence lengths are provided (all zeros).
+            ValueError: If no valid (non-zero) entries are present in the input
+                tensor (i.e., all positions are padded).
         """
 
         length = attention_mask_in_length.sum(dim=-1)
