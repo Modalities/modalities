@@ -636,10 +636,6 @@ class CausalSelfAttention(nn.Module):
 
         indices, cu_seqlens, max_seqlen = attention_masking_information
 
-        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-
         batch_size, seq_len, n_head_q, head_dim = q.shape
         n_head_kv = k.shape[2]
 
@@ -822,11 +818,11 @@ class CausalSelfAttention(nn.Module):
             # Note, that the library is not required for the CPU-only tests.
             if flash_attn_func is None:
                 raise NotImplementedError("ERROR! Dao Flash Attention is not installed.")
-            # the next three lines are only needed for flash-attn from Daio Lab
+            # the next three lines are only needed for flash-attn from Dao Lab
+            q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+            k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+            v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
             if attention_masking_information is None:
-                q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-                k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-                v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
                 y = flash_attn_func(
                     q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
                 )  # (B, T, nh_q, hd)
@@ -991,12 +987,18 @@ class GPT2Block(nn.Module):
                 f"but got `n_embd = {n_embd}` and `ffn_hidden = {ffn_hidden}`."
             )
 
-    def forward(self, x: torch.Tensor, attention_masking_information: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        attention_masking_information: torch.Tensor | tuple[torch.Tensor, torch.Tensor, int] | None = None,
+    ) -> torch.Tensor:
         """
         Forward pass of the GPT2Block.
 
         Args:
             x (torch.Tensor): Input tensor.
+            attention_masking_information (torch.Tensor | tuple[torch.Tensor, torch.Tensor, int] | None):
+                Attention masking information.
 
         Returns:
             torch.Tensor: Output tensor.
@@ -1140,13 +1142,14 @@ class GPT2LLM(NNModel):
             )  # https://paperswithcode.com/method/weight-tying
 
     @overload
-    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor | list[list[int]]]) -> dict[str, torch.Tensor]:
         """
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (dict[str, torch.Tensor]): A dictionary containing input tensors.
+            inputs (dict[str, torch.Tensor | list[list[int]]]): A dictionary containing input tensors.
                 - sample_key (str): Key for the input tensor containing token ids.
+                - sub_seq_lengths_key (str, optional): Key for the input tensor containing subsequence lengths.
 
         Returns:
             dict[str, torch.Tensor]: A dictionary containing output tensors.
@@ -1167,12 +1170,14 @@ class GPT2LLM(NNModel):
         """
         ...
 
-    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+    def forward(
+        self, inputs: dict[str, torch.Tensor | list[list[int]]] | torch.Tensor
+    ) -> dict[str, torch.Tensor] | torch.Tensor:
         """
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.
+            inputs (dict[str, torch.Tensor | list[list[int]]] | torch.Tensor): Input data.
 
         Returns:
             dict[str, torch.Tensor] | torch.Tensor: Model output.
@@ -1258,6 +1263,7 @@ def manual_scaled_dot_product_attention(
     attn_bias = torch.zeros(
         L, S, dtype=query.dtype, device=query.device
     )  # device added (not part of the original code)
+    fully_masked = None
     if attn_mask is not None and attn_mask.dim() == 3:
         attn_bias = attn_bias.unsqueeze(0).repeat(attn_mask.size(0), 1, 1)
     if is_causal:
@@ -1269,22 +1275,25 @@ def manual_scaled_dot_product_attention(
                 combined_mask = temp_mask.unsqueeze(0) & attn_mask
             else:
                 combined_mask = temp_mask & attn_mask
+            fully_masked = ~combined_mask.any(dim=-1)
             attn_bias.masked_fill_(combined_mask.logical_not(), float("-inf"))
         else:
             if attn_mask.dim() == 3:
                 temp_mask = temp_mask.unsqueeze(0)
             attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
             attn_bias += attn_mask
-        attn_bias.to(query.dtype)
     elif attn_mask is not None:
         if attn_mask.dtype == torch.bool:
             attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
         else:
             attn_bias += attn_mask
+    attn_bias = attn_bias.to(query.dtype)
     attn_weight = query @ key.transpose(-2, -1) * scale_factor
     if attn_bias.dim() == 3:
         attn_bias = attn_bias.unsqueeze(1)
     attn_weight += attn_bias
     attn_weight = torch.softmax(attn_weight, dim=-1)
     attn_weight = torch.dropout(attn_weight, dropout_p, train=True)
+    if fully_masked is not None and attn_weight.dim() == 4:
+        attn_weight = attn_weight.masked_fill(fully_masked.unsqueeze(1).unsqueeze(-1), 0.0)
     return attn_weight @ value

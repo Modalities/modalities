@@ -549,9 +549,9 @@ def test_inter_document_masking_manual_matches_dao_flash_with_masks():
     torch.manual_seed(0)
     dao_layer, manual_layer = _build_matching_dao_and_manual_attention()
 
-    inputs = _get_random_input_seq((1, 5, 16))
-    dao_mask = dao_layer.prepare_inter_document_masking(in_batch_seq_lens=[[2, 3]], max_seq_len=5)
-    manual_mask = manual_layer.prepare_inter_document_masking(in_batch_seq_lens=[[2, 3]], max_seq_len=5)
+    inputs = _get_random_input_seq((2, 5, 16))
+    dao_mask = dao_layer.prepare_inter_document_masking(in_batch_seq_lens=[[2, 3], [1, 1, 2]], max_seq_len=5)
+    manual_mask = manual_layer.prepare_inter_document_masking(in_batch_seq_lens=[[2, 3], [1, 1, 2]], max_seq_len=5)
 
     output_dao = dao_layer(inputs, attention_masking_information=dao_mask)
     output_manual = manual_layer(inputs, attention_masking_information=manual_mask)
