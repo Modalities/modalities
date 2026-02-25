@@ -447,21 +447,17 @@ class GPT2LLMCollateFnConfig(BaseModel):
     eos_token_id: int | None = None
     padding_token_id: int | None = None
 
-    @model_validator(mode="before")
-    def check_sub_seq_lengths_and_eos_token(cls, values):
-        sub_seq_lengths_key = values.get("sub_seq_lengths_key")
-        eos_token_id = values.get("eos_token_id")
-        if (sub_seq_lengths_key is None) != (eos_token_id is None):
+    @model_validator(mode="after")
+    def check_sub_seq_lengths_and_eos_token(self) -> "GPT2LLMCollateFnConfig":
+        if (self.sub_seq_lengths_key is None) != (self.eos_token_id is None):
             raise ValueError("Either both or neither of sub_seq_lengths_key and eos_token_id must be provided.")
-        return values
+        return self
 
-    @model_validator(mode="before")
-    def check_padding_token_and_sub_seq_lengths(cls, values):
-        padding_token_id = values.get("padding_token_id")
-        sub_seq_lengths_key = values.get("sub_seq_lengths_key")
-        if padding_token_id is not None and sub_seq_lengths_key is None:
+    @model_validator(mode="after")
+    def check_padding_token_and_sub_seq_lengths(self) -> "GPT2LLMCollateFnConfig":
+        if self.padding_token_id is not None and self.sub_seq_lengths_key is None:
             raise ValueError("If padding_token_id is provided, sub_seq_lengths_key must also be provided.")
-        return values
+        return self
 
 
 class LLMDataLoaderConfig(BaseModel):

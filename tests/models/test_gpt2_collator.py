@@ -31,7 +31,7 @@ def test_gpt2_collate_sub_seq_lengths_without_eos():
 
     result = collator(batch)
 
-    assert result.samples["sub_seq_lengths"] == [[5], [5]]
+    assert result.samples["sub_seq_lengths"] == [[4], [4]]
 
 
 def test_gpt2_collate_sub_seq_lengths_with_eos():
@@ -48,7 +48,7 @@ def test_gpt2_collate_sub_seq_lengths_with_eos():
 
     result = collator(batch)
 
-    assert result.samples["sub_seq_lengths"] == [[2, 3], [4, 1]]
+    assert result.samples["sub_seq_lengths"] == [[2, 2], [4]]
 
 
 def test_gpt2_collate_sub_seq_lengths_with_eos_and_padding():
@@ -66,7 +66,7 @@ def test_gpt2_collate_sub_seq_lengths_with_eos_and_padding():
 
     result = collator(batch)
 
-    assert result.samples["sub_seq_lengths"] == [[2, 4], [3]]
+    assert result.samples["sub_seq_lengths"] == [[2, 3], [3]]
 
 
 def test_gpt2_collate_sub_seq_lengths_adds_tail_when_not_padding():
@@ -81,7 +81,7 @@ def test_gpt2_collate_sub_seq_lengths_adds_tail_when_not_padding():
 
     result = collator(batch)
 
-    assert result.samples["sub_seq_lengths"] == [[2, 2]]
+    assert result.samples["sub_seq_lengths"] == [[2, 1]]
 
 
 def test_gpt2_collate_raises_when_sequence_starts_with_padding_and_no_eos():
