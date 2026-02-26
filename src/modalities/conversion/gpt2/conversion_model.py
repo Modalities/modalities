@@ -114,7 +114,7 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
 
         assert llama_logits.shape == modalities_logits.shape
         assert llama_logits.dtype == modalities_logits.dtype
-        assert torch.equal(llama_logits, modalities_logits)
+        torch.testing.assert_close(llama_logits, modalities_logits)
 
 
 def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:

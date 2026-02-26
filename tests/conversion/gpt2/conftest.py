@@ -154,7 +154,10 @@ def _create_dcp_checkpoint_worker(
             components: Components = component_factory.build_components(
                 config_dict=modalities_config_dict, components_model_type=Components
             )
-            model: GPT2LLM = components.app_state.model
+            assert (
+                len(components.app_state.model_parts) == 1
+            ), "Expected exactly one model part in the app state for this test."
+            model: GPT2LLM = components.app_state.model_parts[0]
             if corrupt_model_head_key_in_state_dict and hasattr(model.transformer, "lm_head"):
                 # Rename the key transformer.lm_head.weight to old_lm_head.weight
                 # simulating the old format used in modalities' gpt2 models.

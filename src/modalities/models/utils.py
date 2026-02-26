@@ -60,7 +60,10 @@ def get_model_from_config(config: ConfigDictType, model_type: ModelTypeEnum) -> 
 
             @property
             def dcp_checkpointed_model(self) -> PydanticPytorchModuleType:
-                return self.app_state.model
+                assert (
+                    len(self.app_state.model_parts) == 1
+                ), "Expected exactly one model part in the app state for this model type."
+                return self.app_state.model_parts[0]
 
     else:
         raise NotImplementedError()

@@ -29,7 +29,7 @@ def test_converting_gpt2_does_not_change_outputs(
     )
 
 
-@pytest.mark.skipif(torch.cuda.device_count() < 8, reason="This test requires 8 GPUs.")
+@pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
 def test_converting_dcp_gpt2_does_not_change_weights(converted_dcp_model: PreTrainedModel, dcp_checkpoint: str):
     new_config: ConfigDictType = _build_single_node_dcp_config(dcp_checkpoint)
     with MultiProcessingCudaEnv(ProcessGroupBackendType.nccl, 0, 0, 1, 24570, device_id=0):
@@ -37,7 +37,7 @@ def test_converting_dcp_gpt2_does_not_change_weights(converted_dcp_model: PreTra
         check_same_weight_model(converted_dcp_model, modalities_model)
 
 
-@pytest.mark.skipif(torch.cuda.device_count() < 8, reason="This test requires 8 GPUs.")
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
 def test_converting_dcp_gpt2_does_not_change_outputs(run_convert_gpt2_dcp: None, output_dir: Path, dcp_checkpoint: str):
     check_converted_dcp_model(
         hf_model_dir=str(output_dir), dcp_dir=dcp_checkpoint, num_testruns=1, device_id_modalities=0, device_hf="cuda:1"
