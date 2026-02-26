@@ -74,7 +74,7 @@ class GPT2LLMCollateFn(CollateFnIF):
         # the last sequence is just padding.
         last_eos_pos = eos_positions[-1].item()
         if self._has_cutoff_final_sequence(seq, last_eos_pos):
-            eos_positions = torch.cat([eos_positions, torch.tensor([len(seq) - 1])])
+            eos_positions = torch.cat([eos_positions, eos_positions.new_tensor([len(seq) - 1])])
         # Compute length of each subsequence and add to lengths list.
         subseq_lengths = []
         prev_pos = 0
