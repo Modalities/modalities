@@ -52,7 +52,7 @@ def data_preperation(tmp_path) -> list[Path]:
     """
     # this writes into the out_files directory
     config_file_path = _ROOT_DIR / Path("tests/instruction_tuning/files/apply_chat_template_config.yaml")
-    config_dict = load_app_config_dict(config_file_path=config_file_path)
+    config_dict = load_app_config_dict(config_file_path=config_file_path, experiments_root_path=tmp_path)
     config_dict["settings"]["dst_path"] = tmp_path / "lorem_ipsum_instruct_converted.jsonl"
 
     partition_to_output_file_path_mapping = split_and_apply_chat_template(config_file_path, config_dict)
@@ -106,14 +106,16 @@ def training(process_id: int, world_size: int, tmp_path, created_files: list[Pat
     os.environ["WORLD_SIZE"] = str(world_size)
 
     config_path = _ROOT_DIR / Path("tests/instruction_tuning/files/instruction_tune_model_config.yaml")
-    config_dict = load_app_config_dict(config_path, experiment_id="test_e2e_instruction_tuning")
+    config_dict = load_app_config_dict(
+        config_path, experiment_id="test_e2e_instruction_tuning", experiments_root_path=tmp_path
+    )
 
     # Adapt config for test
     checkpointing_path = tmp_path / "instruct_checkpoints/"
-    config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpointing_path.__str__()
-    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
-        "checkpoint_path"
-    ] = checkpointing_path.__str__()
+    config_dict["settings"]["paths"]["checkpoint_saving_path"] = str(checkpointing_path)
+    config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"]["checkpoint_path"] = str(
+        checkpointing_path
+    )
 
     for partition in ["train", "test"]:
         # find train pbin in created files
@@ -131,7 +133,7 @@ def training(process_id: int, world_size: int, tmp_path, created_files: list[Pat
         world_size=world_size,
         rdvz_port=22356,
     ):
-        main = Main(config_path)
+        main = Main(config_path, experiments_root_path=tmp_path)
         main.config_dict = config_dict
         components = main.build_components(components_model_type=TrainingComponentsInstantiationModel)
         main.run(components)

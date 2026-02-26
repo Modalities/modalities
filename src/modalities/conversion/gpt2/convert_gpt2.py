@@ -26,6 +26,7 @@ import argparse
 import gc
 import logging
 import os
+import tempfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -130,8 +131,11 @@ def convert_gpt2(
         device_modalities (str, optional): Device for the modalities model. Defaults to "cpu".
         device_hf (str, optional): Device for the Hugging Face model. Defaults to "cpu".
     """
-    modalities_config = load_app_config_dict(Path(modalities_config_path), experiment_id="-1")
-    hf_model, modalities_model = convert_model_checkpoint(modalities_config)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        modalities_config = load_app_config_dict(
+            Path(modalities_config_path), experiment_id="-1", experiments_root_path=Path(tmpdir)
+        )
+        hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
     if num_testruns > 0:
         check_converted_model(

@@ -80,7 +80,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
             num_target_tokens=str(num_target_tokens),
         )
 
-        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
+        full_path = Path(self.checkpoint_path, entity_file_name)
         return full_path
 
     @torch.no_grad()
@@ -89,7 +89,8 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         # saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT
         model_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
         optim_save_policy = FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=True)
-        model = app_state.model
+        assert len(app_state.model_parts) == 1, "FSDP1CheckpointSaving only supports a single model part."
+        model = app_state.model_parts[0]
         optimizer = app_state.optimizer
         with FSDP.state_dict_type(
             module=model,
@@ -223,7 +224,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
             num_target_steps=str(num_target_steps),
             num_target_tokens=str(num_target_tokens),
         )
-        full_path = Path(self.checkpoint_path, experiment_id, entity_file_name)
+        full_path = Path(self.checkpoint_path, entity_file_name)
         return full_path
 
     @torch.no_grad()

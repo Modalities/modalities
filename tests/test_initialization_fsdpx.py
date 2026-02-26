@@ -285,7 +285,7 @@ class TestWeightInitFSDPX:
         world_size = 2
         mp.spawn(
             TestWeightInitFSDPX._test_weight_init_thread,
-            args=(world_size, rdvz_port, tmp_config_file_path, weight_init_params),
+            args=(world_size, rdvz_port, tmp_config_file_path, weight_init_params, temporary_folder_path),
             nprocs=world_size,
             join=True,
         )
@@ -297,6 +297,7 @@ class TestWeightInitFSDPX:
         rdvz_port: int,
         tmp_config_file_path: Path,
         weight_init_params: WeightInitFSDPX,
+        temporary_folder_path: Path,
     ):
         class CustomComponentInstantiationModel(BaseModel):
             tested_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
@@ -308,7 +309,7 @@ class TestWeightInitFSDPX:
             world_size=world_size,
             rdvz_port=rdvz_port,
         ):
-            main_obj = Main(tmp_config_file_path)
+            main_obj = Main(tmp_config_file_path, experiments_root_path=temporary_folder_path)
             # build the components (indluduing the custom component)
             components: CustomComponentInstantiationModel = main_obj.build_components(
                 components_model_type=CustomComponentInstantiationModel

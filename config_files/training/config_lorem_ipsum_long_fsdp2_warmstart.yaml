@@ -74,8 +74,7 @@ settings:
       variant_key: last_step_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
-  warmstart_checkpoint_paths: # ${warmstart_env:checkpoint_paths}
-    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-14__15-25-59_970fedec/eid_2025-03-14__15-25-59_970fedec-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
+  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}  # use modalities warmstart [..] --last_checkpoint_info_file_path [..]
 
 collate_fn:
   component_key: collate_fn

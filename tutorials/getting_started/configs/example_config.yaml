@@ -10,7 +10,8 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: ./checkpoints
+    experiments_root_path: ${modalities_env:experiments_root_path}
+    experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     train_dataset_path: ./data/mem_map/redpajama_v2_samples_512_train.pbin
     val_dataset_path: ./data/mem_map/redpajama_v2_samples_512_test.pbin
   intervals:
@@ -157,7 +158,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: fsdp1
       config:
-        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        checkpoint_path: ${settings.paths.experiment_folder_path}/checkpoints
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
 

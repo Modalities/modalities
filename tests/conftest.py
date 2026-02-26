@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
-import yaml
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -25,6 +24,7 @@ from modalities.models.model import NNModel
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from modalities.trainer import Trainer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
+from modalities.utils.profilers.profilers import SteppableNoProfiler
 
 _ROOT_DIR = Path(__file__).parents[1]
 
@@ -50,20 +50,20 @@ def dummy_packed_data_path(tmpdir) -> Path:
 def dummy_config_path(tmp_path: Path) -> Path:
     # Load original YAML
     original_path = _ROOT_DIR / "tests/test_yaml_configs/config_lorem_ipsum_fsdp1.yaml"
-    with open(original_path, "r") as f:
-        config = yaml.safe_load(f)
+    # with open(original_path, "r") as f:
+    #     config = yaml.safe_load(f)
 
-    checkpoint_path = tmp_path / "checkpoint"
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
+    # checkpoint_path = tmp_path / "checkpoint"
+    # checkpoint_path.mkdir(parents=True, exist_ok=True)
+    # config["settings"]["paths"]["checkpoint_saving_path"] = str(checkpoint_path)
 
-    # Write modified YAML to a temp file
-    new_path = tmp_path / "experiments/modified_config.yaml"
-    new_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(new_path, "w") as f:
-        yaml.safe_dump(config, f)
+    # # Write modified YAML to a temp file
+    # new_path = tmp_path / "experiments/modified_config.yaml"
+    # new_path.parent.mkdir(parents=True, exist_ok=True)
+    # with open(new_path, "w") as f:
+    #     yaml.safe_dump(config, f)
 
-    return new_path
+    return original_path
 
 
 @pytest.fixture
@@ -73,6 +73,15 @@ def dummy_config(monkeypatch, dummy_config_path) -> dict:
     monkeypatch.setenv("WORLD_SIZE", "1")
     config_dict = load_app_config_dict(dummy_config_path, experiment_id="0")
     return config_dict
+
+
+@pytest.fixture
+def monkey_patch_dist_env(monkeypatch):
+    monkeypatch.setenv("RANK", "0")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    monkeypatch.setenv("MASTER_ADDR", "localhost")
+    monkeypatch.setenv("MASTER_PORT", "9948")
 
 
 @dataclasses.dataclass
@@ -125,22 +134,22 @@ def wrapped_gpt2_tokenizer() -> PreTrainedHFTokenizer:
 
 
 @pytest.fixture(scope="function")
-def checkpoint_saving_mock():
+def checkpoint_saving_mock() -> CheckpointSaving:
     return MagicMock(spec=CheckpointSaving)
 
 
 @pytest.fixture(scope="function")
-def evaluator_mock():
+def evaluator_mock() -> Evaluator:
     return MagicMock(spec=Evaluator)
 
 
 @pytest.fixture(scope="function")
-def nn_model_mock():
+def nn_model_mock() -> NNModel:
     return MagicMock(spec=NNModel)
 
 
 @pytest.fixture(scope="function")
-def optimizer_mock():
+def optimizer_mock() -> Optimizer:
     return MagicMock(spec=Optimizer)
 
 
@@ -166,41 +175,43 @@ def optimizer_with_param_groups_mock():
 
 
 @pytest.fixture(scope="function")
-def scheduler_mock():
+def scheduler_mock() -> LRScheduler:
     mocked_lr_scheduler = MagicMock(spec=LRScheduler)
     mocked_lr_scheduler.get_last_lr = lambda: [0.0]
     return mocked_lr_scheduler
 
 
 @pytest.fixture(scope="function")
-def app_state_mock():
-    return MagicMock(spec=AppState)
+def app_state_mock() -> AppState:
+    app_state = MagicMock(spec=AppState)
+    app_state.model_parts = [MagicMock()]
+    return app_state
 
 
 @pytest.fixture(scope="function")
-def gradient_clipper_mock():
+def gradient_clipper_mock() -> GradientClipperIF:
     gradient_clipper = MagicMock(spec=GradientClipperIF)
     gradient_clipper.clip_gradients = lambda: torch.Tensor([0.0])
     return gradient_clipper
 
 
 @pytest.fixture(scope="function")
-def loss_mock():
+def loss_mock() -> Loss:
     return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
 
 
 @pytest.fixture(scope="function")
-def llm_data_loader_mock():
+def llm_data_loader_mock() -> LLMDataLoader:
     return MagicMock(spec=LLMDataLoader)
 
 
 @pytest.fixture(scope="function")
-def progress_publisher_mock():
+def progress_publisher_mock() -> MessagePublisher:
     return MagicMock(spec=MessagePublisher)
 
 
 @pytest.fixture(scope="function")
-def trainer(progress_publisher_mock, gradient_clipper_mock):
+def trainer(progress_publisher_mock: MessagePublisher, gradient_clipper_mock: GradientClipperIF) -> Trainer:
     return Trainer(
         global_rank=int(os.getenv("RANK")),
         progress_publisher=progress_publisher_mock,
@@ -213,6 +224,7 @@ def trainer(progress_publisher_mock, gradient_clipper_mock):
         global_num_seen_tokens=0,
         num_target_tokens=100,
         num_target_steps=10,
+        profiler=SteppableNoProfiler(),
     )
 
 

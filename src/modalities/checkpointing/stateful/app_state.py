@@ -15,6 +15,8 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
+from modalities.optimizers.optimizer_list import OptimizersList
+
 
 class StatefulComponents(Enum):
     MODEL = "model"
@@ -34,15 +36,18 @@ class AppState(Stateful):
     https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html
     """
 
-    def __init__(self, model: nn.Module, optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None):
+    def __init__(
+        self, model: nn.Module | list[nn.Module], optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None
+    ):
         """Initializes the AppState object.
 
         Args:
-            model (nn.Module): The model can be either a non-sharded model, FSDP1 or FSDP2 model.
+            model (nn.Module | list[nn.Module]): The model or model parts can be either
+                a non-sharded model, FSDP1 or FSDP2 model.
             optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
             lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.
         """
-        self._model = model
+        self._model_parts = list(model) if isinstance(model, list) else [model]
         self._optimizer = optimizer
         self._lr_scheduler = lr_scheduler
         self._is_loaded = False
@@ -56,8 +61,8 @@ class AppState(Stateful):
         return self._is_loaded
 
     @property
-    def model(self) -> nn.Module:
-        return self._model
+    def model_parts(self) -> list[nn.Module]:
+        return self._model_parts
 
     @property
     def optimizer(self) -> Optimizer:
@@ -153,7 +158,7 @@ class StateRetrieverIF(ABC):
 class ModelStateRetriever(StateRetrieverIF):
     @staticmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
-        """Returns the state dict of the model in the AppState object.
+        """Returns the flattened state dicts of the model parts in the AppState object.
 
         Args:
             app_state (AppState): The app_state object containing the model.
@@ -161,7 +166,10 @@ class ModelStateRetriever(StateRetrieverIF):
         Returns:
             dict[str, Any]: The state dict of the model in the AppState object.
         """
-        return get_model_state_dict(model=app_state.model)
+        state_dicts = list(map(get_model_state_dict, app_state.model_parts))
+        state_dict_keys = sum((list(sd.keys()) for sd in state_dicts), [])
+        assert len(state_dict_keys) == len(set(state_dict_keys)), "State dict keys are not unique across model parts."
+        return {k: v for sd in state_dicts for k, v in sd.items()}
 
     @staticmethod
     def load_state_dict_(app_state: AppState, state_dict: dict[str, Any]) -> None:
@@ -171,7 +179,8 @@ class ModelStateRetriever(StateRetrieverIF):
             app_state (AppState): The app_state object containing the model.
             state_dict (dict[str, Any]): The state dict to load into the model.
         """
-        set_model_state_dict(model=app_state.model, model_state_dict=state_dict, options=StateDictOptions(strict=False))
+        for model in app_state.model_parts:
+            set_model_state_dict(model=model, model_state_dict=state_dict, options=StateDictOptions(strict=False))
 
 
 class OptimizerStateRetriever(StateRetrieverIF):
@@ -185,13 +194,17 @@ class OptimizerStateRetriever(StateRetrieverIF):
         Returns:
             dict[str, Any]: The state dict of the optimizer in the AppState object.
         """
-        sd = get_optimizer_state_dict(
-            model=app_state.model,
-            optimizers=app_state.optimizer,
-            # NOTE: Flattening is required for pipeline parallelism to work correctly.
-            # see https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L193-L214
-            options=StateDictOptions(flatten_optimizer_state_dict=True),
-        )
+        if isinstance(app_state.optimizer, OptimizersList):
+            sd = app_state.optimizer.state_dict()
+        else:
+            assert len(app_state.model_parts) == 1, "Expected a single model part for non-OptimizersList optimizer."
+            sd = get_optimizer_state_dict(
+                model=app_state.model_parts[0],
+                optimizers=app_state.optimizer,
+                # NOTE: Flattening is required for pipeline parallelism to work correctly.
+                # see https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L193-L214
+                options=StateDictOptions(flatten_optimizer_state_dict=True),
+            )
         return sd
 
     @staticmethod
@@ -202,12 +215,16 @@ class OptimizerStateRetriever(StateRetrieverIF):
             app_state (AppState): The app_state object containing the optimizer.
             state_dict (dict[str, Any]): The state dict to load into the optimizer.
         """
-        set_optimizer_state_dict(
-            model=app_state.model,
-            optimizers=app_state.optimizer,
-            optim_state_dict=state_dict,
-            options=StateDictOptions(flatten_optimizer_state_dict=True),
-        )
+        if isinstance(app_state.optimizer, OptimizersList):
+            app_state.optimizer.load_state_dict(state_dict)
+        else:
+            assert len(app_state.model_parts) == 1, "Expected a single model part for non-OptimizersList optimizer."
+            set_optimizer_state_dict(
+                model=app_state.model_parts[0],
+                optimizers=app_state.optimizer,
+                optim_state_dict=state_dict,
+                options=StateDictOptions(flatten_optimizer_state_dict=True),
+            )
 
 
 class LRSchedulerStateRetriever(StateRetrieverIF):

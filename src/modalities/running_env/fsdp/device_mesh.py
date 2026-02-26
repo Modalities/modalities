@@ -15,8 +15,8 @@ class DeviceMeshConfig(BaseModel):
     # inspired by ParallelDims class in
     # https://github.com/pytorch/torchtitan/blob/cfc0f4e08dc71685cdcb394464187d2eeedd1a5f/torchtitan/parallelisms/parallel_dims.py#L15
     device_type: str = "cuda"
-    data_parallel_replicate_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     # if -1, we will calculate the shard degree based on the world size and other parallel degrees
+    data_parallel_replicate_degree: Annotated[int, Field(strict=True, ge=-1)] = 1
     data_parallel_shard_degree: Annotated[int, Field(strict=True, ge=-1)]
     tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
@@ -27,21 +27,36 @@ class DeviceMeshConfig(BaseModel):
     @model_validator(mode="after")
     def _validate(self):
         for d in (
-            self.data_parallel_replicate_degree,
             self.context_parallel_degree,
             self.tensor_parallel_degree,
             self.pipeline_parallel_degree,
         ):
             if d < 1:
-                raise ConfigError("Parallelism degree must be >= 1, except for data_parallel_shard_degree")
+                raise ConfigError(
+                    "Parallelism degree must be >= 1, except for data_parallel_shard_degree "
+                    "and data_parallel_replicate_degree"
+                )
 
         if not (self.data_parallel_shard_degree == -1 or self.data_parallel_shard_degree >= 1):
             raise ConfigError("data_parallel_shard_degree must be -1 or >= 1")
+        if not (self.data_parallel_replicate_degree == -1 or self.data_parallel_replicate_degree >= 1):
+            raise ConfigError("data_parallel_replicate_degree must be -1 or >= 1")
+
+        if self.data_parallel_replicate_degree == -1 and self.data_parallel_shard_degree == -1:
+            raise ConfigError("At most one of data_parallel_replicate_degree and data_parallel_shard_degree can be -1")
 
         if self.data_parallel_shard_degree == -1:
             # set the shard degree to the world size divided by the product of all other parallel degrees
             self.data_parallel_shard_degree = self.world_size // (
                 self.data_parallel_replicate_degree
+                * self.context_parallel_degree
+                * self.tensor_parallel_degree
+                * self.pipeline_parallel_degree
+            )
+        if self.data_parallel_replicate_degree == -1:
+            # set the replicate degree to the world size divided by the product of all other parallel degrees
+            self.data_parallel_replicate_degree = self.world_size // (
+                self.data_parallel_shard_degree
                 * self.context_parallel_degree
                 * self.tensor_parallel_degree
                 * self.pipeline_parallel_degree

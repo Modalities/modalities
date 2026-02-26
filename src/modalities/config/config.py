@@ -29,6 +29,7 @@ from modalities.config.pydantic_if_types import (
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
     PydanticPytorchDeviceType,
+    PydanticPytorchModuleOrListType,
     PydanticPytorchModuleType,
     PydanticSamplerIFType,
     PydanticTokenizerIFType,
@@ -45,6 +46,7 @@ from modalities.training.activation_checkpointing.activation_checkpointing_varia
     ActivationCheckpointingVariants,
 )
 from modalities.util import parse_enum_by_name
+from modalities.utils.deprecated_alias import add_deprecated_alias
 
 
 class ProcessGroupBackendType(LookupEnum):
@@ -147,20 +149,24 @@ class CheckpointSavingConfig(BaseModel):
 
 class AdamOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class AdamWOptimizerConfig(BaseModel):
     lr: float
-    wrapped_model: PydanticPytorchModuleType
+    wrapped_model: PydanticPytorchModuleOrListType
     betas: tuple[float, float]
     eps: float
     weight_decay: float
     weight_decay_groups_excluded: list[str]
+    foreach: bool | None = None
+    fused: bool | None = None
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -266,11 +272,12 @@ class FSDPWrappedModelConfig(BaseModel):
 
 
 class FSDP2WrappedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
+    layers_per_fsdp_unit: int = 1
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
@@ -291,7 +298,7 @@ class FSDP2WrappedModelConfig(BaseModel):
 
 
 class DebuggingEnrichedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     logging_dir_path: Path
     tracked_ranks: Optional[Set[int]] = None
     log_interval_steps: Optional[int] = 1
@@ -304,7 +311,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
 
 
 class GPT2ModelTPConfig(BaseModel):
-    model: PydanticPytorchModuleType  # TODO set proper type
+    model: PydanticPytorchModuleOrListType  # TODO set proper type
     device_mesh: PydanticDeviceMeshIFType
 
     @model_validator(mode="after")
@@ -315,19 +322,20 @@ class GPT2ModelTPConfig(BaseModel):
         if ParallelismDegrees.TP.value not in mesh_dim_names:
             raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
         if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
+            # TorchTitan uses replicate (i.e, plain DP) to combine DP with TP.
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
 
 class CompiledModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     block_names: list[str]
     fullgraph: Optional[bool] = True
     debug: Optional[bool] = False
 
 
 class WeightInitializedModelConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     model_initializer: PydanticModelInitializationIFType
 
     # avoid warning about protected namespace 'model_', see
@@ -352,12 +360,12 @@ class ActivationCheckpointedModelConfig(BaseModel):
 
     ac_variant: ActivationCheckpointingVariants
     layers_fqn: str
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
 class RawAppStateConfig(BaseModel):
-    model: PydanticPytorchModuleType
+    model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
 
@@ -482,12 +490,13 @@ class RichResultSubscriberConfig(BaseModel):
     global_rank: int
 
 
+@add_deprecated_alias("model_parts", "wrapped_model")
 class GPT2MFUCalculatorConfig(BaseModel):
     n_layer: Annotated[int, Field(strict=True, gt=0)]
     sequence_length: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
     world_size: Annotated[int, Field(strict=True, gt=0)]
-    wrapped_model: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType
+    model_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
 
@@ -504,13 +513,16 @@ ConfigDictType: TypeAlias = dict[str, YAMLValue]
 
 def load_app_config_dict(
     config_file_path: Path,
-    experiment_id: Optional[str] = None,
+    experiments_root_path: Path | None = None,
+    experiment_id: str | None = None,
     additional_resolver_funs: Optional[dict[str, Resolver]] = None,
 ) -> ConfigDictType:
     """Load the application configuration from the given YAML file.
 
     Args:
         config_file_path (Path): YAML config file.
+        experiments_root_path: (Path, optional): The path to the experiments root directory.
+            Defaults to None.
         experiment_id (str, optional): The experiment_id of the current run.
         additional_resolver_funs (dict[str, Resolver], optional): Additional resolver functions.
 
@@ -538,6 +550,8 @@ def load_app_config_dict(
         "config_file_path": config_file_path,
         "config_folder_path": config_file_path.parent,
     }
+    if experiments_root_path is not None:
+        modalities_env_kwargs["experiments_root_path"] = experiments_root_path
     if experiment_id is not None:
         modalities_env_kwargs["experiment_id"] = experiment_id
     OmegaConf.register_new_resolver(

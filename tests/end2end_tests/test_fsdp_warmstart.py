@@ -50,7 +50,7 @@ class TestWarmstart:
     def get_loss_scores(messages: list[Message[EvaluationResultBatch]], loss_key: str) -> list[float]:
         return [message.payload.losses[loss_key].value.item() for message in messages]
 
-    def test_warm_start(self):
+    def test_warm_start(self, tmp_path: Path):
         # We want to verify that the training continues after starting from checkpoint (i.e, warm start)
         # exactly the same way, as if we trained it from scratch.
         # To do so, we have two confings. The first config trains a model for 8 steps and
@@ -61,7 +61,9 @@ class TestWarmstart:
         with tempfile.TemporaryDirectory() as temp_dir:
             # config for two steps model
             gpt2_8_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-            gpt2_8_steps_config_dict = load_app_config_dict(gpt2_8_steps_config_file_path, experiment_id="0")
+            gpt2_8_steps_config_dict = load_app_config_dict(
+                gpt2_8_steps_config_file_path, experiment_id="0", experiments_root_path=tmp_path
+            )
 
             # adopt the checkpoint path
             checkpoint_path = temp_dir
@@ -74,7 +76,7 @@ class TestWarmstart:
             # config for one step model
             gpt2_warm_start_after_4_steps_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
             gpt2_warm_start_after_4_steps_dict = load_app_config_dict(
-                gpt2_warm_start_after_4_steps_config_file_path, experiment_id="1"
+                gpt2_warm_start_after_4_steps_config_file_path, experiment_id="1", experiments_root_path=tmp_path
             )
 
             # adopt the checkpoint path
@@ -97,7 +99,7 @@ class TestWarmstart:
             # )
 
             with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-                main_obj_0 = Main(gpt2_8_steps_config_file_path)
+                main_obj_0 = Main(gpt2_8_steps_config_file_path, experiments_root_path=tmp_path)
                 main_obj_0.config_dict = gpt2_8_steps_config_dict
                 main_obj_0.add_custom_component(
                     component_key="results_subscriber",
@@ -165,7 +167,7 @@ class TestWarmstart:
                     assert cp_info_model_seen_steps == model_max_seen_steps
                     assert cp_info_model_seen_tokens == model_max_seen_tokens
 
-                main_obj_1 = Main(gpt2_warm_start_after_4_steps_config_file_path)
+                main_obj_1 = Main(gpt2_warm_start_after_4_steps_config_file_path, experiments_root_path=tmp_path)
                 main_obj_1.config_dict = gpt2_warm_start_after_4_steps_dict
 
                 main_obj_1.add_custom_component(
@@ -211,22 +213,24 @@ class TestWarmstart:
                     == components_1.app_state.lr_scheduler.get_last_lr()
                 )
 
-    def test_warmstart_dataloader(self):
+    def test_warmstart_dataloader(self, tmp_path: Path):
         # non-skipped config
         gpt2_two_steps_config_file_path = working_dir / "gpt2_train_num_steps_8.yaml"
-        gpt2_two_steps_config_dict = load_app_config_dict(gpt2_two_steps_config_file_path, experiment_id="0")
+        gpt2_two_steps_config_dict = load_app_config_dict(
+            gpt2_two_steps_config_file_path, experiment_id="0", experiments_root_path=tmp_path
+        )
 
         # skipped config
         gpt2_warm_start_from_step_1_config_file_path = working_dir / "gpt2_warm_start_from_step_4.yaml"
         gpt2_warm_start_from_step_1_dict = load_app_config_dict(
-            gpt2_warm_start_from_step_1_config_file_path, experiment_id="1"
+            gpt2_warm_start_from_step_1_config_file_path, experiment_id="1", experiments_root_path=tmp_path
         )
 
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-            main_obj_1 = Main(gpt2_two_steps_config_file_path)
+            main_obj_1 = Main(gpt2_two_steps_config_file_path, experiments_root_path=tmp_path)
             main_obj_1.config_dict = gpt2_two_steps_config_dict
 
-            main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path)
+            main_obj_2 = Main(gpt2_warm_start_from_step_1_config_file_path, experiments_root_path=tmp_path)
             main_obj_2.config_dict = gpt2_warm_start_from_step_1_dict
 
             main_obj_1.add_custom_component(

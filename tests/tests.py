@@ -43,7 +43,7 @@ def check_existence_and_clear_getting_started_example_output(
         print(f"Error: {e.filename} - {e.strerror}.")
 
     # checkpoint
-    output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
+    output_directory_checkpoints = join(run_getting_started_example_directory, "experiments")
     checkpoints = [elem for elem in os.listdir(output_directory_checkpoints) if elem.startswith("20")]
     checkpoint_to_delete = None
     for checkpoint in checkpoints:
@@ -85,7 +85,7 @@ def check_existence_and_clear_getting_started_example_output(
 
 
 def get_checkpoint_from_getting_started_example(run_getting_started_example_directory: str) -> str:
-    output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
+    output_directory_checkpoints = Path(join(run_getting_started_example_directory, "experiments"))
 
     checkpoint_directories = [
         join(output_directory_checkpoints, elem)
@@ -95,20 +95,13 @@ def get_checkpoint_from_getting_started_example(run_getting_started_example_dire
     assert (
         len(checkpoint_directories) == 1
     ), f"ERROR! found {len(checkpoint_directories)} checkpoint directories for getting started example, expected 1."
-    checkpoint_directory = checkpoint_directories[0]
+    checkpoint_directory = Path(checkpoint_directories[0])
 
-    checkpoints = [
-        join(checkpoint_directory, elem)
-        for elem in os.listdir(checkpoint_directory)
-        if isfile(join(checkpoint_directory, elem))
-    ]
-    checkpoints = [elem for elem in checkpoints if "model" in elem and elem.endswith(".bin")]
+    model_checkpoint_file_paths = list(checkpoint_directory.glob("**/*model*.bin"))
     assert (
-        len(checkpoints) == 1
-    ), f"ERROR! found {len(checkpoints)} checkpoints for getting started example, expected 1."
-    checkpoint = checkpoints[0]
-
-    return checkpoint
+        len(model_checkpoint_file_paths) == 1
+    ), f"ERROR! found {len(model_checkpoint_file_paths)} checkpoints for getting started example, expected 1."
+    return str(model_checkpoint_file_paths[0])
 
 
 def replace_checkpoint_in_conversion_config(

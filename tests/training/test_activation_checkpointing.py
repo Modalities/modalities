@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,12 @@ class SelectiveOpActivationCheckpointingInstantiationModel(BaseModel):
     selective_op_activation_checkpointed_model: PydanticPytorchModuleType
 
 
+@pytest.fixture
+def temporary_folder_path():
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        yield Path(tmp_dir_path)
+
+
 @pytest.mark.skipif(
     torch.cuda.device_count() < 2,
     reason="This test requires more than one GPU",
@@ -48,18 +55,20 @@ class SelectiveOpActivationCheckpointingInstantiationModel(BaseModel):
         (22310, 2, "config_activation_checkpointing_fsdp1_legacy.yaml"),
     ],
 )
-def test_full_activation_checkpointing_FSDP1_legacy(world_size: int, rdvz_port: int, relative_config_path: str):
+def test_full_activation_checkpointing_FSDP1_legacy(
+    world_size: int, rdvz_port: int, relative_config_path: str, temporary_folder_path: Path
+):
     # this test is for full activation checkpointing using the legacy FSDP1 implementation
     mp.spawn(
         _test_full_activation_checkpointing_FSDP1_legacy_thread,
-        args=(rdvz_port, world_size, relative_config_path),
+        args=(rdvz_port, world_size, relative_config_path, temporary_folder_path),
         nprocs=world_size,
         join=True,
     )
 
 
 def _test_full_activation_checkpointing_FSDP1_legacy_thread(
-    process_id: int, rdvz_port: int, world_size: int, relative_config_path: str
+    process_id: int, rdvz_port: int, world_size: int, relative_config_path: str, temporary_folder_path: Path
 ):
     config_file_path = working_dir / relative_config_path
 
@@ -70,7 +79,7 @@ def _test_full_activation_checkpointing_FSDP1_legacy_thread(
         world_size=world_size,
         rdvz_port=rdvz_port,
     ):
-        main = Main(config_file_path)
+        main = Main(config_file_path, experiments_root_path=temporary_folder_path)
         components: ActivationCheckpointingInstantiationModel = main.build_components(
             components_model_type=ActivationCheckpointingInstantiationModel
         )
@@ -98,17 +107,19 @@ def _test_full_activation_checkpointing_FSDP1_legacy_thread(
         (22312, 2, "config_activation_checkpointing_fsdp2.yaml"),
     ],
 )
-def test_full_activation_checkpointing_FSDPX(world_size: int, rdvz_port: int, relative_config_path: str):
+def test_full_activation_checkpointing_FSDPX(
+    world_size: int, rdvz_port: int, relative_config_path: str, temporary_folder_path: Path
+):
     mp.spawn(
         _test_full_activation_checkpointing_FSDPX_thread,
-        args=(rdvz_port, world_size, relative_config_path),
+        args=(rdvz_port, world_size, relative_config_path, temporary_folder_path),
         nprocs=world_size,
         join=True,
     )
 
 
 def _test_full_activation_checkpointing_FSDPX_thread(
-    process_id: int, rdvz_port: int, world_size: int, relative_config_path: str
+    process_id: int, rdvz_port: int, world_size: int, relative_config_path: str, temporary_folder_path: Path
 ):
     config_file_path = working_dir / relative_config_path
 
@@ -119,7 +130,7 @@ def _test_full_activation_checkpointing_FSDPX_thread(
         world_size=world_size,
         rdvz_port=rdvz_port,
     ):
-        main = Main(config_file_path)
+        main = Main(config_file_path, experiments_root_path=temporary_folder_path)
         components: ActivationCheckpointingInstantiationModel = main.build_components(
             components_model_type=ActivationCheckpointingInstantiationModel
         )
@@ -143,10 +154,10 @@ def _test_full_activation_checkpointing_FSDPX_thread(
         ("config_activation_checkpointing.yaml"),
     ],
 )
-def test_fsdp2_full_activation_checkpointing(relative_config_path: str):
+def test_fsdp2_full_activation_checkpointing(relative_config_path: str, temporary_folder_path: Path):
     config_file_path = working_dir / relative_config_path
 
-    main = Main(config_file_path, experiment_id="-1")
+    main = Main(config_file_path, experiment_id="-1", experiments_root_path=temporary_folder_path)
     components: FullActivationCheckpointingInstantiationModel = main.build_components(
         components_model_type=FullActivationCheckpointingInstantiationModel
     )
@@ -164,10 +175,10 @@ def test_fsdp2_full_activation_checkpointing(relative_config_path: str):
         ("config_activation_checkpointing.yaml"),
     ],
 )
-def test_fsdp2_selective_layer_activation_checkpointing(relative_config_path: str):
+def test_fsdp2_selective_layer_activation_checkpointing(relative_config_path: str, temporary_folder_path):
     config_file_path = working_dir / relative_config_path
 
-    main = Main(config_file_path, experiment_id="-1")
+    main = Main(config_file_path, experiment_id="-1", experiments_root_path=temporary_folder_path)
     components: SelectiveLayerActivationCheckpointingInstantiationModel = main.build_components(
         components_model_type=SelectiveLayerActivationCheckpointingInstantiationModel
     )
@@ -185,10 +196,10 @@ def test_fsdp2_selective_layer_activation_checkpointing(relative_config_path: st
         ("config_activation_checkpointing.yaml"),
     ],
 )
-def test_fsdp2_selective_op_activation_checkpointing(relative_config_path: str):
+def test_fsdp2_selective_op_activation_checkpointing(relative_config_path: str, temporary_folder_path: Path):
     config_file_path = working_dir / relative_config_path
 
-    main = Main(config_file_path, experiment_id="-1")
+    main = Main(config_file_path, experiment_id="-1", experiments_root_path=temporary_folder_path)
     components: SelectiveOpActivationCheckpointingInstantiationModel = main.build_components(
         components_model_type=SelectiveOpActivationCheckpointingInstantiationModel
     )
@@ -210,7 +221,7 @@ def test_fsdp2_selective_op_activation_checkpointing(relative_config_path: str):
         ("config_activation_checkpointing.yaml"),
     ],
 )
-def test_fsdp2_activation_checkpointing_end2end(relative_config_path: str):
+def test_fsdp2_activation_checkpointing_end2end(relative_config_path: str, temporary_folder_path: Path):
     def forward_and_backward(model: nn.Module, input_ids: torch.Tensor) -> float:
         target = input_ids[:, 1:]  # batch_size, seq_len - 1
         input_ids = input_ids[:, :-1]  # batch_size, seq_len - 1
@@ -242,7 +253,7 @@ def test_fsdp2_activation_checkpointing_end2end(relative_config_path: str):
 
     # build the models with different activation checkpointing variants but equivalent weights
     config_file_path = working_dir / relative_config_path
-    main = Main(config_file_path, experiment_id="-1")
+    main = Main(config_file_path, experiment_id="-1", experiments_root_path=temporary_folder_path)
 
     torch.manual_seed(42)
     model_raw = main.build_components(components_model_type=RawModel).model_raw.to("cuda")

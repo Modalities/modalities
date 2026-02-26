@@ -4,7 +4,7 @@
 
 
 <div align="center">
-    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue" alt="Python Versions">
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.13-blue" alt="Python Versions">
     <a href="https://pytorch.org/">
     <img src="https://img.shields.io/badge/PyTorch-green?logo=pytorch&logoColor=white" alt="PyTorch">
   </a>
@@ -19,7 +19,9 @@
   </a>
 </div>
 
-Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) and Foundation Models (FMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs and FMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP), mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
+Modalities is a PyTorch-native framework for distributed training of Large Language Models (LLMs) at scale. Given the complexity of distributed training and rapid advancements in the field, we aim to provide a flexible and easy-to-use framework that enables researchers and practitioners to train and evaluate LLMs efficiently. Modalities is built on top of PyTorch and leverages the latest advancements in distributed training, such as Fully Sharded Data Parallel (FSDP2), tensor parallelism, mixed precision training, Flash Attention and many more, to achieve state-of-the-art performance and throughput.
+
+For a technical report on the archictecture and latest benchmarks, check out our [Modalities pre-print](https://arxiv.org/abs/2602.08387). 
 
 We successfully scaled Modalities up to 2048 GPUs on two HPC centers, namely [Leonardo Booster](https://leonardo-supercomputer.cineca.eu/hpc-system/) and [MareNostrum 5](https://www.bsc.es/ca/marenostrum/marenostrum-5), featuring Nvidia A100 and H100 GPUs, respectively. The results of our scaling experiments can be found [here](#scaling-experiments).
 
@@ -34,63 +36,54 @@ There are multiple ways to install Modalities. If you want to use the latest nig
 
 If you want to use Modalities as a library and register your custom components with Modalities, you can install it directly via pip which provides you with the latest stable version.
 
-In any case, you need to install pytorch, ninja and flash-attention **beforehand**. This is because the build and installation process of flash attention requires PyTorch to be installed beforehand and flash attention to be installed with no build isolation. Until they improve this, we therefore have to run the following commands **before** installing Modalities.
+It is recommended to install Modalities via uv or install PyTorch, psutil and Ninja **beforehand** and then install Flash-attention manually (with no build isolation) if it is required.
 
-Note: For using pipeline parallelism, pytorch version 2.10 (currently nightly) or higher and a corresponding flash attention version (if required) must be installed instead.
+### Option 1: From source via uv
 
 ```sh
-# create and activate a conda environment (optional, but good practice)
-conda create -n modalities python=3.11
+# Get uv (tested with uv version 0.9.13)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+uv sync
+source .venv/bin/activate
+
+# For developers: use [tests,linting] and install pre-commit hooks
+uv sync --extra tests --extra linting
+pre-commit install --install-hooks
+```
+
+### Option 2: Using pip and manual installation of dependencies
+
+```sh
+# Create and activate a venv or conda environment, e.g.:
+conda create -n modalities python=3.13
 conda activate modalities
 
-# install PyTorch, Ninja and Flash Attention (mandatory)
-pip install torch==2.6.0
-pip install ninja     # Lowers compilation time of flash attention significantly 
-pip install flash-attn==2.7.4.post1 --no-build-isolation
+# Install PyTorch, psutil, Ninja and Flash Attention
+pip install "torch<2.11.0"
+pip install psutil ninja  # Ninja lowers compilation time of flash attention significantly 
+pip install flash-attn==2.8.3 --no-build-isolation
 ```
 
-### Option 1: Installation from source
-
-Either clone the repository via
-```sh
-git clone git@github.com:Modalities/modalities.git
-```
-or download the repository as a zip file and extract it.
-```
-wget https://github.com/Modalities/modalities/archive/refs/heads/main.zip
-unzip main.zip
-```
-
-Afterwards, Modalities can be installed via
-
-```sh
-cd modalities
-pip install -e . 
-```
-
-### Option 2: Installation via pip
-
-To install Modalities via pip, run
+#### Option 2a: Install [pypi package](https://pypi.org/project/modalities/)
 
 ```sh
 pip install modalities
 ```
 
-### Option 3: Feature Complete via UV
+#### Option 2b: Install from source
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --seed --python 3.11 --prompt modalities
-source .venv/bin/activate
-uv pip install torch
-uv pip install ninja
-uv pip install --no-build-isolation flash-attn==2.7.4.post1
-# for developer: use [tests,linting] and install pre-commit hooks
-uv pip install -e .[tests,linting]
+git clone git@github.com:Modalities/modalities.git
+cd modalities
+pip install -e .
+
+# For developers: use [tests,linting] and install pre-commit hooks
+pip install -e .[tests,linting]
 pre-commit install --install-hooks
 ```
 
-### Option 4: Containerized Setup via Singularity / Apptainer
+### Option 3: Containerized Setup via Singularity / Apptainer
 
 If you prefer an isolated, reproducible environment or you are deploying to an HPC center that already supports Apptainer / Singularity, you can build and run Modalities using the provided `modalities.def` file in the container folder.
 
@@ -172,7 +165,7 @@ Explanation:
 
 * `$(which modalities) run`: This part dynamically finds the path to the Modalities executable and runs it. The run command triggers the main process to start the training.
 
-* `--config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
+* `--config_file_path config_files/training/config_lorem_ipsum_long_fsdp2.yaml`: The --config_file_path argument provides the path to the configuration file for the training job. In the example above, it is given by `config_files/training/config_lorem_ipsum_long_fsdp2.yaml`. A configuraton file contains an exhaustive parameterization for all the training components (e.g., dataset, model, optimizer, etc.), making training fully reproducible. An example configuration file can be found [here](tutorials/getting_started/configs/example_config.yaml), and a complete list of components available in Modalities is provided [here](docs/components/components.md).
 
 If you are a VSCode user, you may want to add this to your `launch.json`:
 ```json
@@ -219,7 +212,7 @@ The `modalities data create_raw_index` command triggers the process of creating 
 
 ### Raw Training Dataset Tokenization
 
-Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](tutorials/getting_started/example_dataset_config_train.yaml).
+Tokenization is the process of converting raw text data into a sequence of tokens that can be used as input to the model. The tokenization requires a configuration file, fully describing the tokenization process, making it fully reproducible. An example tokenization config can be found [here](tutorials/getting_started/configs/example_dataset_config_train.yaml).
 
 Example:
 ```sh
@@ -228,7 +221,7 @@ modalities data pack_encoded_data configs/tokenization_config.yaml
 
 ### Inference
 
-For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](tutorials/getting_started/example_text_generation_config.yaml).
+For inference on a model checkpoint, we have to pass a configuration file that specifies the full inference setup. An example inference config can be found [here](tutorials/getting_started/configs/example_text_generation_config.yaml).
 
 Example:
 
@@ -277,7 +270,7 @@ In the following, we list the most important features of Modalities.
 | Flash Attention                    | supported | A highly optimized attention mechanism that significantly reduces the computational burden and memory footprint of attention calculations, enabling faster training and inference on large models.                                                             |
 | Tensor Parallelism                 | supported | Implementing vertical model sharding, as an efficient model parallelism technique                                                                                                                                                                              |
 | Sequence Parallelism               | supported | Variant of Tensor Parallelism that shard on the sequence dimension                                                                                                                                                                                             |
-| Pipeline Parallelism               | supported | Support for GPipe. Alternative schedules such as (interleaved) 1F1B are being implemented.                                                                                                                                                                     |
+| Pipeline Parallelism               | supported | Beta-level support for schedules such as GPipe, (interleaved) 1F1B and DualPipe.                                                                                                                                                                               |
 | FSDP 2                             | supported | Improved version of the original FSDP                                                                                                                                                                                                                          |
 | Torch Compile                      | supported | Speeds up tensor operations by JIT compiling tensor operations into optimized kernels                                                                                                                                                                          |
 | Deferred Initialisation            | supported | Instead of instantiating the model in CPU RAM, the modules are instantiated as fake tensors and operations are recorded. Once sharded (e.g., via FSDP), each rank only instantiates the local tensors by replaying the tensor operations.                      |
@@ -305,11 +298,11 @@ In the following, we list the most important features of Modalities.
 
 ### Reproducibility & Extensibility Features
 
-| Name                                | Status    | Description                                                                                                                                                                                                        |
-|-------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Self-contained Configurations       | supported | Every experiment configuration fully specifies all components, hyperparameters, and seeds, ensuring that experiments are reproducible by design without requiring external context or hidden state.                |
-| Registry for Custom Components      | supported | Modalities uses a registry-based architecture where all components implement generic interfaces, enabling seamless replacement or extension with (custom) modules at runtime.                                      |
-| Generic Benchmarking                | supported | Supports systematic grid searches over arbitrary parameters to benchmark throughput, memory footprint, and downstream performance across model, data, and system configurations.                                   |
+| Name                           | Status    | Description                                                                                                                                                                                         |
+|--------------------------------|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Self-contained Configurations  | supported | Every experiment configuration fully specifies all components, hyperparameters, and seeds, ensuring that experiments are reproducible by design without requiring external context or hidden state. |
+| Registry for Custom Components | supported | Modalities uses a registry-based architecture where all components implement generic interfaces, enabling seamless replacement or extension with (custom) modules at runtime.                       |
+| Generic Benchmarking           | supported | Supports systematic grid searches over arbitrary parameters to benchmark throughput, memory footprint, and downstream performance across model, data, and system configurations.                    |
 
 
 
@@ -390,7 +383,7 @@ Further scaling results can be found at [MareNostrum5 Scaling Experiments](https
 Modalities welcomes your contributions! Please check out our
 [contributing](CONTRIBUTING.md) guidelines regarding the details on formatting, testing,
 etc.<br/><br/><br/>
-Thanks so much to all of our amazing contributors!
+Thanks so much to all of our contributors and collaborators!
 
 <a href="https://github.com/modalities/modalities/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=modalities/modalities&r="  width="800px"/>
@@ -398,11 +391,14 @@ Thanks so much to all of our amazing contributors!
 
 ## Citation
 
-    @misc{modalities,
-          title={Modalities: A PyTorch-native framework for distributed and reproducible foundation model training.}, 
-          author={Lübbering, Max and Ali, Mehdi and Stollenwerk, Felix and Fromm, Michael and Weber, Alexander Arno and Rutmann, Richard},
-          year={2024},
-          howpublished={\url{https://github.com/Modalities/modalities}},
-          url="https://github.com/Modalities/modalities",
-    }
-    
+```
+@misc{luebbering2026modalitiespytorchnativeframeworklargescale,
+      title={Modalities, a PyTorch-native Framework For Large-scale LLM Training and Research}, 
+      author={Max Lübbering and Timm Ruland and Richard Rutmann and Felix Stollenwerk and David Fitzek and Michael Fromm and Alexander Weber and Rafet Sifa and Nicolas Flores-Herr and Joachim Köhler and Mehdi Ali},
+      year={2026},
+      eprint={2602.08387},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2602.08387}, 
+}
+```
