@@ -60,7 +60,7 @@ conda create -n modalities python=3.13
 conda activate modalities
 
 # Install PyTorch, psutil, Ninja and Flash Attention
-pip install "torch<2.11.0"  # Or appropriate version for your CUDA setup.
+pip install "torch>=2.10,<2.11.0"  # Or appropriate version for your CUDA setup.
 pip install psutil ninja  # Ninja lowers compilation time of flash attention significantly 
 pip install flash-attn==2.8.3 --no-build-isolation
 ```
