@@ -1278,7 +1278,7 @@ def manual_scaled_dot_product_attention(
     if attn_mask is not None and attn_mask.dim() == 3:
         attn_bias = attn_bias.unsqueeze(0).repeat(attn_mask.size(0), 1, 1)
     if is_causal:
-        temp_mask = torch.ones(L, S, dtype=torch.bool, device=query.device).tril(diagonal=0)  # device added
+        temp_mask = torch.ones(L, S, dtype=torch.bool, device=query.device).tril(diagonal=0)
         if attn_mask is None:
             attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
         elif attn_mask.dtype == torch.bool:
