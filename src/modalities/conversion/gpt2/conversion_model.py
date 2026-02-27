@@ -178,11 +178,6 @@ def _load_hf_model_for_dcp_comparison(
     hf_model.config._attn_implementation = _map_attention_type(
         dcp_modalities_config["model_raw" if "model_raw" in dcp_modalities_config else "model"]["config"]
     )
-    # Rotary embedding frequencies are not downcasted in FSDP2.
-    # Therefore, we need to ensure they remain in the original precision.
-    hf_model.model.rotary_emb.inv_freq = hf_model.model.rotary_emb.original_inv_freq.to(
-        hf_model.model.rotary_emb.inv_freq.device
-    )
 
     return hf_model
 
