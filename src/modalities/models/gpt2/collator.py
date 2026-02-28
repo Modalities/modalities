@@ -55,20 +55,20 @@ class GPT2LLMCollateFn(CollateFnIF):
         return DatasetBatch(targets=targets, samples=samples)
 
     def _compute_sub_sequence_lengths_for_each_sequence(self, sample_tensor: torch.Tensor) -> list[list[int]]:
-        sub_seq_lengths = []
-        for seq in sample_tensor:
-            eos_positions = (seq == self.eos_token_id).nonzero(as_tuple=True)[0]
+        sub_seq_lengths_in_batch = []
+        for batch_seq in sample_tensor:
+            eos_positions = (batch_seq == self.eos_token_id).nonzero(as_tuple=True)[0]
             if len(eos_positions) == 0:
                 assert (
-                    self.padding_token_id is None or seq[0] != self.padding_token_id
+                    self.padding_token_id is None or batch_seq[0] != self.padding_token_id
                 ), "Sequence starts with padding token"
-                sub_seq_lengths.append([len(seq)])
+                sub_seq_lengths_in_batch.append([len(batch_seq)])
             else:
-                subseq_lengths = self._compute_subsequence_length(seq, eos_positions)
-                sub_seq_lengths.append(subseq_lengths)
-        return sub_seq_lengths
+                lens_in_seq = self._compute_subsequence_length_in_sequence(batch_seq, eos_positions)
+                sub_seq_lengths_in_batch.append(lens_in_seq)
+        return sub_seq_lengths_in_batch
 
-    def _compute_subsequence_length(self, seq: torch.Tensor, eos_positions: torch.Tensor) -> list[int]:
+    def _compute_subsequence_length_in_sequence(self, seq: torch.Tensor, eos_positions: torch.Tensor) -> list[int]:
         # If the last sequence is cut, i.e. does not end on an eos token,
         # it should also be included unless the padding token is set and
         # the last sequence is just padding.
@@ -76,12 +76,12 @@ class GPT2LLMCollateFn(CollateFnIF):
         if self._has_cutoff_final_sequence(seq, last_eos_pos):
             eos_positions = torch.cat([eos_positions, eos_positions.new_tensor([len(seq) - 1])])
         # Compute length of each subsequence and add to lengths list.
-        subseq_lengths = []
+        sub_seq_lengths = []
         prev_pos = 0
         for pos in eos_positions:
-            subseq_lengths.append(pos.item() - prev_pos + 1)
+            sub_seq_lengths.append(pos.item() - prev_pos + 1)
             prev_pos = pos.item() + 1
-        return subseq_lengths
+        return sub_seq_lengths
 
     def _has_cutoff_final_sequence(self, seq: torch.Tensor, last_eos_pos: int) -> bool:
         # Assumption: If the first token of the last sequence is padding, so is the rest.
