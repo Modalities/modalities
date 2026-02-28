@@ -59,9 +59,9 @@ class GPT2LLMCollateFn(CollateFnIF):
         for batch_seq in sample_tensor:
             eos_positions = (batch_seq == self.eos_token_id).nonzero(as_tuple=True)[0]
             if len(eos_positions) == 0:
-                assert (
-                    self.padding_token_id is None or batch_seq[0] != self.padding_token_id
-                ), "Sequence starts with padding token"
+                assert self.padding_token_id is None or (
+                    batch_seq[0] != self.padding_token_id and torch.all(batch_seq != self.padding_token_id)
+                ), "Whole batch sequence consists of padding tokens."
                 sub_seq_lengths_in_batch.append([len(batch_seq)])
             else:
                 lens_in_seq = self._compute_subsequence_length_in_sequence(batch_seq, eos_positions)
