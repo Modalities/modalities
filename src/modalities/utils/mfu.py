@@ -14,7 +14,6 @@ from modalities.utils.typing_utils import FSDPX
 #       https://www.nvidia.com/en-us/data-center/h100/
 #
 # NOTE: These values are valid for fp16 and bf16 only
-# FIXME: For B200, is 2.25 PFLOPS correct or should it be 4.5 PFLOPS?
 PEAK_PERFORMANCE = {"A100": 312e12, "H100": 989e12, "GH200": 989e12, "B200": 2.25e15}
 
 
