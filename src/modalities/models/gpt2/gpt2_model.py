@@ -533,7 +533,8 @@ class CausalSelfAttention(nn.Module):
             )
             return self._get_unpad_data_for_concatenated_sequences(concatenated_lengths)
         raise NotImplementedError(
-            f"Attention implementation {self.attention_impl} is not supported for inter-document masking. Use `manual` or `dao_flash`."
+            f"Attention implementation {self.attention_impl} is not supported for "
+            "inter-document masking. Use `manual` or `dao_flash`."
         )
 
     @staticmethod
@@ -1244,17 +1245,20 @@ class GPT2LLM(NNModel):
         h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
 
         if sub_seq_lengths is not None:
-            attention_masking_information = self.transformer.h["0"].attn.prepare_inter_document_masking(
-                in_batch_seq_lens=sub_seq_lengths, max_seq_len=seq_len
-            )
+            if hasattr(self.transformer, "h") and "0" in self.transformer.h:
+                attention_masking_information = self.transformer.h["0"].attn.prepare_inter_document_masking(
+                    in_batch_seq_lens=sub_seq_lengths, max_seq_len=seq_len
+                )
+            else:
+                # TODO: Handle this in case of pipeline parallelism.
+                raise NotImplementedError(
+                    "In the current document part, not attention layer exists from "
+                    "which to build inter document masking. Most likely, pipeline "
+                    "parallelism is being used for which inter document masking is "
+                    "currently not supported."
+                )
         else:
-            # TODO: Handle this in case of pipeline parallelism.
-            raise NotImplementedError(
-                "In the current document part, not attention layer exists from "
-                "which to build inter document masking. Most likely, pipeline "
-                "parallelism is being used for which inter document masking is "
-                "currently not supported."
-            )
+            attention_masking_information = None
 
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h, attention_masking_information=attention_masking_information)
