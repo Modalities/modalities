@@ -825,6 +825,9 @@ class CausalSelfAttention(nn.Module):
             )  # (B, nh_q, T, hd)
             y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
+            assert (
+                attention_masking_information is None
+            ), "Inter-document masking is not supported for PyTorch Flash Attention."
             k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
             y = torch.nn.functional.scaled_dot_product_attention(
                 query=q,
