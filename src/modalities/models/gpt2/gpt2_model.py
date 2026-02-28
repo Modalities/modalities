@@ -523,14 +523,7 @@ class CausalSelfAttention(nn.Module):
         """
         device = self.c_proj.weight.device
         if self.attention_impl == AttentionImplementation.MANUAL:
-            batch_size = len(in_batch_seq_lens)
-            attn_mask = torch.zeros((batch_size, max_seq_len, max_seq_len), dtype=torch.bool, device=device)
-            for i, doc_seq_lens in enumerate(in_batch_seq_lens):
-                doc_boundaries = torch.cumsum(torch.tensor([0] + doc_seq_lens, device=device), dim=0)
-                for j in range(len(doc_boundaries) - 1):
-                    start_idx = doc_boundaries[j]
-                    end_idx = doc_boundaries[j + 1]
-                    attn_mask[i, start_idx:end_idx, start_idx:end_idx] = True
+            attn_mask = self._build_3d_attention_mask(in_batch_seq_lens, max_seq_len, device)
             return attn_mask
         if self.attention_impl == AttentionImplementation.DAO_FLASH:
             concatenated_lengths = self._build_concatenated_lengths_tensor(
@@ -546,6 +539,21 @@ class CausalSelfAttention(nn.Module):
         raise NotImplementedError(
             f"Attention implementation {self.attention_impl} is not supported for inter-document masking."
         )
+
+    @staticmethod
+    def _build_3d_attention_mask(
+        in_batch_seq_lens: list[list[int]], max_seq_len: int, device: torch.device
+    ) -> torch.Tensor:
+        batch_size = len(in_batch_seq_lens)
+        attn_mask = torch.zeros((batch_size, max_seq_len, max_seq_len), dtype=torch.bool, device=device)
+        for i, doc_seq_lens in enumerate(in_batch_seq_lens):
+            CausalSelfAttention._validate_subsequence_lengths(max_seq_len, i, doc_seq_lens)
+            doc_boundaries = torch.cumsum(torch.tensor([0] + doc_seq_lens, device=device), dim=0)
+            for j in range(len(doc_boundaries) - 1):
+                start_idx = doc_boundaries[j]
+                end_idx = doc_boundaries[j + 1]
+                attn_mask[i, start_idx:end_idx, start_idx:end_idx] = True
+        return attn_mask
 
     @staticmethod
     def _build_concatenated_lengths_tensor(
@@ -569,21 +577,25 @@ class CausalSelfAttention(nn.Module):
         batch_size = len(in_batch_seq_lens)
         concatenated_lengths = torch.zeros((batch_size, max_seq_len), dtype=torch.int32, device=device)
         for batch_idx, doc_seq_lens in enumerate(in_batch_seq_lens):
-            if len(doc_seq_lens) > max_seq_len:
-                raise ValueError(
-                    f"Number of subsequences ({len(doc_seq_lens)}) exceeds max_seq_len ({max_seq_len}) "
-                    f"for batch index {batch_idx}."
-                )
-            if sum(doc_seq_lens) > max_seq_len:
-                raise ValueError(
-                    f"Sum of subsequence lengths ({sum(doc_seq_lens)}) exceeds max_seq_len ({max_seq_len}) "
-                    f"for batch index {batch_idx}."
-                )
+            CausalSelfAttention._validate_subsequence_lengths(max_seq_len, batch_idx, doc_seq_lens)
             if len(doc_seq_lens) > 0:
                 concatenated_lengths[batch_idx, : len(doc_seq_lens)] = torch.tensor(
                     doc_seq_lens, dtype=torch.int32, device=device
                 )
         return concatenated_lengths
+
+    @staticmethod
+    def _validate_subsequence_lengths(max_seq_len: int, batch_idx: int, doc_seq_lens: list[int]):
+        if len(doc_seq_lens) > max_seq_len:
+            raise ValueError(
+                f"Number of subsequences ({len(doc_seq_lens)}) exceeds max_seq_len ({max_seq_len}) "
+                f"for batch index {batch_idx}. (Detected while building inter document masking.)"
+            )
+        if sum(doc_seq_lens) > max_seq_len:
+            raise ValueError(
+                f"Sum of subsequence lengths ({sum(doc_seq_lens)}) exceeds max_seq_len ({max_seq_len}) "
+                f"for batch index {batch_idx}. (Detected while building inter document masking.)"
+            )
 
     @staticmethod
     def _get_unpad_data_for_concatenated_sequences(
@@ -1232,13 +1244,18 @@ class GPT2LLM(NNModel):
         # TODO: use drop out also without absolute position embedding?
         h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
 
-        # TODO: Handle this in case of pipeline parallelism.
         if sub_seq_lengths is not None:
             attention_masking_information = self.transformer.h["0"].attn.prepare_inter_document_masking(
                 in_batch_seq_lens=sub_seq_lengths, max_seq_len=seq_len
             )
         else:
-            attention_masking_information = None
+            # TODO: Handle this in case of pipeline parallelism.
+            raise NotImplementedError(
+                "In the current document part, not attention layer exists from "
+                "which to build inter document masking. Most likely, pipeline "
+                "parallelism is being used for which inter document masking is "
+                "currently not supported."
+            )
 
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h, attention_masking_information=attention_masking_information)
