@@ -18,7 +18,12 @@ from modalities.models.gpt2.gpt2_model import (
     flash_attn_varlen_func,
 )
 
-torch.manual_seed(0)  # FIXME remove or do within tests?
+
+@pytest.fixture(autouse=True)
+def _set_torch_seed_per_test():
+    torch.manual_seed(0)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(0)
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
