@@ -532,12 +532,8 @@ class CausalSelfAttention(nn.Module):
                 device=device,
             )
             return self._get_unpad_data_for_concatenated_sequences(concatenated_lengths)
-        if self.attention_impl == AttentionImplementation.PYTORCH_FLASH:
-            raise NotImplementedError(
-                "Inter-document masking is not supported for `pytorch_flash`. " "Use `manual` or `dao_flash`."
-            )
         raise NotImplementedError(
-            f"Attention implementation {self.attention_impl} is not supported for inter-document masking."
+            f"Attention implementation {self.attention_impl} is not supported for inter-document masking. Use `manual` or `dao_flash`."
         )
 
     @staticmethod
