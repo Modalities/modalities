@@ -11,6 +11,7 @@ initialized_model:
       config:
         num_layers: ${model_raw.config.n_layer}
         n_embd: ${model_raw.config.n_embd}
+        bias: ${model_raw.config.bias}
 
 
 model_raw:
