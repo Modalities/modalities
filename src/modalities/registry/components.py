@@ -243,7 +243,7 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "model_initialization",
-        "llama3_like",
+        "gpt2_llama3_like",
         Llama3Initializer,
         Llama3InitializerConfig,
     ),
