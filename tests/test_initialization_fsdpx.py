@@ -504,26 +504,25 @@ class TestWeightInitFSDPX:
 
 
 class TestLlama3LikeInitialization:
-    @pytest.mark.parametrize("has_bias", [True, False])
-    def test_llama3_like_initialization(self, has_bias: bool):
+    @pytest.mark.parametrize("depth_init", [True, False])
+    def test_llama3_like_initialization(self, depth_init: bool):
         config_file_path = Path(__file__).parent / "test_yaml_configs/llama3_config_initalization.yaml"
         n_layer = 4
         n_embd = 256
-        model = self._get_components(config_file_path=config_file_path, has_bias=has_bias)
+        model = self._get_components(config_file_path=config_file_path, depth_init=depth_init)
         self._test_wte(model=model)
         self._test_lm_head(model=model, n_embd=n_embd)
 
-        for _, block in model.transformer["h"].items():
-            self._test_qkv_proj(gpt2_block=block, has_bias=has_bias)
-            self._test_c_proj(gpt2_block=block, has_bias=has_bias, n_layer=n_layer)
-            self._test_swiglu_proj(gpt2_block=block, has_bias=has_bias, n_layer=n_layer)
+        for layer_id, (_, block) in enumerate(model.transformer["h"].items()):
+            self._test_qkv_proj(gpt2_block=block)
+            self._test_c_proj(gpt2_block=block, depth_init=depth_init, n_layer=n_layer, layer_id=layer_id)
+            self._test_swiglu_proj(gpt2_block=block, depth_init=depth_init, n_layer=n_layer, layer_id=layer_id)
 
-    def _get_components(self, config_file_path: Path, has_bias: bool) -> GPT2LLM:
+    def _get_components(self, config_file_path: Path, depth_init: bool) -> GPT2LLM:
         config_dict = load_app_config_dict(
             config_file_path=config_file_path,
         )
-        config_dict["model_raw"]["config"]["bias"] = has_bias
-        config_dict["initialized_model"]["config"]["model_initializer"]["config"]["bias"] = has_bias
+        config_dict["initialized_model"]["config"]["model_initializer"]["config"]["depth_init"] = depth_init
         registry = Registry(COMPONENTS)
         component_factory = ComponentFactory(registry=registry)
 
@@ -545,58 +544,40 @@ class TestLlama3LikeInitialization:
         assert model.transformer.lm_head.weight.min().detach().cpu() >= -3 / math.sqrt(n_embd)
         assert model.transformer.lm_head.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
-    def _test_qkv_proj(self, gpt2_block: GPT2Block, has_bias: bool):
+    def _test_qkv_proj(self, gpt2_block: GPT2Block):
         layers = (gpt2_block.attn.q_attn, gpt2_block.attn.k_attn, gpt2_block.attn.v_attn)
         for layer in layers:
-            assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-2)
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
             assert layer.weight.max().detach().cpu() <= 2
             assert layer.weight.min().detach().cpu() >= -2
             assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
-            if has_bias:
-                assert layer.bias is not None
-                assert layer.bias.std().detach().cpu() == pytest.approx(0.02, abs=1e-2)
-                assert layer.bias.max().detach().cpu() <= 2
-                assert layer.bias.min().detach().cpu() >= -2
-            else:
-                assert layer.bias is None
-
-    def _test_c_proj(self, gpt2_block: GPT2Block, has_bias: bool, n_layer: int):
+    def _test_c_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
         layer = gpt2_block.attn.c_proj
-        assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-2)
+        if depth_init:
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3)
+        else:
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
+
         assert layer.weight.max().detach().cpu() <= 2
         assert layer.weight.min().detach().cpu() >= -2
         assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
-        if has_bias:
-            assert layer.bias is not None
-            assert layer.bias.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
-            assert layer.bias.max().detach().cpu() <= 2
-            assert layer.bias.min().detach().cpu() >= -2
-        else:
-            assert layer.bias is None
-
-    def _test_swiglu_proj(self, gpt2_block: GPT2Block, has_bias: bool, n_layer: int):
+    def _test_swiglu_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
         layers = (gpt2_block.mlp.V, gpt2_block.mlp.W_2)
         for layer in layers:
-            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
+            if depth_init:
+                assert layer.weight.std().detach().cpu() == pytest.approx(
+                    0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3
+                )
+            else:
+                assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
             assert layer.weight.max().detach().cpu() <= 2
             assert layer.weight.min().detach().cpu() >= -2
             assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
-
-            if has_bias:
-                # all zero bias
-                assert layer.bias is not None and torch.all(layer.bias == 0)
-            else:
-                assert layer.bias is None
 
         layer = gpt2_block.mlp.W
         assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
         assert layer.weight.max().detach().cpu() <= 2
         assert layer.weight.min().detach().cpu() >= -2
         assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
-
-        if has_bias:
-            assert layer.bias is not None and torch.all(layer.bias == 0)
-        else:
-            assert layer.bias is None

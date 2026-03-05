@@ -7,11 +7,11 @@ initialized_model:
       pass_type: BY_REFERENCE
     model_initializer:
       component_key: model_initialization
-      variant_key: llama3_like
+      variant_key: gpt2_llama3_like
       config:
         num_layers: ${model_raw.config.n_layer}
         n_embd: ${model_raw.config.n_embd}
-        bias: ${model_raw.config.bias}
+        depth_init: False
 
 
 model_raw:
@@ -31,7 +31,7 @@ model_raw:
     ffn_hidden: 128 # 128 ffn hidden dim for testing
     n_embd: 256 # 256 embedding dim for testing
     dropout: 0.0
-    bias: true
+    bias: false
     attention_config:
       qkv_transforms:
         - type_hint: RotaryTransform
