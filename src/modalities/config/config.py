@@ -443,6 +443,21 @@ class BatchSamplerConfig(BaseModel):
 class GPT2LLMCollateFnConfig(BaseModel):
     sample_key: str
     target_key: str
+    sub_seq_lengths_key: str | None = None
+    eos_token_id: int | None = None
+    padding_token_id: int | None = None
+
+    @model_validator(mode="after")
+    def check_sub_seq_lengths_and_eos_token(self) -> "GPT2LLMCollateFnConfig":
+        if (self.sub_seq_lengths_key is None) != (self.eos_token_id is None):
+            raise ValueError("Either both or neither of sub_seq_lengths_key and eos_token_id must be provided.")
+        return self
+
+    @model_validator(mode="after")
+    def check_padding_token_and_sub_seq_lengths(self) -> "GPT2LLMCollateFnConfig":
+        if self.padding_token_id is not None and self.sub_seq_lengths_key is None:
+            raise ValueError("If padding_token_id is provided, sub_seq_lengths_key must also be provided.")
+        return self
 
 
 class LLMDataLoaderConfig(BaseModel):
