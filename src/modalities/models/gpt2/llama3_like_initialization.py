@@ -2,6 +2,7 @@ import math
 import re
 from typing import Annotated, Callable
 
+import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field
 
@@ -31,7 +32,7 @@ class Llama3Initializer(ModelInitializationIF):
             r"transformer\.wte\.weight": (nn.init.normal_, {"mean": 0.0, "std": 1}),
             # lm head weights
             r"transformer\.lm_head\.weight": (
-                nn.init.trunc_normal_,
+                trunc_normal_,
                 {
                     "mean": 0.0,
                     "std": 1 / math.sqrt(n_embd),
@@ -41,7 +42,7 @@ class Llama3Initializer(ModelInitializationIF):
             ),
             # qkv projections
             r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn)\.weight": (
-                nn.init.trunc_normal_,
+                trunc_normal_,
                 {
                     "mean": 0.0,
                     "std": 0.02,
@@ -51,7 +52,7 @@ class Llama3Initializer(ModelInitializationIF):
             ),
             # final attention projection in attention block
             r"transformer\.h\.\d+\.attn\.c_proj\.weight": (
-                nn.init.trunc_normal_,
+                trunc_normal_,
                 {
                     "mean": 0.0,
                     "std": (
@@ -65,7 +66,7 @@ class Llama3Initializer(ModelInitializationIF):
             ),
             # SwiGLU
             r"transformer\.h\.\d+\.mlp\.(W)\.weight": (
-                nn.init.trunc_normal_,
+                trunc_normal_,
                 {
                     "mean": 0.0,
                     "std": 0.02,
@@ -74,7 +75,7 @@ class Llama3Initializer(ModelInitializationIF):
                 },
             ),
             r"transformer\.h\.\d+\.mlp\.(V|W_2)\.weight": (
-                nn.init.trunc_normal_,
+                trunc_normal_,
                 {
                     "mean": 0.0,
                     "std": (
@@ -132,3 +133,37 @@ class Llama3Initializer(ModelInitializationIF):
                 raise ValueError(
                     f"Regex {k} did not match any FQNs. The model specification probably does not match LLama3."
                 )
+
+
+def trunc_normal_(
+    tensor: torch.Tensor,
+    mean: float = 0.0,
+    std: float = 1.0,
+    a: float = -2.0,
+    b: float = 2.0,
+):
+    """
+    Fills the input tensor with values sampled from a truncated normal distribution.
+    Values are drawn from a normal distribution with the given mean and standard
+    deviation. Any sampled values outside the range defined by a and b are resampled
+    until they fall within the bounds.
+
+    To avoid numerical instability in torch.nn.init.trunc_normal_, the initialization
+    is always performed using float32 precision. The result is then cast back to the
+    original data type of the input tensor.
+
+    Args:
+        tensor: an n dimensional torch Tensor
+        mean: the mean of the normal distribution
+        std: the standard deviation of the normal distribution
+        a: the lower bound for truncation
+        b: the upper bound for truncation
+
+    Returns:
+        The input tensor filled with values from the truncated normal distribution.
+    """
+    # This function is copied from from Meta's open-source project TorchTitan,
+    # licensed under the BSD 3-Clause License.
+    tmp = tensor.float()
+    nn.init.trunc_normal_(tmp, mean=mean, std=std, a=a, b=b)
+    tensor.copy_(tmp)
