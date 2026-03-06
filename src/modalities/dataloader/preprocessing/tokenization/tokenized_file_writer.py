@@ -93,7 +93,7 @@ class TokenizedFileWriter:
         else:
             raise ValueError("Currently only support token byte sizes of 1, 2, and 4.")
 
-        max_allowed = (1 << (8 * token_size_in_bytes)) - 1
+        max_allowed = 2 ** (8 * token_size_in_bytes) - 1
 
         samples: list[bytes] = []
         index_list: list[tuple[int, int]] = []
