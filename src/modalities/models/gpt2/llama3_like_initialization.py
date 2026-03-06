@@ -24,6 +24,15 @@ class Llama3Initializer(ModelInitializationIF):
     """
 
     def __init__(self, num_layers: int, n_embd: int, depth_init: bool) -> None:
+        """
+        Initializes the Llama3Initializer.
+        Args:
+            num_layers: The number of transformer layers in the model. Used to calculate std for certain parameters.
+            n_embd: The embedding dimension of the model. Used to calculate std and truncation for certain parameters.
+            depth_init: Whether to use depth-aware initialization for certain parameters, where the std
+                        is scaled based on the layer's depth in the model. If False, a constant std is
+                        used for all layers baed on num_layers.
+        """
         super().__init__()
         self.depth_init = depth_init
 
