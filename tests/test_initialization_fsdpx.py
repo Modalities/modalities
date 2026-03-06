@@ -18,8 +18,16 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import StateDictType
 
 from modalities.__main__ import Main
-from modalities.config.config import ProcessGroupBackendType
-from modalities.config.pydantic_if_types import PydanticFSDP1ModuleType, PydanticFSDP2ModuleType
+from modalities.config.component_factory import ComponentFactory
+from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
+from modalities.config.pydantic_if_types import (
+    PydanticFSDP1ModuleType,
+    PydanticFSDP2ModuleType,
+    PydanticPytorchModuleType,
+)
+from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block
+from modalities.registry.components import COMPONENTS
+from modalities.registry.registry import Registry
 from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
@@ -493,3 +501,83 @@ class TestWeightInitFSDPX:
             model=model, optimizers=[], options=StateDictOptions(full_state_dict=True, broadcast_from_rank0=True)
         )[0]
         return model_state
+
+
+class TestLlama3LikeInitialization:
+    @pytest.mark.parametrize("depth_init", [True, False])
+    def test_llama3_like_initialization(self, depth_init: bool):
+        config_file_path = Path(__file__).parent / "test_yaml_configs/llama3_config_initalization.yaml"
+        n_layer = 4
+        n_embd = 256
+        model = self._get_components(config_file_path=config_file_path, depth_init=depth_init)
+        self._test_wte(model=model)
+        self._test_lm_head(model=model, n_embd=n_embd)
+
+        for layer_id, (_, block) in enumerate(model.transformer["h"].items()):
+            self._test_qkv_proj(gpt2_block=block)
+            self._test_c_proj(gpt2_block=block, depth_init=depth_init, n_layer=n_layer, layer_id=layer_id)
+            self._test_swiglu_proj(gpt2_block=block, depth_init=depth_init, n_layer=n_layer, layer_id=layer_id)
+
+    def _get_components(self, config_file_path: Path, depth_init: bool) -> GPT2LLM:
+        config_dict = load_app_config_dict(
+            config_file_path=config_file_path,
+        )
+        config_dict["initialized_model"]["config"]["model_initializer"]["config"]["depth_init"] = depth_init
+        registry = Registry(COMPONENTS)
+        component_factory = ComponentFactory(registry=registry)
+
+        class ComponentsInstantiationModel(BaseModel):
+            initialized_model: PydanticPytorchModuleType
+
+        components: ComponentsInstantiationModel = component_factory.build_components(
+            config_dict=config_dict, components_model_type=ComponentsInstantiationModel
+        )
+        return components.initialized_model
+
+    def _test_wte(self, model: GPT2LLM):
+        assert model.transformer.wte.weight.std().detach().cpu() == pytest.approx(1, abs=1e-2)
+        assert model.transformer.wte.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-2)
+
+    def _test_lm_head(self, model: GPT2LLM, n_embd: int):
+        assert model.transformer.lm_head.weight.std().detach().cpu() == pytest.approx(1 / math.sqrt(n_embd), abs=1e-3)
+        assert model.transformer.lm_head.weight.max().detach().cpu() <= 3 / math.sqrt(n_embd)
+        assert model.transformer.lm_head.weight.min().detach().cpu() >= -3 / math.sqrt(n_embd)
+        assert model.transformer.lm_head.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
+
+    def _test_qkv_proj(self, gpt2_block: GPT2Block):
+        layers = (gpt2_block.attn.q_attn, gpt2_block.attn.k_attn, gpt2_block.attn.v_attn)
+        for layer in layers:
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
+            assert layer.weight.max().detach().cpu() <= 2
+            assert layer.weight.min().detach().cpu() >= -2
+            assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
+
+    def _test_c_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
+        layer = gpt2_block.attn.c_proj
+        if depth_init:
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3)
+        else:
+            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
+
+        assert layer.weight.max().detach().cpu() <= 2
+        assert layer.weight.min().detach().cpu() >= -2
+        assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
+
+    def _test_swiglu_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
+        layers = (gpt2_block.mlp.V, gpt2_block.mlp.W_2)
+        for layer in layers:
+            if depth_init:
+                assert layer.weight.std().detach().cpu() == pytest.approx(
+                    0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3
+                )
+            else:
+                assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
+            assert layer.weight.max().detach().cpu() <= 2
+            assert layer.weight.min().detach().cpu() >= -2
+            assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
+
+        layer = gpt2_block.mlp.W
+        assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
+        assert layer.weight.max().detach().cpu() <= 2
+        assert layer.weight.min().detach().cpu() >= -2
+        assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
