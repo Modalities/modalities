@@ -105,12 +105,6 @@ class Llama3Initializer(ModelInitializationIF):
                 if re.fullmatch(weight_regex, parameter_name):
                     init_fn, arg_dict = regex_to_init[weight_regex]
                     if arg_dict["std"] is not None and callable(arg_dict["std"]):
-                        if not depth_init:
-                            raise ValueError(
-                                "Dynamic std calculation is only allowed if depth_init "
-                                f"is True, but got depth_init={depth_init}"
-                            )
-
                         # If std is a function, call it with the layer_id
                         layer_id_match = re.search(r"transformer\.h\.(\d+)\.", parameter_name)
                         if layer_id_match is not None:
