@@ -1,0 +1,489 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.running_env.fsdp package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.tokenization package" href="modalities.tokenization.html" />
+    <link rel="prev" title="modalities.running_env package" href="modalities.running_env.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+          <li class="breadcrumb-item"><a href="modalities.running_env.html">modalities.running_env package</a></li>
+      <li class="breadcrumb-item active">modalities.running_env.fsdp package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.running_env.fsdp.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-running-env-fsdp-package">
+<h1>modalities.running_env.fsdp package<a class="headerlink" href="#modalities-running-env-fsdp-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.running_env.fsdp.device_mesh">
+<span id="modalities-running-env-fsdp-device-mesh-module"></span><h2>modalities.running_env.fsdp.device_mesh module<a class="headerlink" href="#module-modalities.running_env.fsdp.device_mesh" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">DeviceMeshConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#DeviceMeshConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>data_parallel_replicate_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=-1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>data_parallel_shard_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Ge</em><em>(</em><em>ge=-1</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>tensor_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Gt</em><em>(</em><em>gt=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>pipeline_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Gt</em><em>(</em><em>gt=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>context_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Gt</em><em>(</em><em>gt=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+<li><p><strong>enable_loss_parallel</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>world_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><em>Annotated</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>FieldInfo</em><em>(</em><em>annotation=NoneType</em><em>, </em><em>required=True</em><em>, </em><em>metadata=</em><em>[</em><em>Strict</em><em>(</em><em>strict=True</em><em>)</em><em>, </em><em>Gt</em><em>(</em><em>gt=0</em><em>)</em><em>]</em><em>)</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.context_parallel_degree">
+<span class="sig-name descname"><span class="pre">context_parallel_degree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Gt</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">gt</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.context_parallel_degree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.data_parallel_replicate_degree">
+<span class="sig-name descname"><span class="pre">data_parallel_replicate_degree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">-</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.data_parallel_replicate_degree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.data_parallel_shard_degree">
+<span class="sig-name descname"><span class="pre">data_parallel_shard_degree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Ge</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">ge</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">-</span></span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.data_parallel_shard_degree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.device_type">
+<span class="sig-name descname"><span class="pre">device_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.device_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.enable_loss_parallel">
+<span class="sig-name descname"><span class="pre">enable_loss_parallel</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.enable_loss_parallel" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.model_config">
+<span class="sig-name descname"><span class="pre">model_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><span class="pre">ConfigDict</span><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.model_config" title="Link to this definition"></a></dt>
+<dd><p>Configuration for the model, should be a dictionary conforming to [<cite>ConfigDict</cite>][pydantic.config.ConfigDict].</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.pipeline_parallel_degree">
+<span class="sig-name descname"><span class="pre">pipeline_parallel_degree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Gt</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">gt</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.pipeline_parallel_degree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.tensor_parallel_degree">
+<span class="sig-name descname"><span class="pre">tensor_parallel_degree</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Gt</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">gt</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.tensor_parallel_degree" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.world_size">
+<span class="sig-name descname"><span class="pre">world_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">FieldInfo</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">annotation</span></span><span class="o"><span class="pre">=</span></span><span class="pre">NoneType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">required</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Strict</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">strict</span></span><span class="o"><span class="pre">=</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Gt</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">gt</span></span><span class="o"><span class="pre">=</span></span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig.world_size" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">ParallelismDegrees</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#ParallelismDegrees"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees.CP">
+<span class="sig-name descname"><span class="pre">CP</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cp'</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees.CP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees.DP_REPLICATE">
+<span class="sig-name descname"><span class="pre">DP_REPLICATE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dp_replicate'</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees.DP_REPLICATE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees.DP_SHARD">
+<span class="sig-name descname"><span class="pre">DP_SHARD</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dp_shard'</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees.DP_SHARD" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees.PP">
+<span class="sig-name descname"><span class="pre">PP</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'pp'</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees.PP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.ParallelismDegrees.TP">
+<span class="sig-name descname"><span class="pre">TP</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'tp'</span></span><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees.TP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.get_device_mesh">
+<span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">get_device_mesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_parallel_replicate_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_parallel_shard_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tensor_parallel_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pipeline_parallel_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context_parallel_degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_loss_parallel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">world_size</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#get_device_mesh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.get_device_mesh" title="Link to this definition"></a></dt>
+<dd><p>Gets the device mesh for the specified parallelism degrees.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DeviceMesh</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>data_parallel_replicate_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>data_parallel_shard_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>tensor_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>pipeline_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>context_parallel_degree</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>enable_loss_parallel</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>world_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>device_type (str): The device type.
+data_parallel_replicate_degree (int): The data parallel replicate degree.
+data_parallel_shard_degree (int): The data parallel shard degree.
+tensor_parallel_degree (int): The tensor parallel degree.
+pipeline_parallel_degree (int): The pipeline parallel degree.
+context_parallel_degree (int): The context parallel degree.
+enable_loss_parallel (bool): Whether to enable loss parallelism.
+world_size (int): The world size.</p>
+</dd>
+<dt>Returns:</dt><dd><p>DeviceMesh: The device mesh.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.get_mesh_for_parallelism_method">
+<span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">get_mesh_for_parallelism_method</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallelism_method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#get_mesh_for_parallelism_method"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.get_mesh_for_parallelism_method" title="Link to this definition"></a></dt>
+<dd><p>Gets the sub-mesh for the specified parallelism method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DeviceMesh</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device_mesh</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><em>DeviceMesh</em></a>)</p></li>
+<li><p><strong>parallelism_method</strong> (<a class="reference internal" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees" title="modalities.running_env.fsdp.device_mesh.ParallelismDegrees"><em>ParallelismDegrees</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>device_mesh (DeviceMesh): The device mesh.
+parallelism_method (ParallelismDegrees): The parallelism method.</p>
+</dd>
+<dt>Returns:</dt><dd><p>DeviceMesh: The sub-mesh for the specified parallelism method.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.get_parallel_degree">
+<span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">get_parallel_degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallelism_methods</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#get_parallel_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.get_parallel_degree" title="Link to this definition"></a></dt>
+<dd><p>Gets the number of parallel ranks (i.e., the parallelism degree)
+from the device mesh for a specific parallelism method.
+Args:</p>
+<blockquote>
+<div><p>device_mesh (DeviceMesh): The device mesh.
+parallelism_methods (list[ParallelismDegrees]): The parallelism methods.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Returns:</dt><dd><p>int: The number of parallel ranks for the specified parallelism method.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device_mesh</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><em>DeviceMesh</em></a>)</p></li>
+<li><p><strong>parallelism_methods</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees" title="modalities.running_env.fsdp.device_mesh.ParallelismDegrees"><em>ParallelismDegrees</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.get_parallel_rank">
+<span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">get_parallel_rank</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallelism_method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#get_parallel_rank"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.get_parallel_rank" title="Link to this definition"></a></dt>
+<dd><p>Gets the parallel rank ID for the specified parallelism method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device_mesh</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><em>DeviceMesh</em></a>)</p></li>
+<li><p><strong>parallelism_method</strong> (<a class="reference internal" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees" title="modalities.running_env.fsdp.device_mesh.ParallelismDegrees"><em>ParallelismDegrees</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>device_mesh (DeviceMesh): The device mesh.
+parallelism_method (ParallelismDegrees): The parallelism method.</p>
+</dd>
+<dt>Returns:</dt><dd><p>int: The parallel rank ID for the specified parallelism method.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.device_mesh.has_parallelism_method">
+<span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.device_mesh.</span></span><span class="sig-name descname"><span class="pre">has_parallelism_method</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device_mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallelism_method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/device_mesh.html#has_parallelism_method"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.device_mesh.has_parallelism_method" title="Link to this definition"></a></dt>
+<dd><p>Checks if the device mesh has the specified parallelism method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>device_mesh</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/distributed.html#torch.distributed.device_mesh.DeviceMesh" title="(in PyTorch v2.10)"><em>DeviceMesh</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>parallelism_method</strong> (<a class="reference internal" href="#modalities.running_env.fsdp.device_mesh.ParallelismDegrees" title="modalities.running_env.fsdp.device_mesh.ParallelismDegrees"><em>ParallelismDegrees</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>device_mesh (DeviceMesh | None): The device mesh.
+parallelism_method (ParallelismDegrees): The parallelism method.</p>
+</dd>
+<dt>Returns:</dt><dd><p>bool: True if the device mesh has the specified parallelism method, False otherwise.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-modalities.running_env.fsdp.fsdp_auto_wrapper">
+<span id="modalities-running-env-fsdp-fsdp-auto-wrapper-module"></span><h2>modalities.running_env.fsdp.fsdp_auto_wrapper module<a class="headerlink" href="#module-modalities.running_env.fsdp.fsdp_auto_wrapper" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.fsdp_auto_wrapper.</span></span><span class="sig-name descname"><span class="pre">FSDPAutoWrapFactoryIF</span></span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/fsdp_auto_wrapper.html#FSDPAutoWrapFactoryIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF.get_auto_wrap_policy">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_auto_wrap_policy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/fsdp_auto_wrapper.html#FSDPAutoWrapFactoryIF.get_auto_wrap_policy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF.get_auto_wrap_policy" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryTypes">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.fsdp_auto_wrapper.</span></span><span class="sig-name descname"><span class="pre">FSDPAutoWrapFactoryTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/fsdp_auto_wrapper.html#FSDPAutoWrapFactoryTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modalities.config.html#modalities.config.lookup_enum.LookupEnum" title="modalities.config.lookup_enum.LookupEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">LookupEnum</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPTransformerAutoWrapPolicyFactory">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.fsdp_auto_wrapper.</span></span><span class="sig-name descname"><span class="pre">FSDPTransformerAutoWrapPolicyFactory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_names</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/fsdp_auto_wrapper.html#FSDPTransformerAutoWrapPolicyFactory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPTransformerAutoWrapPolicyFactory" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF" title="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPAutoWrapFactoryIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">FSDPAutoWrapFactoryIF</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>block_names</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPTransformerAutoWrapPolicyFactory.get_auto_wrap_policy">
+<span class="sig-name descname"><span class="pre">get_auto_wrap_policy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/fsdp_auto_wrapper.html#FSDPTransformerAutoWrapPolicyFactory.get_auto_wrap_policy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.fsdp_auto_wrapper.FSDPTransformerAutoWrapPolicyFactory.get_auto_wrap_policy" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.running_env.fsdp.reducer">
+<span id="modalities-running-env-fsdp-reducer-module"></span><h2>modalities.running_env.fsdp.reducer module<a class="headerlink" href="#module-modalities.running_env.fsdp.reducer" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.reducer.Reducer">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.running_env.fsdp.reducer.</span></span><span class="sig-name descname"><span class="pre">Reducer</span></span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/reducer.html#Reducer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.reducer.Reducer" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.running_env.fsdp.reducer.Reducer.reduce">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">reduce</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">post_processing_fun</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/running_env/fsdp/reducer.html#Reducer.reduce"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.running_env.fsdp.reducer.Reducer.reduce" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tensor</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a>)</p></li>
+<li><p><strong>operation</strong> (<em>RedOpType</em>)</p></li>
+<li><p><strong>post_processing_fun</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.10)"><em>Tensor</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.running_env.fsdp">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.running_env.fsdp" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.running_env.html" class="btn btn-neutral float-left" title="modalities.running_env package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.tokenization.html" class="btn btn-neutral float-right" title="modalities.tokenization package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

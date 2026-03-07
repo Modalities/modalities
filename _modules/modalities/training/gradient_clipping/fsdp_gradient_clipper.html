@@ -1,0 +1,384 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.training.gradient_clipping.fsdp_gradient_clipper &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.training.gradient_clipping.fsdp_gradient_clipper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.training.gradient_clipping.fsdp_gradient_clipper</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">distributed</span> <span class="k">as</span> <span class="n">dist</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceMesh</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FSDPModule</span> <span class="k">as</span> <span class="n">FSDP2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP1</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">DTensor</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.config.lookup_enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">LookupEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.running_env.fsdp.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ParallelismDegrees</span><span class="p">,</span>
+    <span class="n">get_mesh_for_parallelism_method</span><span class="p">,</span>
+    <span class="n">has_parallelism_method</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.gradient_clipping.gradient_clipper</span><span class="w"> </span><span class="kn">import</span> <span class="n">GradientClipperIF</span>
+
+
+<div class="viewcode-block" id="GradientClippingMode">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.GradientClippingMode">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GradientClippingMode</span><span class="p">(</span><span class="n">LookupEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum class representing different modes of gradient clipping.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        P1_NORM (int): Mode for Manhattan norm based clipping.</span>
+<span class="sd">        P2_NORM (int): Mode for Euclidean norm based clipping.</span>
+<span class="sd">        MAX_NORM (str): Mode for maximum norm based clipping.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">P1_NORM</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">P2_NORM</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">MAX_NORM</span> <span class="o">=</span> <span class="s2">&quot;inf&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="FSDP1GradientClipper">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP1GradientClipper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP1GradientClipper</span><span class="p">(</span><span class="n">GradientClipperIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The FSDP1GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP.</span>
+<span class="sd">    Follows the documentation from</span>
+<span class="sd">    https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.clip_grad_norm_</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">FSDP1</span><span class="p">,</span> <span class="n">max_norm</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">norm_type</span><span class="o">=</span><span class="n">GradientClippingMode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the FSDP1GradientClipper object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wrapped_model (FSDP1): The wrapped model.</span>
+<span class="sd">            max_norm (float): The maximum norm value for gradient clipping.</span>
+<span class="sd">            norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped_model</span> <span class="o">=</span> <span class="n">wrapped_model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_norm</span> <span class="o">=</span> <span class="n">max_norm</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span> <span class="o">=</span> <span class="n">norm_type</span>
+
+<div class="viewcode-block" id="FSDP1GradientClipper.clip_gradients">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP1GradientClipper.clip_gradients">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_gradients</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Clips the gradients of the wrapped model using the specified maximum norm and norm type.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The gradient norm after clipping.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">gradient_norm_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrapped_model</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span><span class="n">max_norm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_norm</span><span class="p">,</span> <span class="n">norm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gradient_norm_score</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FSDP1LoggingOnlyGradientClipper">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP1LoggingOnlyGradientClipper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP1LoggingOnlyGradientClipper</span><span class="p">(</span><span class="n">GradientClipperIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The FSDP1LoggingOnlyGradientClipper class that is responsible for logging the gradient</span>
+<span class="sd">    norms without actually clipping the gradients.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrapped_model</span><span class="p">:</span> <span class="n">FSDP1</span><span class="p">,</span> <span class="n">norm_type</span><span class="o">=</span><span class="n">GradientClippingMode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the FSDP1LoggingOnlyGradientClipper.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wrapped_model (FSDP1): The wrapped FSDP1 model.</span>
+<span class="sd">            norm_type (GradientClippingMode, optional): The type of gradient clipping. Defaults to GradientClippingMode.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wrapped_model</span> <span class="o">=</span> <span class="n">wrapped_model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span> <span class="o">=</span> <span class="n">norm_type</span>
+
+<div class="viewcode-block" id="FSDP1LoggingOnlyGradientClipper.clip_gradients">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP1LoggingOnlyGradientClipper.clip_gradients">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_gradients</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the gradient norm, but does not apply clipping since max_norm is set to inifinity.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The gradient norms.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">gradient_norm_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrapped_model</span><span class="o">.</span><span class="n">clip_grad_norm_</span><span class="p">(</span><span class="n">max_norm</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">norm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gradient_norm_score</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FSDP2LoggingOnlyGradientClipper">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP2LoggingOnlyGradientClipper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP2LoggingOnlyGradientClipper</span><span class="p">(</span><span class="n">GradientClipperIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The FSDP2LoggingOnlyGradientClipper class that is responsible for logging the gradient</span>
+<span class="sd">    norms without actually clipping the gradients.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_parts</span><span class="p">:</span> <span class="n">FSDP2</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">FSDP2</span><span class="p">],</span>
+        <span class="n">norm_type</span><span class="p">:</span> <span class="n">GradientClippingMode</span><span class="p">,</span>
+        <span class="n">device_mesh</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceMesh</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">error_if_nonfinite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">foreach</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the FSDP2LoggingOnlyGradientClipper.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_parts (FSDP2 | list[FSDP2]): The wrapped FSDP2 model or list of models.</span>
+<span class="sd">            norm_type (GradientClippingMode): The type of gradient clipping.</span>
+<span class="sd">            device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.</span>
+<span class="sd">            error_if_nonfinite (bool): if True, an error is thrown if the total</span>
+<span class="sd">                norm of the gradients from :attr:`parameters` is ``nan``,</span>
+<span class="sd">                ``inf``, or ``-inf``. Default: False (will switch to True in the future)</span>
+<span class="sd">            foreach (bool): use the faster foreach-based implementation.</span>
+<span class="sd">                If ``None``, use the foreach implementation for CUDA and CPU native tensors and silently</span>
+<span class="sd">                fall back to the slow implementation for other device types.</span>
+<span class="sd">                Default: ``None``</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">models</span> <span class="o">=</span> <span class="n">model_parts</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_parts</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">model_parts</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span> <span class="o">=</span> <span class="n">norm_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device_mesh</span> <span class="o">=</span> <span class="n">device_mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_if_nonfinite</span> <span class="o">=</span> <span class="n">error_if_nonfinite</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">foreach</span> <span class="o">=</span> <span class="n">foreach</span>
+
+<div class="viewcode-block" id="FSDP2LoggingOnlyGradientClipper.clip_gradients">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP2LoggingOnlyGradientClipper.clip_gradients">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_gradients</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the gradient norm, but does not apply clipping since max_norm is set to inifinity.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The gradient norms.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">grads</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">grad</span> <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">grad</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">total_norm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">get_total_norm</span><span class="p">(</span>
+            <span class="n">tensors</span><span class="o">=</span><span class="n">grads</span><span class="p">,</span>
+            <span class="n">norm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">error_if_nonfinite</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">error_if_nonfinite</span><span class="p">,</span>
+            <span class="n">foreach</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foreach</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Inspired by torch titan</span>
+        <span class="c1"># If total_norm is a DTensor, the placements must be `torch.distributed._tensor.ops.math_ops._NormPartial`.</span>
+        <span class="c1"># We can simply reduce the DTensor to get the total norm in this tensor&#39;s process group</span>
+        <span class="c1"># and then convert it to a local tensor.</span>
+        <span class="c1"># NOTE: It has the purpose to return a reduced total_norm tensor whose .item() would return the correct value</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="n">DTensor</span><span class="p">):</span>
+            <span class="c1"># Will reach here if any non-PP parallelism is used.</span>
+            <span class="c1"># If only using PP, total_norm will be a local tensor.</span>
+            <span class="n">total_norm</span> <span class="o">=</span> <span class="n">total_norm</span><span class="o">.</span><span class="n">full_tensor</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">has_parallelism_method</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="p">):</span>
+            <span class="n">pp_mesh</span> <span class="o">=</span> <span class="n">get_mesh_for_parallelism_method</span><span class="p">(</span>
+                <span class="n">device_mesh</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="o">=</span><span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">MAX</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">pp_mesh</span><span class="o">.</span><span class="n">get_group</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">total_norm</span> <span class="o">**=</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">total_norm</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">SUM</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">pp_mesh</span><span class="o">.</span><span class="n">get_group</span><span class="p">())</span>
+                <span class="n">total_norm</span> <span class="o">**=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm_type</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">return</span> <span class="n">total_norm</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FSDP2GradientClipper">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP2GradientClipper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP2GradientClipper</span><span class="p">(</span><span class="n">FSDP2LoggingOnlyGradientClipper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The FSDP2GradientClipper class that is responsible for clipping the gradients of a model wrapped with FSDP.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_parts</span><span class="p">:</span> <span class="n">FSDP2</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">FSDP2</span><span class="p">],</span>
+        <span class="n">max_norm</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">norm_type</span><span class="p">:</span> <span class="n">GradientClippingMode</span><span class="p">,</span>
+        <span class="n">device_mesh</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceMesh</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">error_if_nonfinite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">foreach</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the FSDP2GradientClipper object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_parts (FSDP2 | list[FSDP2]): The wrapped FSDP2 model or list of model parts.</span>
+<span class="sd">            max_norm (float): The maximum norm value for gradient clipping.</span>
+<span class="sd">            norm_type (GradientClippingMode): The type of gradient clipping.</span>
+<span class="sd">            device_mesh (DeviceMesh, optional): The device mesh used for distributed training. Defaults to None.</span>
+<span class="sd">            error_if_nonfinite (bool): if True, an error is thrown if the total</span>
+<span class="sd">                norm of the gradients from :attr:`parameters` is ``nan``,</span>
+<span class="sd">                ``inf``, or ``-inf``. Default: False (will switch to True in the future)</span>
+<span class="sd">            foreach (bool): use the faster foreach-based implementation.</span>
+<span class="sd">                If ``None``, use the foreach implementation for CUDA and CPU native tensors and silently</span>
+<span class="sd">                fall back to the slow implementation for other device types.</span>
+<span class="sd">                Default: ``None``</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">model_parts</span><span class="o">=</span><span class="n">model_parts</span><span class="p">,</span>
+            <span class="n">norm_type</span><span class="o">=</span><span class="n">norm_type</span><span class="p">,</span>
+            <span class="n">device_mesh</span><span class="o">=</span><span class="n">device_mesh</span><span class="p">,</span>
+            <span class="n">error_if_nonfinite</span><span class="o">=</span><span class="n">error_if_nonfinite</span><span class="p">,</span>
+            <span class="n">foreach</span><span class="o">=</span><span class="n">foreach</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_norm</span> <span class="o">=</span> <span class="n">max_norm</span>
+
+<div class="viewcode-block" id="FSDP2GradientClipper.clip_gradients">
+<a class="viewcode-back" href="../../../../api/modalities.training.gradient_clipping.html#modalities.training.gradient_clipping.fsdp_gradient_clipper.FSDP2GradientClipper.clip_gradients">[docs]</a>
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_gradients</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Clips the gradients of the wrapped model using the specified maximum norm and norm type.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The gradient norm after clipping.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">total_norm</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">clip_gradients</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">models</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">clip_grads_with_norm_</span><span class="p">(</span>
+                <span class="n">parameters</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
+                <span class="n">max_norm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_norm</span><span class="p">,</span>
+                <span class="n">total_norm</span><span class="o">=</span><span class="n">total_norm</span><span class="p">,</span>
+                <span class="n">foreach</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">foreach</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">total_norm</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

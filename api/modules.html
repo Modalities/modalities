@@ -1,0 +1,389 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities package" href="modalities.html" />
+    <link rel="prev" title="Future Work" href="../future_work.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">modalities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html">modalities package</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">modalities</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities">
+<h1>modalities<a class="headerlink" href="#modalities" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.html">modalities package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.html">modalities.checkpointing package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#modalities-checkpointing-checkpoint-conversion-module">modalities.checkpointing.checkpoint_conversion module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing.checkpoint_loading">modalities.checkpointing.checkpoint_loading module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing.checkpoint_saving">modalities.checkpointing.checkpoint_saving module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing.checkpoint_saving_execution">modalities.checkpointing.checkpoint_saving_execution module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing.checkpoint_saving_instruction">modalities.checkpointing.checkpoint_saving_instruction module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing.checkpoint_saving_strategies">modalities.checkpointing.checkpoint_saving_strategies module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.html#module-modalities.checkpointing">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.config.html">modalities.config package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#modalities-config-component-factory-module">modalities.config.component_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#modalities-config-config-module">modalities.config.config module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#modalities-config-instantiation-models-module">modalities.config.instantiation_models module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#module-modalities.config.lookup_enum">modalities.config.lookup_enum module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#modalities-config-pydantic-if-types-module">modalities.config.pydantic_if_types module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#module-modalities.config.utils">modalities.config.utils module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html#module-modalities.config">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html#module-modalities.conversion">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#modalities-dataloader-apply-chat-template-module">modalities.dataloader.apply_chat_template module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.create_index">modalities.dataloader.create_index module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#modalities-dataloader-create-instruction-tuning-data-module">modalities.dataloader.create_instruction_tuning_data module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.create_packed_data">modalities.dataloader.create_packed_data module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.dataloader">modalities.dataloader.dataloader module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.dataloader_factory">modalities.dataloader.dataloader_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.dataset">modalities.dataloader.dataset module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.dataset_factory">modalities.dataloader.dataset_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.filter_packed_data">modalities.dataloader.filter_packed_data module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.large_file_lines_reader">modalities.dataloader.large_file_lines_reader module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#modalities-dataloader-sampler-factory-module">modalities.dataloader.sampler_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader.samplers">modalities.dataloader.samplers module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html#module-modalities.dataloader">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html#modalities-inference-inference-module">modalities.inference.inference module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html#module-modalities.inference">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#module-modalities.logging_broker.message_broker">modalities.logging_broker.message_broker module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#module-modalities.logging_broker.messages">modalities.logging_broker.messages module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#module-modalities.logging_broker.publisher">modalities.logging_broker.publisher module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#module-modalities.logging_broker.subscriber">modalities.logging_broker.subscriber module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html#module-modalities.logging_broker">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.models.html">modalities.models package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#module-modalities.models.model">modalities.models.model module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#modalities-models-model-factory-module">modalities.models.model_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#modalities-models-utils-module">modalities.models.utils module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html#module-modalities.models">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html#module-modalities.nn.attention">modalities.nn.attention module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html#module-modalities.nn.mlp">modalities.nn.mlp module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html#module-modalities.nn">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#module-modalities.optimizers.lr_schedulers">modalities.optimizers.lr_schedulers module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#module-modalities.optimizers.optimizer_factory">modalities.optimizers.optimizer_factory module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#module-modalities.optimizers.optimizer_list">modalities.optimizers.optimizer_list module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#module-modalities.optimizers.scheduler_list">modalities.optimizers.scheduler_list module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html#module-modalities.optimizers">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html#module-modalities.preprocessing.create_chunks">modalities.preprocessing.create_chunks module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html#module-modalities.preprocessing.shuffle_data">modalities.preprocessing.shuffle_data module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html#module-modalities.preprocessing">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html#modalities-registry-components-module">modalities.registry.components module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html#modalities-registry-registry-module">modalities.registry.registry module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html#module-modalities.registry">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html#modalities-running-env-cuda-env-module">modalities.running_env.cuda_env module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html#module-modalities.running_env.env_utils">modalities.running_env.env_utils module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html#module-modalities.running_env">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html#module-modalities.tokenization.tokenizer_wrapper">modalities.tokenization.tokenizer_wrapper module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html#module-modalities.tokenization">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.training.html">modalities.training package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html#module-modalities.training.training_progress">modalities.training.training_progress module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html#module-modalities.training">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.communication_test">modalities.utils.communication_test module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.debug">modalities.utils.debug module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.debug_components">modalities.utils.debug_components module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#modalities-utils-debugging-configs-module">modalities.utils.debugging_configs module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.deprecated_alias">modalities.utils.deprecated_alias module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.file_ops">modalities.utils.file_ops module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.logger_utils">modalities.utils.logger_utils module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.maybe_list_parameter">modalities.utils.maybe_list_parameter module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.mfu">modalities.utils.mfu module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.number_conversion">modalities.utils.number_conversion module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.seeding">modalities.utils.seeding module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils.typing_utils">modalities.utils.typing_utils module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#modalities-utils-verify-tokenization-consistency-module">modalities.utils.verify_tokenization_consistency module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html#module-modalities.utils">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.Batch"><code class="docutils literal notranslate"><span class="pre">Batch</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch"><code class="docutils literal notranslate"><span class="pre">DatasetBatch</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.batch_dim"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.batch_dim</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.detach"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.detach()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.device"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.device</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.samples"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.samples</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.targets"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.targets</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.DatasetBatch.to"><code class="docutils literal notranslate"><span class="pre">DatasetBatch.to()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch.dataloader_tag"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch.dataloader_tag</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch.losses"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch.losses</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch.metrics"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch.metrics</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch.num_train_steps_done"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch.num_train_steps_done</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch.throughput_metrics"><code class="docutils literal notranslate"><span class="pre">EvaluationResultBatch.throughput_metrics</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.batch_dim"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.batch_dim</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.detach"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.detach()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.device"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.device</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.get_predictions"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.get_predictions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.get_targets"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.get_targets()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.predictions"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.predictions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.targets"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.targets</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.to"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.to()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.InferenceResultBatch.to_cpu"><code class="docutils literal notranslate"><span class="pre">InferenceResultBatch.to_cpu()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.ResultItem"><code class="docutils literal notranslate"><span class="pre">ResultItem</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.ResultItem.decimal_places"><code class="docutils literal notranslate"><span class="pre">ResultItem.decimal_places</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.ResultItem.value"><code class="docutils literal notranslate"><span class="pre">ResultItem.value</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.batch.TorchDeviceMixin"><code class="docutils literal notranslate"><span class="pre">TorchDeviceMixin</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.TorchDeviceMixin.detach"><code class="docutils literal notranslate"><span class="pre">TorchDeviceMixin.detach()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.TorchDeviceMixin.device"><code class="docutils literal notranslate"><span class="pre">TorchDeviceMixin.device</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.batch.TorchDeviceMixin.to"><code class="docutils literal notranslate"><span class="pre">TorchDeviceMixin.to()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.BatchStateError"><code class="docutils literal notranslate"><span class="pre">BatchStateError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.CheckpointingError"><code class="docutils literal notranslate"><span class="pre">CheckpointingError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.ConfigError"><code class="docutils literal notranslate"><span class="pre">ConfigError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.DatasetNotFoundError"><code class="docutils literal notranslate"><span class="pre">DatasetNotFoundError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.ModelStateError"><code class="docutils literal notranslate"><span class="pre">ModelStateError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.OptimizerError"><code class="docutils literal notranslate"><span class="pre">OptimizerError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.RunningEnvError"><code class="docutils literal notranslate"><span class="pre">RunningEnvError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.exceptions.TimeRecorderStateError"><code class="docutils literal notranslate"><span class="pre">TimeRecorderStateError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.loss_functions.CLMCrossEntropyLoss"><code class="docutils literal notranslate"><span class="pre">CLMCrossEntropyLoss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.loss_functions.Loss"><code class="docutils literal notranslate"><span class="pre">Loss</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.loss_functions.Loss.tag"><code class="docutils literal notranslate"><span class="pre">Loss.tag</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.loss_functions.NCELoss"><code class="docutils literal notranslate"><span class="pre">NCELoss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.loss_functions.nce_loss"><code class="docutils literal notranslate"><span class="pre">nce_loss()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorder"><code class="docutils literal notranslate"><span class="pre">TimeRecorder</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorder.reset"><code class="docutils literal notranslate"><span class="pre">TimeRecorder.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorder.start"><code class="docutils literal notranslate"><span class="pre">TimeRecorder.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorder.stop"><code class="docutils literal notranslate"><span class="pre">TimeRecorder.stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorderStates"><code class="docutils literal notranslate"><span class="pre">TimeRecorderStates</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorderStates.RUNNING"><code class="docutils literal notranslate"><span class="pre">TimeRecorderStates.RUNNING</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.html#modalities.util.TimeRecorderStates.STOPPED"><code class="docutils literal notranslate"><span class="pre">TimeRecorderStates.STOPPED</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.cpu_scalar_float"><code class="docutils literal notranslate"><span class="pre">cpu_scalar_float()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.cpu_scalar_int"><code class="docutils literal notranslate"><span class="pre">cpu_scalar_int()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.format_metrics_to_gb"><code class="docutils literal notranslate"><span class="pre">format_metrics_to_gb()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_experiment_id_from_config"><code class="docutils literal notranslate"><span class="pre">get_experiment_id_from_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_local_number_of_trainable_parameters"><code class="docutils literal notranslate"><span class="pre">get_local_number_of_trainable_parameters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_module_class_from_name"><code class="docutils literal notranslate"><span class="pre">get_module_class_from_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_synced_experiment_id_of_run"><code class="docutils literal notranslate"><span class="pre">get_synced_experiment_id_of_run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_synced_string"><code class="docutils literal notranslate"><span class="pre">get_synced_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.get_total_number_of_trainable_parameters"><code class="docutils literal notranslate"><span class="pre">get_total_number_of_trainable_parameters()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.parse_enum_by_name"><code class="docutils literal notranslate"><span class="pre">parse_enum_by_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.print_rank_0"><code class="docutils literal notranslate"><span class="pre">print_rank_0()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities.util.warn_rank_0"><code class="docutils literal notranslate"><span class="pre">warn_rank_0()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../future_work.html" class="btn btn-neutral float-left" title="Future Work" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.html" class="btn btn-neutral float-right" title="modalities package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

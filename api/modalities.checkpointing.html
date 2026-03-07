@@ -1,0 +1,620 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing package &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="modalities.checkpointing.fsdp package" href="modalities.checkpointing.fsdp.html" />
+    <link rel="prev" title="modalities package" href="modalities.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Modalities
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">modalities</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="modalities.html">modalities package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="modalities.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">modalities.checkpointing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.config.html">modalities.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.conversion.html">modalities.conversion package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.dataloader.html">modalities.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.inference.html">modalities.inference package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.logging_broker.html">modalities.logging_broker package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.models.html">modalities.models package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.nn.html">modalities.nn package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.optimizers.html">modalities.optimizers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.preprocessing.html">modalities.preprocessing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.registry.html">modalities.registry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.running_env.html">modalities.running_env package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.tokenization.html">modalities.tokenization package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.training.html">modalities.training package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.utils.html">modalities.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-api-module">modalities.api module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.batch">modalities.batch module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-evaluator-module">modalities.evaluator module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.exceptions">modalities.exceptions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-gym-module">modalities.gym module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.loss_functions">modalities.loss_functions module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-main-module">modalities.main module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#modalities-trainer-module">modalities.trainer module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities.util">modalities.util module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.html#module-modalities">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">modalities</a></li>
+          <li class="breadcrumb-item"><a href="modalities.html">modalities package</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/modalities.checkpointing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modalities-checkpointing-package">
+<h1>modalities.checkpointing package<a class="headerlink" href="#modalities-checkpointing-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modalities.checkpointing.fsdp.html">modalities.checkpointing.fsdp package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.fsdp.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.fsdp.html#module-modalities.checkpointing.fsdp.fsdp_checkpoint_loading">modalities.checkpointing.fsdp.fsdp_checkpoint_loading module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.DCPCheckpointLoading"><code class="docutils literal notranslate"><span class="pre">DCPCheckpointLoading</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.DCPCheckpointLoading.load_checkpoint_"><code class="docutils literal notranslate"><span class="pre">DCPCheckpointLoading.load_checkpoint_()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading"><code class="docutils literal notranslate"><span class="pre">FSDP1CheckpointLoading</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading.load_model_checkpoint"><code class="docutils literal notranslate"><span class="pre">FSDP1CheckpointLoading.load_model_checkpoint()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_loading.FSDP1CheckpointLoading.load_optimizer_checkpoint_"><code class="docutils literal notranslate"><span class="pre">FSDP1CheckpointLoading.load_optimizer_checkpoint_()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.fsdp.html#module-modalities.checkpointing.fsdp.fsdp_checkpoint_saving">modalities.checkpointing.fsdp.fsdp_checkpoint_saving module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.CheckpointingEntityType"><code class="docutils literal notranslate"><span class="pre">CheckpointingEntityType</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.CheckpointingEntityType.MODEL"><code class="docutils literal notranslate"><span class="pre">CheckpointingEntityType.MODEL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.CheckpointingEntityType.OPTIMIZER"><code class="docutils literal notranslate"><span class="pre">CheckpointingEntityType.OPTIMIZER</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.DCPCheckpointSaving"><code class="docutils literal notranslate"><span class="pre">DCPCheckpointSaving</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.DCPCheckpointSaving.CHECKPOINT_FOLDER_STRUCTURE"><code class="docutils literal notranslate"><span class="pre">DCPCheckpointSaving.CHECKPOINT_FOLDER_STRUCTURE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.FSDP1CheckpointSaving"><code class="docutils literal notranslate"><span class="pre">FSDP1CheckpointSaving</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.FSDP1CheckpointSaving.CHECKPOINT_STRUCTURE"><code class="docutils literal notranslate"><span class="pre">FSDP1CheckpointSaving.CHECKPOINT_STRUCTURE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.fsdp.html#module-modalities.checkpointing.fsdp">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.checkpointing.stateful.html">modalities.checkpointing.stateful package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.stateful.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.stateful.html#module-modalities.checkpointing.stateful.app_state">modalities.checkpointing.stateful.app_state module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState"><code class="docutils literal notranslate"><span class="pre">AppState</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.is_loaded"><code class="docutils literal notranslate"><span class="pre">AppState.is_loaded</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.load_state_dict"><code class="docutils literal notranslate"><span class="pre">AppState.load_state_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.lr_scheduler"><code class="docutils literal notranslate"><span class="pre">AppState.lr_scheduler</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.model_parts"><code class="docutils literal notranslate"><span class="pre">AppState.model_parts</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.optimizer"><code class="docutils literal notranslate"><span class="pre">AppState.optimizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.state_dict"><code class="docutils literal notranslate"><span class="pre">AppState.state_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever"><code class="docutils literal notranslate"><span class="pre">LRSchedulerStateRetriever</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.get_state_dict"><code class="docutils literal notranslate"><span class="pre">LRSchedulerStateRetriever.get_state_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.load_state_dict_"><code class="docutils literal notranslate"><span class="pre">LRSchedulerStateRetriever.load_state_dict_()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever"><code class="docutils literal notranslate"><span class="pre">ModelStateRetriever</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever.get_state_dict"><code class="docutils literal notranslate"><span class="pre">ModelStateRetriever.get_state_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever.load_state_dict_"><code class="docutils literal notranslate"><span class="pre">ModelStateRetriever.load_state_dict_()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever"><code class="docutils literal notranslate"><span class="pre">OptimizerStateRetriever</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.get_state_dict"><code class="docutils literal notranslate"><span class="pre">OptimizerStateRetriever.get_state_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.load_state_dict_"><code class="docutils literal notranslate"><span class="pre">OptimizerStateRetriever.load_state_dict_()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF"><code class="docutils literal notranslate"><span class="pre">StateRetrieverIF</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF.get_state_dict"><code class="docutils literal notranslate"><span class="pre">StateRetrieverIF.get_state_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF.load_state_dict_"><code class="docutils literal notranslate"><span class="pre">StateRetrieverIF.load_state_dict_()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StatefulComponents"><code class="docutils literal notranslate"><span class="pre">StatefulComponents</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StatefulComponents.LR_SCHEDULER"><code class="docutils literal notranslate"><span class="pre">StatefulComponents.LR_SCHEDULER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StatefulComponents.MODEL"><code class="docutils literal notranslate"><span class="pre">StatefulComponents.MODEL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StatefulComponents.OPTIMIZER"><code class="docutils literal notranslate"><span class="pre">StatefulComponents.OPTIMIZER</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.stateful.html#module-modalities.checkpointing.stateful.app_state_factory">modalities.checkpointing.stateful.app_state_factory module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state_factory.AppStateFactory"><code class="docutils literal notranslate"><span class="pre">AppStateFactory</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_dcp_checkpointed_app_state_"><code class="docutils literal notranslate"><span class="pre">AppStateFactory.get_dcp_checkpointed_app_state_()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state_factory.AppStateFactory.get_raw_app_state"><code class="docutils literal notranslate"><span class="pre">AppStateFactory.get_raw_app_state()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.stateful.html#module-modalities.checkpointing.stateful">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modalities.checkpointing.torch.html">modalities.checkpointing.torch package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.torch.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.torch.html#modalities-checkpointing-torch-torch-checkpoint-loading-module">modalities.checkpointing.torch.torch_checkpoint_loading module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modalities.checkpointing.torch.html#module-modalities.checkpointing.torch">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="modalities-checkpointing-checkpoint-conversion-module">
+<h2>modalities.checkpointing.checkpoint_conversion module<a class="headerlink" href="#modalities-checkpointing-checkpoint-conversion-module" title="Link to this heading"></a></h2>
+</section>
+<section id="module-modalities.checkpointing.checkpoint_loading">
+<span id="modalities-checkpointing-checkpoint-loading-module"></span><h2>modalities.checkpointing.checkpoint_loading module<a class="headerlink" href="#module-modalities.checkpointing.checkpoint_loading" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_loading.DistributedCheckpointLoadingIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_loading.</span></span><span class="sig-name descname"><span class="pre">DistributedCheckpointLoadingIF</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_loading.html#DistributedCheckpointLoadingIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_loading.DistributedCheckpointLoadingIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Distributed checkpoint loading interface for loading PyTorch models and optimizer checkpoints.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_loading.DistributedCheckpointLoadingIF.load_checkpoint_">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_checkpoint_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkpoint_dir_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_loading.html#DistributedCheckpointLoadingIF.load_checkpoint_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_loading.DistributedCheckpointLoadingIF.load_checkpoint_" title="Link to this definition"></a></dt>
+<dd><p>Loads the distributed checkpoint from the specified directory path into the AppState.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><code class="xref py py-class docutils literal notranslate"><span class="pre">AppState</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>app_state</strong> (<a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>checkpoint_dir_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>app_state (AppState): The application state with the model, optimizer and lr scheduler.
+checkpoint_dir_path (Path): The directory path to the distributed checkpoint.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</p>
+</dd>
+<dt>Returns:</dt><dd><p>AppState: The application state with the loaded checkpoint.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_loading.</span></span><span class="sig-name descname"><span class="pre">FSDP1CheckpointLoadingIF</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_loading.html#FSDP1CheckpointLoadingIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Checkpoint loading interface for loading PyTorch models and optimizer checkpoints.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF.load_model_checkpoint">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_model_checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_loading.html#FSDP1CheckpointLoadingIF.load_model_checkpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF.load_model_checkpoint" title="Link to this definition"></a></dt>
+<dd><p>Loads a model checkpoint from the specified file path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>file_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>model (nn.Module): The model to load the checkpoint into.
+file_path (Path): The path to the checkpoint file.</p>
+</dd>
+<dt>Returns:</dt><dd><p>nn.Module: The loaded model with the checkpoint parameters.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF.load_optimizer_checkpoint_">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load_optimizer_checkpoint_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_loading.html#FSDP1CheckpointLoadingIF.load_optimizer_checkpoint_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_loading.FSDP1CheckpointLoadingIF.load_optimizer_checkpoint_" title="Link to this definition"></a></dt>
+<dd><p>Loads an optimizer checkpoint from the specified file path (in-place).</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>optimizer (Optimizer): The optimizer to load the checkpoint into (in-place).
+model (nn.Module): The model associated with the optimizer.
+file_path (Path): The path to the checkpoint file.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>optimizer</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#torch.optim.Optimizer" title="(in PyTorch v2.10)"><em>Optimizer</em></a>)</p></li>
+<li><p><strong>model</strong> (<a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module" title="(in PyTorch v2.10)"><em>Module</em></a>)</p></li>
+<li><p><strong>file_path</strong> (<a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.checkpoint_saving">
+<span id="modalities-checkpointing-checkpoint-saving-module"></span><h2>modalities.checkpointing.checkpoint_saving module<a class="headerlink" href="#module-modalities.checkpointing.checkpoint_saving" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving.CheckpointSaving">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving.</span></span><span class="sig-name descname"><span class="pre">CheckpointSaving</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">checkpoint_saving_strategy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkpoint_saving_execution</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving.html#CheckpointSaving"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving.CheckpointSaving" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Class for saving checkpoints based on a saving and execution strategy.</p>
+<p>Initializes the CheckpointSaving object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>checkpoint_saving_strategy (CheckpointSavingStrategyIF): The strategy for saving checkpoints.
+checkpoint_saving_execution (CheckpointSavingExecutionABC): The execution for saving checkpoints.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>checkpoint_saving_strategy</strong> (<a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF" title="modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF"><em>CheckpointSavingStrategyIF</em></a>)</p></li>
+<li><p><strong>checkpoint_saving_execution</strong> (<a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC" title="modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC"><em>CheckpointSavingExecutionABC</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving.CheckpointSaving.save_checkpoint">
+<span class="sig-name descname"><span class="pre">save_checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">training_progress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaluation_result</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopping_criterion_fulfilled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving.html#CheckpointSaving.save_checkpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving.CheckpointSaving.save_checkpoint" title="Link to this definition"></a></dt>
+<dd><p>Saves a checkpoint of the model and optimizer.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>training_progress (TrainingProgress): The training progress.
+evaluation_result (dict[str, EvaluationResultBatch]): The evaluation result.
+app_state (AppState): The application state to be checkpointed.
+early_stopping_criterion_fulfilled (bool, optional):
+Whether the early stopping criterion is fulfilled. Defaults to False.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>training_progress</strong> (<a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a>)</p></li>
+<li><p><strong>evaluation_result</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch" title="modalities.batch.EvaluationResultBatch"><em>EvaluationResultBatch</em></a><em>]</em>)</p></li>
+<li><p><strong>app_state</strong> (<a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+<li><p><strong>early_stopping_criterion_fulfilled</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.checkpoint_saving_execution">
+<span id="modalities-checkpointing-checkpoint-saving-execution-module"></span><h2>modalities.checkpointing.checkpoint_saving_execution module<a class="headerlink" href="#module-modalities.checkpointing.checkpoint_saving_execution" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving_execution.</span></span><span class="sig-name descname"><span class="pre">CheckpointSavingExecutionABC</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_execution.html#CheckpointSavingExecutionABC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Abstract class for saving PyTorch model and optimizer checkpoints.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC.run_checkpoint_instruction">
+<span class="sig-name descname"><span class="pre">run_checkpoint_instruction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">checkpointing_instruction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">training_progress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">app_state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_execution.html#CheckpointSavingExecutionABC.run_checkpoint_instruction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_execution.CheckpointSavingExecutionABC.run_checkpoint_instruction" title="Link to this definition"></a></dt>
+<dd><p>Runs the checkpoint instruction.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>checkpointing_instruction (CheckpointingInstruction): The checkpointing instruction.
+training_progress (TrainingProgress): The training progress.
+app_state (AppState): The application state to be checkpointed.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>checkpointing_instruction</strong> (<a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction" title="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction"><em>CheckpointingInstruction</em></a>)</p></li>
+<li><p><strong>training_progress</strong> (<a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a>)</p></li>
+<li><p><strong>app_state</strong> (<a class="reference internal" href="modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState" title="modalities.checkpointing.stateful.app_state.AppState"><em>AppState</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.checkpoint_saving_instruction">
+<span id="modalities-checkpointing-checkpoint-saving-instruction-module"></span><h2>modalities.checkpointing.checkpoint_saving_instruction module<a class="headerlink" href="#module-modalities.checkpointing.checkpoint_saving_instruction" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving_instruction.</span></span><span class="sig-name descname"><span class="pre">CheckpointingInstruction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">save_current</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkpoints_to_delete</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_instruction.html#CheckpointingInstruction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Represents a checkpointing instruction (i.e., saving and deleting).</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>save_current (bool): Indicates whether to save the current checkpoint.
+checkpoints_to_delete (list[TrainingProgress]): List of checkpoint IDs to delete.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>save_current</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>checkpoints_to_delete</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction.checkpoints_to_delete">
+<span class="sig-name descname"><span class="pre">checkpoints_to_delete</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><span class="pre">TrainingProgress</span></a><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;dataclasses._MISSING_TYPE</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction.checkpoints_to_delete" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction.save_current">
+<span class="sig-name descname"><span class="pre">save_current</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction.save_current" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing.checkpoint_saving_strategies">
+<span id="modalities-checkpointing-checkpoint-saving-strategies-module"></span><h2>modalities.checkpointing.checkpoint_saving_strategies module<a class="headerlink" href="#module-modalities.checkpointing.checkpoint_saving_strategies" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving_strategies.</span></span><span class="sig-name descname"><span class="pre">CheckpointSavingStrategyIF</span></span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#CheckpointSavingStrategyIF"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Checkpoint saving strategy interface.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF.get_checkpoint_instruction">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">get_checkpoint_instruction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">training_progress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaluation_result</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopping_criterion_fulfilled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#CheckpointSavingStrategyIF.get_checkpoint_instruction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF.get_checkpoint_instruction" title="Link to this definition"></a></dt>
+<dd><p>Returns the checkpointing instruction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction" title="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction"><code class="xref py py-class docutils literal notranslate"><span class="pre">CheckpointingInstruction</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>training_progress</strong> (<a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a>)</p></li>
+<li><p><strong>evaluation_result</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch" title="modalities.batch.EvaluationResultBatch"><em>EvaluationResultBatch</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>early_stopping_criterion_fulfilled</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>training_progress (TrainingProgress): The training progress.
+evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
+The evaluation result. Defaults to None.
+early_stopping_criterion_fulfilled (bool, optional):
+Whether the early stopping criterion is fulfilled. Defaults to False.</p>
+</dd>
+<dt>Returns:</dt><dd><p>CheckpointingInstruction: The checkpointing instruction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.SaveEveryKStepsCheckpointingStrategy">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving_strategies.</span></span><span class="sig-name descname"><span class="pre">SaveEveryKStepsCheckpointingStrategy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">k</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#SaveEveryKStepsCheckpointingStrategy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.SaveEveryKStepsCheckpointingStrategy" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF" title="modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">CheckpointSavingStrategyIF</span></code></a></p>
+<p>Initializes the CheckpointSavingStrategy object.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>k (int): The value of k.</p>
+</dd>
+<dt>Returns:</dt><dd><p>None</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>k</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.SaveEveryKStepsCheckpointingStrategy.get_checkpoint_instruction">
+<span class="sig-name descname"><span class="pre">get_checkpoint_instruction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">training_progress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaluation_result</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopping_criterion_fulfilled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#SaveEveryKStepsCheckpointingStrategy.get_checkpoint_instruction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.SaveEveryKStepsCheckpointingStrategy.get_checkpoint_instruction" title="Link to this definition"></a></dt>
+<dd><p>Returns a CheckpointingInstruction object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction" title="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction"><code class="xref py py-class docutils literal notranslate"><span class="pre">CheckpointingInstruction</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>training_progress</strong> (<a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a>)</p></li>
+<li><p><strong>evaluation_result</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch" title="modalities.batch.EvaluationResultBatch"><em>EvaluationResultBatch</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>early_stopping_criterion_fulfilled</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Args:</dt><dd><p>training_progress (TrainingProgress): The training progress.
+evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
+The evaluation result. Defaults to None.
+early_stopping_criterion_fulfilled (bool, optional):
+Whether the early stopping criterion is fulfilled. Defaults to False.</p>
+</dd>
+<dt>Returns:</dt><dd><p>CheckpointingInstruction: The checkpointing instruction object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.SaveKMostRecentCheckpointsStrategy">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">modalities.checkpointing.checkpoint_saving_strategies.</span></span><span class="sig-name descname"><span class="pre">SaveKMostRecentCheckpointsStrategy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#SaveKMostRecentCheckpointsStrategy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.SaveKMostRecentCheckpointsStrategy" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF" title="modalities.checkpointing.checkpoint_saving_strategies.CheckpointSavingStrategyIF"><code class="xref py py-class docutils literal notranslate"><span class="pre">CheckpointSavingStrategyIF</span></code></a></p>
+<p>Strategy for saving the k most recent checkpoints only.</p>
+<p>Initializes the checkpoint saving strategy.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><dl class="simple">
+<dt>k (int, optional): The number of most recent checkpoints to save.</dt><dd><p>Defaults to -1, which means all checkpoints are saved.
+Set to 0 to not save any checkpoints.
+Set to a positive integer to save the specified number of
+checkpointsStrategy for saving the k most recent checkpoints only.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>k</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="modalities.checkpointing.checkpoint_saving_strategies.SaveKMostRecentCheckpointsStrategy.get_checkpoint_instruction">
+<span class="sig-name descname"><span class="pre">get_checkpoint_instruction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">training_progress</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaluation_result</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopping_criterion_fulfilled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/modalities/checkpointing/checkpoint_saving_strategies.html#SaveKMostRecentCheckpointsStrategy.get_checkpoint_instruction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#modalities.checkpointing.checkpoint_saving_strategies.SaveKMostRecentCheckpointsStrategy.get_checkpoint_instruction" title="Link to this definition"></a></dt>
+<dd><p>Generates a checkpointing instruction based on the given parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction" title="modalities.checkpointing.checkpoint_saving_instruction.CheckpointingInstruction"><code class="xref py py-class docutils literal notranslate"><span class="pre">CheckpointingInstruction</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>training_progress</strong> (<a class="reference internal" href="modalities.training.html#modalities.training.training_progress.TrainingProgress" title="modalities.training.training_progress.TrainingProgress"><em>TrainingProgress</em></a>)</p></li>
+<li><p><strong>evaluation_result</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference internal" href="modalities.html#modalities.batch.EvaluationResultBatch" title="modalities.batch.EvaluationResultBatch"><em>EvaluationResultBatch</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>early_stopping_criterion_fulfilled</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl>
+<dt>Args:</dt><dd><p>training_progress (TrainingProgress): The training progress.
+evaluation_result (dict[str, EvaluationResultBatch] | None, optional):</p>
+<blockquote>
+<div><p>The evaluation result. Defaults to None.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>early_stopping_criterion_fulfilled (bool, optional):</dt><dd><p>Whether the early stopping criterion is fulfilled. Defaults to False.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>CheckpointingInstruction: The generated checkpointing instruction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-modalities.checkpointing">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-modalities.checkpointing" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modalities.html" class="btn btn-neutral float-left" title="modalities package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modalities.checkpointing.fsdp.html" class="btn btn-neutral float-right" title="modalities.checkpointing.fsdp package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

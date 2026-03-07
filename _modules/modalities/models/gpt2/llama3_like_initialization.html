@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.models.gpt2.llama3_like_initialization &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.models.gpt2.llama3_like_initialization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.models.gpt2.llama3_like_initialization</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Callable</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.nn.model_initialization.initialization_if</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelInitializationIF</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;llama3 initialization&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Llama3InitializerConfig">
+<a class="viewcode-back" href="../../../../api/modalities.models.gpt2.html#modalities.models.gpt2.llama3_like_initialization.Llama3InitializerConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Llama3InitializerConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_layers</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">n_embd</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">depth_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="Llama3Initializer">
+<a class="viewcode-back" href="../../../../api/modalities.models.gpt2.html#modalities.models.gpt2.llama3_like_initialization.Llama3Initializer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Llama3Initializer</span><span class="p">(</span><span class="n">ModelInitializationIF</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Follows weight initialization distributions and parameterization for Llama3 as described in TorchTitan.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_layers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_embd</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">depth_init</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the Llama3Initializer.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            num_layers: The number of transformer layers in the model. Used to calculate std for certain parameters.</span>
+<span class="sd">            n_embd: The embedding dimension of the model. Used to calculate std and truncation for certain parameters.</span>
+<span class="sd">            depth_init: Whether to use depth-aware initialization for certain parameters, where the std</span>
+<span class="sd">                        is scaled based on the layer&#39;s depth in the model. If False, a constant std is</span>
+<span class="sd">                        used for all layers baed on num_layers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">depth_init</span> <span class="o">=</span> <span class="n">depth_init</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">regex_to_init</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="c1"># embedding weights</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.wte\.weight&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">normal_</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+            <span class="c1"># lm head weights</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.lm_head\.weight&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">trunc_normal_</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                    <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">n_embd</span><span class="p">),</span>
+                    <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">3</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">n_embd</span><span class="p">),</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">3</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">n_embd</span><span class="p">),</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+            <span class="c1"># qkv projections</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn)\.weight&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">trunc_normal_</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                    <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="mf">0.02</span><span class="p">,</span>
+                    <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+            <span class="c1"># final attention projection in attention block</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.attn\.c_proj\.weight&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">trunc_normal_</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                    <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="p">(</span>
+                        <span class="p">(</span><span class="k">lambda</span> <span class="n">layer_id</span><span class="p">:</span> <span class="mf">0.02</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">layer_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+                        <span class="k">if</span> <span class="n">depth_init</span>
+                        <span class="k">else</span> <span class="mf">0.02</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">num_layers</span><span class="p">)</span>
+                    <span class="p">),</span>
+                    <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+            <span class="c1"># SwiGLU</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.mlp\.(W)\.weight&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">trunc_normal_</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                    <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="mf">0.02</span><span class="p">,</span>
+                    <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+            <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.mlp\.(V|W_2)\.weight&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">trunc_normal_</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                    <span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="p">(</span>
+                        <span class="p">(</span><span class="k">lambda</span> <span class="n">layer_id</span><span class="p">:</span> <span class="mf">0.02</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">layer_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+                        <span class="k">if</span> <span class="n">depth_init</span>
+                        <span class="k">else</span> <span class="mf">0.02</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">num_layers</span><span class="p">)</span>
+                    <span class="p">),</span>
+                    <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span>
+                    <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="Llama3Initializer.initialize_in_place">
+<a class="viewcode-back" href="../../../../api/modalities.models.gpt2.html#modalities.models.gpt2.llama3_like_initialization.Llama3Initializer.initialize_in_place">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize_in_place</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_by_fqn_regex</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">regex_to_init</span><span class="p">)</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_by_fqn_regex</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">regex_to_init</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]):</span>
+        <span class="n">hits</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">regex_to_init</span><span class="o">.</span><span class="n">keys</span><span class="p">()}</span>
+
+        <span class="k">for</span> <span class="n">parameter_name</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">parameter_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;bias&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Bias initialization is not allowed for Llama3Initializer. Found bias parameter: </span><span class="si">{</span><span class="n">parameter_name</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="n">match_count</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">weight_regex</span> <span class="ow">in</span> <span class="n">regex_to_init</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">parameter_name</span> <span class="o">=</span> <span class="n">parameter_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+                    <span class="s2">&quot;_orig_mod.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+                <span class="p">)</span>  <span class="c1"># remove FQN modification from torch.compile if present</span>
+                <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">weight_regex</span><span class="p">,</span> <span class="n">parameter_name</span><span class="p">):</span>
+                    <span class="n">init_fn</span><span class="p">,</span> <span class="n">arg_dict</span> <span class="o">=</span> <span class="n">regex_to_init</span><span class="p">[</span><span class="n">weight_regex</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">arg_dict</span><span class="p">[</span><span class="s2">&quot;std&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">callable</span><span class="p">(</span><span class="n">arg_dict</span><span class="p">[</span><span class="s2">&quot;std&quot;</span><span class="p">]):</span>
+                        <span class="c1"># If std is a function, call it with the layer_id</span>
+                        <span class="n">layer_id_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;transformer\.h\.(\d+)\.&quot;</span><span class="p">,</span> <span class="n">parameter_name</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">layer_id_match</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">layer_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_id_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+                            <span class="n">arg_dict</span> <span class="o">=</span> <span class="n">arg_dict</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>  <span class="c1"># create a copy of the arg_dict to avoid mutating the original</span>
+                            <span class="n">arg_dict</span><span class="p">[</span><span class="s2">&quot;std&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg_dict</span><span class="p">[</span><span class="s2">&quot;std&quot;</span><span class="p">](</span><span class="n">layer_id</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;Could not extract layer_id from parameter name </span><span class="si">{</span><span class="n">parameter_name</span><span class="si">}</span><span class="s2"> &quot;</span>
+                                <span class="s2">&quot;for dynamic std calculation&quot;</span>
+                            <span class="p">)</span>
+                    <span class="n">init_fn</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="o">**</span><span class="n">arg_dict</span><span class="p">)</span>
+                    <span class="n">match_count</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">hits</span><span class="p">[</span><span class="n">weight_regex</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">match_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter </span><span class="si">{</span><span class="n">parameter_name</span><span class="si">}</span><span class="s2"> did not match any regex for initialization&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">match_count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Parameter </span><span class="si">{</span><span class="n">parameter_name</span><span class="si">}</span><span class="s2"> matched multiple regexes for initialization, which is not allowed&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">hits</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Regex </span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2"> did not match any FQNs. The model specification probably does not match LLama3.&quot;</span>
+                <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="trunc_normal_">
+<a class="viewcode-back" href="../../../../api/modalities.models.gpt2.html#modalities.models.gpt2.llama3_like_initialization.trunc_normal_">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">trunc_normal_</span><span class="p">(</span>
+    <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">mean</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">a</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.0</span><span class="p">,</span>
+    <span class="n">b</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fills the input tensor with values sampled from a truncated normal distribution.</span>
+<span class="sd">    Values are drawn from a normal distribution with the given mean and standard</span>
+<span class="sd">    deviation. Any sampled values outside the range defined by a and b are resampled</span>
+<span class="sd">    until they fall within the bounds.</span>
+
+<span class="sd">    To avoid numerical instability in torch.nn.init.trunc_normal_, the initialization</span>
+<span class="sd">    is always performed using float32 precision. The result is then cast back to the</span>
+<span class="sd">    original data type of the input tensor.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tensor: an n dimensional torch Tensor</span>
+<span class="sd">        mean: the mean of the normal distribution</span>
+<span class="sd">        std: the standard deviation of the normal distribution</span>
+<span class="sd">        a: the lower bound for truncation</span>
+<span class="sd">        b: the upper bound for truncation</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The input tensor filled with values from the truncated normal distribution.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># This function is copied from from Meta&#39;s open-source project TorchTitan,</span>
+    <span class="c1"># licensed under the BSD 3-Clause License.</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">trunc_normal_</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">mean</span><span class="o">=</span><span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="n">std</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="n">b</span><span class="p">)</span>
+    <span class="n">tensor</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
