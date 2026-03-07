@@ -99,10 +99,10 @@ class Llama3Initializer(ModelInitializationIF):
         }
 
     def initialize_in_place(self, model: nn.Module):
-        self._init_by_fqn_regex(model, self.regex_to_init, depth_init=self.depth_init)
+        self._init_by_fqn_regex(model, self.regex_to_init)
 
     @staticmethod
-    def _init_by_fqn_regex(model: nn.Module, regex_to_init: dict[str, tuple[Callable, dict]], depth_init: bool):
+    def _init_by_fqn_regex(model: nn.Module, regex_to_init: dict[str, tuple[Callable, dict]]):
         hits = {k: 0 for k in regex_to_init.keys()}
 
         for parameter_name, p in model.named_parameters():
@@ -112,6 +112,9 @@ class Llama3Initializer(ModelInitializationIF):
                 )
             match_count = 0
             for weight_regex in regex_to_init.keys():
+                parameter_name = parameter_name.replace(
+                    "_orig_mod.", ""
+                )  # remove FQN modification from torch.compile if present
                 if re.fullmatch(weight_regex, parameter_name):
                     init_fn, arg_dict = regex_to_init[weight_regex]
                     if arg_dict["std"] is not None and callable(arg_dict["std"]):
