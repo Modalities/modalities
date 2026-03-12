@@ -92,6 +92,7 @@ from modalities.models.components.layer_norms import (
 )
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
+from modalities.models.gpt2.llama3_like_initialization import Llama3Initializer, Llama3InitializerConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
 from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
@@ -239,6 +240,12 @@ COMPONENTS = [
         "composed",
         ComposedInitializationRoutines.get_composed_model_initializer,
         ComposedModelInitializationConfig,
+    ),
+    ComponentEntity(
+        "model_initialization",
+        "gpt2_llama3_like",
+        Llama3Initializer,
+        Llama3InitializerConfig,
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),

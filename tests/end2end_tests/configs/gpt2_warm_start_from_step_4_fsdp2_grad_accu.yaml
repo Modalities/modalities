@@ -177,7 +177,7 @@ app_state_raw:
   component_key: app_state
   variant_key: raw
   config:
-    model: 
+    model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
     optimizer:
@@ -288,7 +288,7 @@ optimizer:
     eps: 1e-8
     weight_decay: 1e-1
     weight_decay_groups_excluded: [embedding, layernorm]
-    wrapped_model: 
+    wrapped_model:
       instance_key: initialized_model
       pass_type: BY_REFERENCE
 
