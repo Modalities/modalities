@@ -89,7 +89,7 @@ def load_dcp_config(dcp_checkpoint_dir: str) -> tuple[str, ConfigDictType]:
             config_src = find_yaml_config_in_dir(str(Path(dcp_checkpoint_dir).parent))
         if config_src is None:
             raise FileNotFoundError("No YAML config file found in checkpoint directory or its parent.")
-        dcp_config = load_app_config_dict(Path(config_src), experiment_id="-1")
+        dcp_config = load_app_config_dict(Path(config_src), experiments_root_path=Path("/tmp"), experiment_id="-1")
         return config_src, dcp_config
 
 
