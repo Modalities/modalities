@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
+import re
 from pathlib import Path
 from typing import cast
 
@@ -41,6 +43,12 @@ def _parse_args() -> argparse.Namespace:
         required=True,
         help="Paths to multiple checkpoint directories containing *.distcp files.",
     )
+    parser.add_argument(
+        "--json-output-path",
+        type=Path,
+        default=Path("layer_norms_across_checkpoints.json"),
+        help="Output path for raw per-checkpoint norms as JSON.",
+    )
     return parser.parse_args()
 
 
@@ -76,7 +84,7 @@ def _get_dp_shard_group(device_mesh: DeviceMesh | None):
         return None
 
 
-def _compute_and_print_layer_norms(app_state: AppState, dp_shard_group) -> None:
+def _compute_and_print_layer_norms(app_state: AppState, dp_shard_group) -> dict[str, float]:
     layer_sq_sums: dict[str, torch.Tensor] = {}
 
     for model_part_idx, model_part in enumerate(app_state.model_parts):
@@ -97,11 +105,27 @@ def _compute_and_print_layer_norms(app_state: AppState, dp_shard_group) -> None:
         dist.all_reduce(sq_sum, op=dist.ReduceOp.SUM, group=dp_shard_group)
         layer_sq_sums[layer_key] = sq_sum
 
+    layer_norms = {layer_key: torch.sqrt(sq_sum).item() for layer_key, sq_sum in layer_sq_sums.items()}
+
     if dist.get_rank() == 0:
         print("Per-layer parameter L2 norms (global across DP-shards):")
-        for layer_key in sorted(layer_sq_sums):
-            norm = torch.sqrt(layer_sq_sums[layer_key]).item()
-            print(f"{layer_key}: {norm:.6f}")
+        for layer_key in sorted(layer_norms):
+            print(f"{layer_key}: {layer_norms[layer_key]:.6f}")
+
+    return layer_norms
+
+
+def _extract_checkpoint_label(checkpoint_dir_path: Path) -> str:
+    match = re.search(r"seen_steps_(\d+)", checkpoint_dir_path.name)
+    if match:
+        return f"steps_{match.group(1)}"
+    return checkpoint_dir_path.name
+
+
+def _save_json_results(results: list[dict], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
 
 
 def main() -> None:
@@ -110,6 +134,7 @@ def main() -> None:
 
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         rank = dist.get_rank()
+        collected_results: list[dict] = []
 
         for checkpoint_dir_path in checkpoint_dir_paths:
             # Rebuild components per checkpoint because AppState only supports one load call.
@@ -131,13 +156,24 @@ def main() -> None:
             dp_shard_group = _get_dp_shard_group(device_mesh)
             if rank == 0:
                 print(f"\n=== {checkpoint_dir_path} ===")
-            _compute_and_print_layer_norms(app_state, dp_shard_group)
+            layer_norms = _compute_and_print_layer_norms(app_state, dp_shard_group)
 
             if rank == 0:
+                collected_results.append(
+                    {
+                        "checkpoint_path": str(checkpoint_dir_path),
+                        "checkpoint_label": _extract_checkpoint_label(checkpoint_dir_path),
+                        "layer_norms": layer_norms,
+                    }
+                )
                 print(
                     f"Loaded checkpoint from {checkpoint_dir_path} on world size {dist.get_world_size()} "
                     f"(pid={os.getpid()})."
                 )
+
+        if rank == 0:
+            _save_json_results(collected_results, args.json_output_path)
+            print(f"Saved raw layer norms JSON to {args.json_output_path}")
 
 
 if __name__ == "__main__":
