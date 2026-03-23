@@ -10,7 +10,7 @@ import torch
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Plot layer norms across checkpoints from a JSON log file.")
+    parser = argparse.ArgumentParser(description="Plot parameter norms across checkpoints from a JSON log file.")
     parser.add_argument(
         "--layer-norms-json-path",
         type=Path,
@@ -45,12 +45,13 @@ def _plot_checkpoint_comparison(
     plot_output_path: Path,
     layer_filter_regex: str,
 ) -> None:
+    metric_key = "parameter_norms" if "parameter_norms" in results[0] else "layer_norms"
     layer_pattern = re.compile(layer_filter_regex)
     filtered_layers = sorted(
         {
             layer_name
             for checkpoint_result in results
-            for layer_name in checkpoint_result["layer_norms"].keys()
+            for layer_name in checkpoint_result[metric_key].keys()
             if layer_pattern.search(layer_name)
         }
     )
@@ -60,7 +61,7 @@ def _plot_checkpoint_comparison(
     checkpoint_labels = [checkpoint_result["checkpoint_label"] for checkpoint_result in results]
     matrix = torch.tensor(
         [
-            [checkpoint_result["layer_norms"].get(layer_name, float("nan")) for layer_name in filtered_layers]
+            [checkpoint_result[metric_key].get(layer_name, float("nan")) for layer_name in filtered_layers]
             for checkpoint_result in results
         ],
         dtype=torch.float32,
@@ -71,9 +72,9 @@ def _plot_checkpoint_comparison(
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     image = ax.imshow(matrix.T.numpy(), aspect="auto", interpolation="nearest")
 
-    ax.set_title("Layer Norms Across Checkpoints")
+    ax.set_title("Parameter Norms Across Checkpoints")
     ax.set_xlabel("Checkpoint")
-    ax.set_ylabel("Layer")
+    ax.set_ylabel("Parameter")
     ax.set_xticks(range(len(checkpoint_labels)))
     ax.set_xticklabels(checkpoint_labels, rotation=45, ha="right")
     ax.set_yticks(range(len(filtered_layers)))
@@ -96,7 +97,7 @@ def main() -> None:
         plot_output_path=args.plot_output_path,
         layer_filter_regex=args.layer_filter_regex,
     )
-    print(f"Saved cross-checkpoint layer-norm plot to {args.plot_output_path}")
+    print(f"Saved cross-checkpoint parameter-norm plot to {args.plot_output_path}")
 
 
 if __name__ == "__main__":

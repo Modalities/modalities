@@ -56,22 +56,12 @@ def _resolve_checkpoint_dir_paths(args: argparse.Namespace) -> list[Path]:
     return list(args.checkpoint_dir_paths)
 
 
-def _get_layer_key(parameter_name: str) -> str:
-    # Strip common wrapping prefixes that appear for wrapped modules.
+def _normalize_parameter_name(parameter_name: str) -> str:
     name = parameter_name
     for prefix in ("module.", "_orig_mod.", "_fsdp_wrapped_module."):
         if name.startswith(prefix):
             name = name[len(prefix) :]
-
-    tokens = name.split(".")
-    for i in range(len(tokens) - 1):
-        if tokens[i] in {"h", "layers", "blocks"} and tokens[i + 1].isdigit():
-            if i > 0:
-                return ".".join(tokens[i - 1 : i + 2])
-            return ".".join(tokens[i : i + 2])
-
-    # Fallback: group by parent module path if no canonical layer index token exists.
-    return ".".join(tokens[:-1]) if len(tokens) > 1 else name
+    return name
 
 
 def _get_dp_shard_group(device_mesh: DeviceMesh | None):
@@ -84,35 +74,35 @@ def _get_dp_shard_group(device_mesh: DeviceMesh | None):
         return None
 
 
-def _compute_and_print_layer_norms(app_state: AppState, dp_shard_group) -> dict[str, float]:
-    layer_sq_sums: dict[str, torch.Tensor] = {}
+def _compute_and_print_parameter_norms(app_state: AppState, dp_shard_group) -> dict[str, float]:
+    parameter_sq_sums: dict[str, torch.Tensor] = {}
 
     for model_part_idx, model_part in enumerate(app_state.model_parts):
         for name, parameter in model_part.named_parameters():
             if not parameter.requires_grad:
                 continue
-            full_name = f"model_part_{model_part_idx}.{name}" if len(app_state.model_parts) > 1 else name
-            layer_key = _get_layer_key(full_name)
+            raw_name = f"model_part_{model_part_idx}.{name}" if len(app_state.model_parts) > 1 else name
+            parameter_name = _normalize_parameter_name(raw_name)
 
             # FSDP2 parameters can be DTensors. Convert to local shard first so c10d all_reduce
             # operates on plain tensors instead of DTensors.
             local_param = parameter.to_local() if isinstance(parameter, DTensor) else parameter
             local_sq_sum = local_param.detach().float().pow(2).sum()
-            layer_sq_sums[layer_key] = layer_sq_sums.get(layer_key, torch.zeros_like(local_sq_sum)) + local_sq_sum
+            parameter_sq_sums[parameter_name] = local_sq_sum
 
     # Aggregate over the DP-shard group to reconstruct global norms for sharded parameters.
-    for layer_key, sq_sum in layer_sq_sums.items():
+    for parameter_name, sq_sum in parameter_sq_sums.items():
         dist.all_reduce(sq_sum, op=dist.ReduceOp.SUM, group=dp_shard_group)
-        layer_sq_sums[layer_key] = sq_sum
+        parameter_sq_sums[parameter_name] = sq_sum
 
-    layer_norms = {layer_key: torch.sqrt(sq_sum).item() for layer_key, sq_sum in layer_sq_sums.items()}
+    parameter_norms = {name: torch.sqrt(sq_sum).item() for name, sq_sum in parameter_sq_sums.items()}
 
     if dist.get_rank() == 0:
-        print("Per-layer parameter L2 norms (global across DP-shards):")
-        for layer_key in sorted(layer_norms):
-            print(f"{layer_key}: {layer_norms[layer_key]:.6f}")
+        print("Per-parameter L2 norms (global across DP-shards):")
+        for parameter_name in sorted(parameter_norms):
+            print(f"{parameter_name}: {parameter_norms[parameter_name]:.6f}")
 
-    return layer_norms
+    return parameter_norms
 
 
 def _extract_checkpoint_label(checkpoint_dir_path: Path) -> str:
@@ -156,14 +146,14 @@ def main() -> None:
             dp_shard_group = _get_dp_shard_group(device_mesh)
             if rank == 0:
                 print(f"\n=== {checkpoint_dir_path} ===")
-            layer_norms = _compute_and_print_layer_norms(app_state, dp_shard_group)
+            parameter_norms = _compute_and_print_parameter_norms(app_state, dp_shard_group)
 
             if rank == 0:
                 collected_results.append(
                     {
                         "checkpoint_path": str(checkpoint_dir_path),
                         "checkpoint_label": _extract_checkpoint_label(checkpoint_dir_path),
-                        "layer_norms": layer_norms,
+                        "parameter_norms": parameter_norms,
                     }
                 )
                 print(
@@ -173,7 +163,7 @@ def main() -> None:
 
         if rank == 0:
             _save_json_results(collected_results, args.json_output_path)
-            print(f"Saved raw layer norms JSON to {args.json_output_path}")
+            print(f"Saved raw parameter norms JSON to {args.json_output_path}")
 
 
 if __name__ == "__main__":
