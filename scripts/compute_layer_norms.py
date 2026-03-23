@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import os
 from pathlib import Path
 from typing import cast
@@ -27,7 +26,7 @@ class ComponentsInstantiationModel(BaseModel):
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Load a Modalities DCP checkpoint into an app state.")
+    parser = argparse.ArgumentParser(description="Load one or more Modalities DCP checkpoints into an app state.")
     parser.add_argument("--config-file-path", type=Path, required=True, help="Path to the YAML config file.")
     parser.add_argument(
         "--experiments-root-path",
@@ -36,34 +35,17 @@ def _parse_args() -> argparse.Namespace:
         help="Path passed to Main for resolver/context setup.",
     )
     parser.add_argument(
-        "--checkpoint-dir-path",
+        "--checkpoint-dir-paths",
         type=Path,
-        default=None,
-        help="Path to a checkpoint directory containing *.distcp files.",
-    )
-    parser.add_argument(
-        "--last-checkpoint-info-path",
-        type=Path,
-        default=None,
-        help="Path to last_checkpoint_info.json. Used when checkpoint-dir-path is omitted.",
+        nargs="+",
+        required=True,
+        help="Paths to multiple checkpoint directories containing *.distcp files.",
     )
     return parser.parse_args()
 
 
-def _resolve_checkpoint_dir_path(args: argparse.Namespace) -> Path:
-    if args.checkpoint_dir_path is not None and args.last_checkpoint_info_path is not None:
-        raise ValueError("Pass either --checkpoint-dir-path or --last-checkpoint-info-path, not both.")
-
-    if args.checkpoint_dir_path is not None:
-        return args.checkpoint_dir_path
-
-    if args.last_checkpoint_info_path is None:
-        raise ValueError("Pass one of --checkpoint-dir-path or --last-checkpoint-info-path.")
-
-    with open(args.last_checkpoint_info_path, "r", encoding="utf-8") as f:
-        checkpoint_info = json.load(f)
-
-    return Path(checkpoint_info["checkpoint_folder_path"])
+def _resolve_checkpoint_dir_paths(args: argparse.Namespace) -> list[Path]:
+    return list(args.checkpoint_dir_paths)
 
 
 def _get_layer_key(parameter_name: str) -> str:
@@ -124,34 +106,38 @@ def _compute_and_print_layer_norms(app_state: AppState, dp_shard_group) -> None:
 
 def main() -> None:
     args = _parse_args()
-    checkpoint_dir_path = _resolve_checkpoint_dir_path(args)
+    checkpoint_dir_paths = _resolve_checkpoint_dir_paths(args)
 
     with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
         rank = dist.get_rank()
 
-        main_obj = Main(
-            config_path=args.config_file_path,
-            experiments_root_path=args.experiments_root_path,
-        )
-        components = cast(
-            ComponentsInstantiationModel,
-            main_obj.build_components(components_model_type=ComponentsInstantiationModel),
-        )
-
-        app_state = cast(AppState, getattr(components, "app_state"))
-        device_mesh = cast(DeviceMesh | None, getattr(components, "device_mesh", None))
-
-        loader = DCPCheckpointLoading(global_rank=rank)
-        loader.load_checkpoint_(app_state=app_state, checkpoint_dir_path=checkpoint_dir_path)
-
-        dp_shard_group = _get_dp_shard_group(device_mesh)
-        _compute_and_print_layer_norms(app_state, dp_shard_group)
-
-        if rank == 0:
-            print(
-                f"Loaded checkpoint from {checkpoint_dir_path} on world size {dist.get_world_size()} "
-                f"(pid={os.getpid()})."
+        for checkpoint_dir_path in checkpoint_dir_paths:
+            # Rebuild components per checkpoint because AppState only supports one load call.
+            main_obj = Main(
+                config_path=args.config_file_path,
+                experiments_root_path=args.experiments_root_path,
             )
+            components = cast(
+                ComponentsInstantiationModel,
+                main_obj.build_components(components_model_type=ComponentsInstantiationModel),
+            )
+
+            app_state = cast(AppState, getattr(components, "app_state"))
+            device_mesh = cast(DeviceMesh | None, getattr(components, "device_mesh", None))
+
+            loader = DCPCheckpointLoading(global_rank=rank)
+            loader.load_checkpoint_(app_state=app_state, checkpoint_dir_path=checkpoint_dir_path)
+
+            dp_shard_group = _get_dp_shard_group(device_mesh)
+            if rank == 0:
+                print(f"\n=== {checkpoint_dir_path} ===")
+            _compute_and_print_layer_norms(app_state, dp_shard_group)
+
+            if rank == 0:
+                print(
+                    f"Loaded checkpoint from {checkpoint_dir_path} on world size {dist.get_world_size()} "
+                    f"(pid={os.getpid()})."
+                )
 
 
 if __name__ == "__main__":
