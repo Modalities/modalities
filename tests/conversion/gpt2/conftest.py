@@ -84,14 +84,23 @@ def config_file_path(config_file_name: str) -> Path:
 
 
 @pytest.fixture()
-def config_file_name() -> str:
-    return "gpt2_config_test.yaml"
+def config_file_name(request: pytest.FixtureRequest) -> str:
+    return getattr(request, "param", "gpt2_config_test.yaml")
 
 
 @pytest.fixture()
-def dcp_checkpoint(tmpdir_factory: pytest.TempdirFactory, corrupt_model_head_key_in_state_dict: bool) -> str:
+def dcp_config_file_name(request: pytest.FixtureRequest) -> str:
+    return getattr(request, "param", "gpt2_dcp_config.yaml")
+
+
+@pytest.fixture()
+def dcp_checkpoint(
+    tmpdir_factory: pytest.TempdirFactory,
+    corrupt_model_head_key_in_state_dict: bool,
+    dcp_config_file_name: str,
+) -> str:
     tmp_path = tmpdir_factory.mktemp("dcp_checkpoint_test")
-    config_file = _ROOT_DIR / "tests" / "conversion" / "test_configs" / "gpt2_dcp_config.yaml"
+    config_file = _ROOT_DIR / "tests" / "conversion" / "test_configs" / dcp_config_file_name
     world_size = 8
     port = find_free_port()
     manager = py_mp.Manager()
@@ -199,3 +208,4 @@ def _create_dcp_checkpoint_worker(
             except Exception:
                 logging.error("Failed to put exception info into error queue.")
             os._exit(1)
+    print(f"Process {device_idx} completed successfully.")

@@ -3,12 +3,14 @@ import warnings
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from transformers import AutoModelForCausalLM, LlamaForCausalLM
+from transformers.models.llama import LlamaConfig
 
 from modalities.checkpointing.convert_dcp_to_torch import load_dcp_config
 from modalities.config.config import ConfigDictType, PrecisionEnum, ProcessGroupBackendType
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 from modalities.conversion.gpt2.modeling_gpt2 import GPT2DecoderLayer, GPT2ForCausalLM
-from modalities.models.components.layer_norms import LayerNormConfig
+from modalities.models.components.layer_norms import LayerNormConfig, PytorchRMSLayerNormConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block, PositionTypes
 from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
@@ -16,7 +18,7 @@ from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import PyTorchDtypes
 
 
-def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM, GPT2LLM]:
+def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM | LlamaForCausalLM, GPT2LLM]:
     """Converts the modalities model to a Huggingface transformers model.
        Both the loaded modalities model and the converted Huggingface model are returned
        so that they can be compared.
@@ -31,22 +33,25 @@ def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2For
     dtype = PrecisionEnum(
         modalities_config["checkpointed_model"]["config"]["checkpoint_loading"]["config"]["precision"]
     )
-    hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=dtype.value)
+    is_llama_compatible = isinstance(gpt2_config, LlamaConfig)
+    model_type = LlamaForCausalLM if is_llama_compatible else GPT2ForCausalLM
+    hf_model = model_type(gpt2_config).to(dtype=dtype.value)
     modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
     _copy_weights_model(hf_model, modalities_model)
     return hf_model, modalities_model
 
 
-def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
+def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config | LlamaConfig:
     """Converts the modalities model configuration to a Huggingface transformers configuration.
        For this the model_raw or model section of the modalities config is used.
        Corresponding entries are mapped to the Huggingface configuration.
+       Depending on the norm type, either GPT2Config or LlamaConfig is returned.
 
     Args:
         modalities_config (ConfigDictType): Modalities config dictionary.
 
     Returns:
-        GPT2Config: Converted Huggingface model configuration.
+        GPT2Config | LlamaConfig: Converted Huggingface model configuration.
     """
     config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]
     _check_conversion_criteria(config)
@@ -59,27 +64,42 @@ def convert_model_config(modalities_config: ConfigDictType) -> GPT2Config:
             f"(set to {attention_type}) and use sdpa by default."
         )
 
-    return GPT2Config(
-        vocab_size=config["vocab_size"],
-        hidden_size=config["n_embd"],
-        pad_token_id=None,
-        num_hidden_layers=config["n_layer"],
-        num_key_value_heads=config["n_head_kv"],
-        num_attention_heads=config["n_head_q"],
-        intermediate_size=SwiGLU._get_hidden_dim(
+    config_kwargs = {
+        "vocab_size": config["vocab_size"],
+        "hidden_size": config["n_embd"],
+        "pad_token_id": None,
+        "num_hidden_layers": config["n_layer"],
+        "num_key_value_heads": config["n_head_kv"],
+        "num_attention_heads": config["n_head_q"],
+        "intermediate_size": SwiGLU._get_hidden_dim(
             ffn_hidden=config["ffn_hidden"], enforce_swiglu_hidden_dim_multiple_of=256
         ),
-        attention_bias=config["bias"],
-        mlp_bias=config["bias"],
-        hidden_act="silu",
-        layer_norm_eps=_get_layer_norm_value(config[ffn_norm_key]["config"], "eps"),
-        layer_norm_elementwise_affine=_get_layer_norm_value(config[ffn_norm_key]["config"], "elementwise_affine"),
-        layer_norm_bias=_get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
-        max_position_embeddings=config["sequence_length"],
-        rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
-        attn_implementation=attention_type,
-        output_attentions=False,
-    )
+        "attention_bias": config["bias"],
+        "mlp_bias": config["bias"],
+        "hidden_act": "silu",
+        "max_position_embeddings": config["sequence_length"],
+        "rope_theta": config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
+        "attn_implementation": attention_type,
+        "output_attentions": False,
+    }
+
+    norm_type = config[ffn_norm_key]["norm_type"]
+    if norm_type == "layer_norm":
+        config_kwargs.update(
+            {
+                "layer_norm_eps": _get_layer_norm_value(config[ffn_norm_key]["config"], "eps"),
+                "layer_norm_elementwise_affine": _get_layer_norm_value(
+                    config[ffn_norm_key]["config"], "elementwise_affine"
+                ),
+                "layer_norm_bias": _get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
+            }
+        )
+        config_class = GPT2Config
+    else:
+        config_kwargs.update({"rms_norm_eps": _get_rms_norm_value(config[ffn_norm_key]["config"], "eps")})
+        config_class = LlamaConfig
+
+    return config_class(**config_kwargs)
 
 
 def check_converted_dcp_model(
@@ -166,11 +186,11 @@ def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
 
 def _load_hf_model_for_dcp_comparison(
     hf_model_dir: str, dcp_modalities_config: ConfigDictType, device_hf: str
-) -> GPT2ForCausalLM:
+) -> GPT2ForCausalLM | LlamaForCausalLM:
     # Need execution dtype of FSDP2 to get same outputs from model.
     dtype = dcp_modalities_config["fsdp_model"]["config"]["mixed_precision_settings"]["param_dtype"]
-    hf_model: GPT2ForCausalLM = (
-        GPT2ForCausalLM.from_pretrained(hf_model_dir, local_files_only=True, trust_remote_code=True)
+    hf_model: GPT2ForCausalLM | LlamaForCausalLM = (
+        AutoModelForCausalLM.from_pretrained(hf_model_dir, local_files_only=True, trust_remote_code=True)
         .to(device=device_hf)
         .to(PyTorchDtypes(dtype).value)
     )
@@ -197,21 +217,31 @@ def _check_conversion_criteria(model_config: ConfigDictType) -> None:
 
     norms = ["attention_norm_config", "ffn_norm_config", "lm_head_norm_config"]
     for norm in norms:
-        assert model_config[norm]["norm_type"] == "layer_norm"
+        assert model_config[norm]["norm_type"] == "layer_norm" or model_config[norm]["norm_type"] == "pytorch_rms_norm"
 
-    assert (
-        len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
-    ), "All norms must have the same bias setting."
-    assert (
-        len(set(_get_layer_norm_value(model_config[norm]["config"], "elementwise_affine") for norm in norms)) == 1
-    ), "All norms must have the same elementwise_affine setting."
-    assert (
-        len(set(_get_layer_norm_value(model_config[norm]["config"], "eps") for norm in norms)) == 1
-    ), "All norms must have the same eps setting."
+    if model_config[norm]["norm_type"] == "layer_norm":
+        assert (
+            len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
+        ), "All norms must have the same bias setting."
+        assert (
+            len(set(_get_layer_norm_value(model_config[norm]["config"], "elementwise_affine") for norm in norms)) == 1
+        ), "All norms must have the same elementwise_affine setting."
+        assert (
+            len(set(_get_layer_norm_value(model_config[norm]["config"], "eps") for norm in norms)) == 1
+        ), "All norms must have the same eps setting."
+    elif model_config[norm]["norm_type"] == "pytorch_rms_norm":
+        assert (
+            len(set(_get_rms_norm_value(model_config[norm]["config"], "eps") for norm in norms)) == 1
+        ), "All norms must have the same eps setting."
 
 
 def _get_layer_norm_value(config: ConfigDictType, field: str) -> bool | float | int:
     default = LayerNormConfig.model_fields[field].default
+    return config.get(field, default)
+
+
+def _get_rms_norm_value(config: ConfigDictType, field: str) -> bool | float | int:
+    default = PytorchRMSLayerNormConfig.model_fields[field].default
     return config.get(field, default)
 
 
@@ -225,11 +255,11 @@ def _map_attention_type(config: ConfigDictType) -> str:
     return attention_impl
 
 
-def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
+def _copy_weights_model(hf_model: GPT2ForCausalLM | LlamaForCausalLM, modalities_model: GPT2LLM):
     """Copies the weights of the modalities model to the Huggingface transformers model.
 
     Args:
-        hf_model (GPT2ForCausalLM): The uninitialized Huggingface transformers model.
+        hf_model (GPT2ForCausalLM | LlamaForCausalLM): The uninitialized Huggingface transformers model.
                                     The weights will be copied here.
         modalities_model (GPT2LLM): The modalities model from which the weights will be copied.
     """
@@ -261,8 +291,13 @@ def _copy_weights_layer_norms(hf_layer: GPT2DecoderLayer, modalities_layer: GPT2
 
 
 def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm, m2: nn.Linear | nn.LayerNorm):
+    bias1 = getattr(m1, "bias", None)
+    bias2 = getattr(m2, "bias", None)
     assert m1.weight.shape == m2.weight.shape
-    assert (m1.bias is None and m2.bias is None) or m1.bias.shape == m2.bias.shape
+    if not (
+        (bias1 is None and bias2 is None) or (bias1 is not None and bias2 is not None and bias1.shape == bias2.shape)
+    ):
+        raise AttributeError(f"Bias do not match between modules.\n" f"m1: {m1}\n" f"m2: {m2}")
     m1.weight.data.copy_(m2.weight.data)
-    if m1.bias is not None:
-        m1.bias.data.copy_(m2.bias.data)
+    if bias1 is not None and bias2 is not None:
+        bias1.data.copy_(bias2.data)

@@ -41,6 +41,7 @@ from modalities.conversion.gpt2.conversion_model import (
     convert_model_checkpoint,
 )
 from modalities.conversion.gpt2.conversion_tokenizer import convert_tokenizer
+from modalities.conversion.gpt2.modeling_gpt2 import GPT2ForCausalLM
 
 logger = logging.getLogger(__name__)
 
@@ -165,13 +166,15 @@ def convert_gpt2(
         hf_model.config.pad_token_id = pad_token_id
     else:
         logger.warning("No tokenizer specified in the config. Skipping tokenizer conversion.")
-    hf_model.config.auto_map = {
-        "AutoConfig": "configuration_gpt2.GPT2Config",
-        "AutoModel": "modeling_gpt2.GPT2Model",
-        "AutoModelForCausalLM": "modeling_gpt2.GPT2ForCausalLM",
-    }
+    if isinstance(hf_model, GPT2ForCausalLM):
+        hf_model.config.auto_map = {
+            "AutoConfig": "configuration_gpt2.GPT2Config",
+            "AutoModel": "modeling_gpt2.GPT2Model",
+            "AutoModelForCausalLM": "modeling_gpt2.GPT2ForCausalLM",
+        }
     hf_model.save_pretrained(output_dir)
-    transfer_model_code(output_dir)
+    if isinstance(hf_model, GPT2ForCausalLM):
+        transfer_model_code(output_dir)
 
 
 def _ensure_logging():

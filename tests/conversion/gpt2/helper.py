@@ -39,8 +39,10 @@ def check_same_weight_layer_norms(llama_layer: GPT2DecoderLayer, modalities_laye
 
 
 def check_same_weight_base_modules(l1: nn.Linear | nn.LayerNorm, l2: nn.Linear | nn.LayerNorm):
+    bias1 = getattr(l1, "bias", None)
+    bias2 = getattr(l2, "bias", None)
     assert torch.equal(l1.weight, to_local(l2.weight))
-    assert (l1.bias is None and l2.bias is None) or torch.equal(l1.bias, to_local(l2.bias))
+    assert (bias1 is None and bias2 is None) or torch.equal(bias1, to_local(bias2))
 
 
 @torch.no_grad()
