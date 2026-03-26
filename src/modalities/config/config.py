@@ -186,7 +186,7 @@ class OneCycleLRSchedulerConfig(BaseModel):
     steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
-    cycle_momentum: bool = True
+    cycle_momentum: bool = False
     base_momentum: Annotated[float, Field(strict=True, gt=0)] | list[
         Annotated[float, Field(strict=True, gt=0.0)]
     ] = 0.85
@@ -275,7 +275,7 @@ class FSDP2WrappedModelConfig(BaseModel):
     mixed_precision_settings: FSDP2MixedPrecisionSettings
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
-    # layers_per_fsdp_unit: int = 1
+    layers_per_fsdp_unit: int = 1
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
