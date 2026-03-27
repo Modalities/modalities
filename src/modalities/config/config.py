@@ -227,6 +227,22 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
 
 
+class LinearWarmupCosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    warmup_steps: Annotated[int, Field(strict=True, gt=0)]
+    total_steps: Annotated[int, Field(strict=True, gt=0)]
+    initial_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    final_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    max_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+
+    @model_validator(mode="after")
+    def check_total_steps_greater_than_warmup_steps(self) -> "LinearWarmupCosineAnnealingLRSchedulerConfig":
+        if self.total_steps <= self.warmup_steps:
+            raise ValueError("total_steps must be greater than warmup_steps.")
+        return self
+
+
 class FSDP1CheckpointedOptimizerConfig(BaseModel):
     checkpoint_loading: PydanticFSDP1CheckpointLoadingIFType
     checkpoint_path: Path
