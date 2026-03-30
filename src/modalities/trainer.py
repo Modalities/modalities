@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+import gc
 from typing import Callable, Optional
 
 import torch
@@ -24,6 +25,25 @@ from modalities.util import TimeRecorder, print_rank_0
 from modalities.utils.mfu import MFUCalculatorABC
 from modalities.utils.profilers.profilers import SteppableProfilerIF
 from modalities.utils.typing_utils import FSDPX
+
+
+class GarbageCollection:
+    # Some portions of this implementation are inspired, adapted, or refactored
+    # from Meta's open-source project TorchTitan,
+    # licensed under the BSD 3-Clause License.
+    def __init__(self, gc_freq: int = 10):
+        assert gc_freq > 0, "gc_freq must be a positive integer"
+        self.gc_freq = gc_freq
+        gc.disable()
+        self.collect()
+
+    def run(self, step_count: int):
+        if step_count > 1 and step_count % self.gc_freq == 0:
+            self.collect()
+
+    @staticmethod
+    def collect(generation: int = 1):
+        gc.collect(generation)
 
 
 class ThroughputAggregationKeys(Enum):
@@ -70,6 +90,7 @@ class Trainer:
         Returns:
             None
         """
+        self.gc = GarbageCollection(gc_freq=10)
         self.global_rank = global_rank
         if device_mesh is not None:
             self.dp_degree = get_parallel_degree(
@@ -283,6 +304,7 @@ class Trainer:
                 )
                 # Check if model performance should be logged
                 if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
+                    dist.barrier()
                     forward_backward_time_recorder.stop()
                     forward_backward_time = forward_backward_time_recorder.delta_t
                     forward_backward_time_recorder.reset()
@@ -363,8 +385,10 @@ class Trainer:
 
                     cumulated_losses.zero_()
                 if step_performed:
+                    self.gc.run(step_count=training_progress.num_seen_steps_total)
                     evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                     checkpointing_callback(training_progress=training_progress)
+                    
                 profiler_cm.step()
 
     @staticmethod

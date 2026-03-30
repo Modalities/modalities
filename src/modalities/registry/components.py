@@ -48,6 +48,7 @@ from modalities.config.config import (
     GPT2MFUCalculatorConfig,
     GPT2ModelTPConfig,
     LinearLRSchedulerConfig,
+    LinearWarmupCosineAnnealingLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     OneCycleLRSchedulerConfig,
@@ -108,7 +109,7 @@ from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
 )
-from modalities.optimizers.lr_schedulers import DummyLRScheduler
+from modalities.optimizers.lr_schedulers import DummyLRScheduler, LRSchedulerFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.optimizers.optimizer_list import OptimizersList
 from modalities.optimizers.scheduler_list import SchedulerList
@@ -284,6 +285,12 @@ COMPONENTS = [
         "cosine_annealing_lr",
         maybe_optimizer_list(torch.optim.lr_scheduler.CosineAnnealingLR),
         CosineAnnealingLRSchedulerConfig,
+    ),
+    ComponentEntity(
+        "scheduler",
+        "linear_warmup_cosine_annealing_lr",
+        maybe_optimizer_list(LRSchedulerFactory.get_linear_warmup_cosine_annealing_lr_scheduler),
+        LinearWarmupCosineAnnealingLRSchedulerConfig,
     ),
     # tokenizers
     ComponentEntity("tokenizer", "pretrained_hf_tokenizer", PreTrainedHFTokenizer, PreTrainedHFTokenizerConfig),
