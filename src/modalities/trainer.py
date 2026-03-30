@@ -35,15 +35,15 @@ class GarbageCollection:
         assert gc_freq > 0, "gc_freq must be a positive integer"
         self.gc_freq = gc_freq
         gc.disable()
-        self.collect()  # GC invoked here
+        self.collect()
 
     def run(self, step_count: int):
         if step_count > 1 and step_count % self.gc_freq == 0:
-            self.collect()  # GC invoked here
+            self.collect()
 
     @staticmethod
     def collect(generation: int = 1):
-        gc.collect(generation)  # GC invoked here
+        gc.collect(generation)
 
 
 class ThroughputAggregationKeys(Enum):
