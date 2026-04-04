@@ -492,6 +492,7 @@ class EvaluationResultToDiscSubscriberConfig(BaseModel):
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):
     global_rank: int
+    entity: Optional[str] = None
     project: str
     experiment_id: str
     mode: WandbMode
