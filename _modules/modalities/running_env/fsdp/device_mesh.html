@@ -1,0 +1,363 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.running_env.fsdp.device_mesh &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.running_env.fsdp.device_mesh</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.running_env.fsdp.device_mesh</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">prod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">model_validator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.device_mesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceMesh</span><span class="p">,</span> <span class="n">init_device_mesh</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConfigError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="s2">&quot;model_factory&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DeviceMeshConfig">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.DeviceMeshConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DeviceMeshConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="c1"># inspired by ParallelDims class in</span>
+    <span class="c1"># https://github.com/pytorch/torchtitan/blob/cfc0f4e08dc71685cdcb394464187d2eeedd1a5f/torchtitan/parallelisms/parallel_dims.py#L15</span>
+    <span class="n">device_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span>
+    <span class="c1"># if -1, we will calculate the shard degree based on the world size and other parallel degrees</span>
+    <span class="n">data_parallel_replicate_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">data_parallel_shard_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">tensor_parallel_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">pipeline_parallel_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">context_parallel_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">enable_loss_parallel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">world_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context_parallel_degree</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipeline_parallel_degree</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="n">d</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                    <span class="s2">&quot;Parallelism degree must be &gt;= 1, except for data_parallel_shard_degree &quot;</span>
+                    <span class="s2">&quot;and data_parallel_replicate_degree&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s2">&quot;data_parallel_shard_degree must be -1 or &gt;= 1&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s2">&quot;data_parallel_replicate_degree must be -1 or &gt;= 1&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s2">&quot;At most one of data_parallel_replicate_degree and data_parallel_shard_degree can be -1&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># set the shard degree to the world size divided by the product of all other parallel degrees</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world_size</span> <span class="o">//</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_parallel_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline_parallel_degree</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># set the replicate degree to the world size divided by the product of all other parallel degrees</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world_size</span> <span class="o">//</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_parallel_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline_parallel_degree</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline_parallel_degree</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_parallel_degree</span>
+            <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world_size</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid parallel dims: data_parallel_shard_degree(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_shard_degree</span><span class="si">}</span><span class="s2">) * &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;data_parallel_replicate_degree(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data_parallel_replicate_degree</span><span class="si">}</span><span class="s2">) * &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;tensor_parallel_degree(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span><span class="si">}</span><span class="s2">) *&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;* pipeline_parallel_degree(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pipeline_parallel_degree</span><span class="si">}</span><span class="s2">) *&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;context_parallel_degree(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">context_parallel_degree</span><span class="si">}</span><span class="s2">)!= WORLD_SIZE(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">world_size</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_loss_parallel</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_parallel_degree</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">enable_loss_parallel</span><span class="si">=}</span><span class="s2"> requires tensor_parallel_degree &gt; 1&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+
+<div class="viewcode-block" id="ParallelismDegrees">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.ParallelismDegrees">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ParallelismDegrees</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">DP_REPLICATE</span> <span class="o">=</span> <span class="s2">&quot;dp_replicate&quot;</span>
+    <span class="n">DP_SHARD</span> <span class="o">=</span> <span class="s2">&quot;dp_shard&quot;</span>
+    <span class="n">CP</span> <span class="o">=</span> <span class="s2">&quot;cp&quot;</span>
+    <span class="n">TP</span> <span class="o">=</span> <span class="s2">&quot;tp&quot;</span>
+    <span class="n">PP</span> <span class="o">=</span> <span class="s2">&quot;pp&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="get_device_mesh">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.get_device_mesh">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_device_mesh</span><span class="p">(</span>
+    <span class="n">device_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">data_parallel_replicate_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">data_parallel_shard_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">tensor_parallel_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">pipeline_parallel_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">context_parallel_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">enable_loss_parallel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DeviceMesh</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Gets the device mesh for the specified parallelism degrees.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        device_type (str): The device type.</span>
+<span class="sd">        data_parallel_replicate_degree (int): The data parallel replicate degree.</span>
+<span class="sd">        data_parallel_shard_degree (int): The data parallel shard degree.</span>
+<span class="sd">        tensor_parallel_degree (int): The tensor parallel degree.</span>
+<span class="sd">        pipeline_parallel_degree (int): The pipeline parallel degree.</span>
+<span class="sd">        context_parallel_degree (int): The context parallel degree.</span>
+<span class="sd">        enable_loss_parallel (bool): Whether to enable loss parallelism.</span>
+<span class="sd">        world_size (int): The world size.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DeviceMesh: The device mesh.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dims</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">pipeline_parallel_degree</span><span class="p">,</span>
+            <span class="n">data_parallel_replicate_degree</span><span class="p">,</span>
+            <span class="n">data_parallel_shard_degree</span><span class="p">,</span>
+            <span class="n">context_parallel_degree</span><span class="p">,</span>
+            <span class="n">tensor_parallel_degree</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="p">[</span>
+            <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">PP</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_REPLICATE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_SHARD</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">CP</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">TP</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="n">ParallelismDegrees</span><span class="o">.</span><span class="n">DP_SHARD</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+            <span class="n">dims</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+            <span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">names</span><span class="p">)</span>
+    <span class="n">device_mesh</span> <span class="o">=</span> <span class="n">init_device_mesh</span><span class="p">(</span><span class="n">device_type</span><span class="p">,</span> <span class="n">dims</span><span class="p">,</span> <span class="n">mesh_dim_names</span><span class="o">=</span><span class="n">names</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">device_mesh</span><span class="si">=}</span><span class="s2"> | </span><span class="si">{</span><span class="n">world_size</span><span class="si">=}</span><span class="s2"> | </span><span class="si">{</span><span class="n">enable_loss_parallel</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># TODO: Torch Titan had some more checks here. We need to check if we also need those:</span>
+    <span class="c1"># https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104</span>
+    <span class="k">return</span> <span class="n">device_mesh</span></div>
+
+
+
+<div class="viewcode-block" id="get_parallel_degree">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.get_parallel_degree">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_parallel_degree</span><span class="p">(</span><span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span> <span class="n">parallelism_methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ParallelismDegrees</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gets the number of parallel ranks (i.e., the parallelism degree)</span>
+<span class="sd">    from the device mesh for a specific parallelism method.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        device_mesh (DeviceMesh): The device mesh.</span>
+<span class="sd">        parallelism_methods (list[ParallelismDegrees]): The parallelism methods.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        int: The number of parallel ranks for the specified parallelism method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">device_mesh</span><span class="o">.</span><span class="n">mesh_dim_names</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;device_mesh.mesh_dim_names is None&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">prod</span><span class="p">(</span>
+        <span class="n">device_mesh</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">device_mesh</span><span class="o">.</span><span class="n">mesh_dim_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">method</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">parallelism_methods</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">value</span> <span class="ow">in</span> <span class="n">device_mesh</span><span class="o">.</span><span class="n">mesh_dim_names</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="has_parallelism_method">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.has_parallelism_method">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">has_parallelism_method</span><span class="p">(</span><span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="p">:</span> <span class="n">ParallelismDegrees</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks if the device mesh has the specified parallelism method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        device_mesh (DeviceMesh | None): The device mesh.</span>
+<span class="sd">        parallelism_method (ParallelismDegrees): The parallelism method.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the device mesh has the specified parallelism method, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">device_mesh</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="p">(</span><span class="n">mesh_dim_names</span> <span class="o">:=</span> <span class="n">device_mesh</span><span class="o">.</span><span class="n">mesh_dim_names</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">parallelism_method</span><span class="o">.</span><span class="n">value</span> <span class="ow">in</span> <span class="n">mesh_dim_names</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_mesh_for_parallelism_method">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.get_mesh_for_parallelism_method">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_mesh_for_parallelism_method</span><span class="p">(</span><span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="p">:</span> <span class="n">ParallelismDegrees</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DeviceMesh</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gets the sub-mesh for the specified parallelism method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        device_mesh (DeviceMesh): The device mesh.</span>
+<span class="sd">        parallelism_method (ParallelismDegrees): The parallelism method.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DeviceMesh: The sub-mesh for the specified parallelism method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">has_parallelism_method</span><span class="p">(</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device mesh does not have parallelism method </span><span class="si">{</span><span class="n">parallelism_method</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">device_mesh</span><span class="p">[</span><span class="n">parallelism_method</span><span class="o">.</span><span class="n">value</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="get_parallel_rank">
+<a class="viewcode-back" href="../../../../api/modalities.running_env.fsdp.html#modalities.running_env.fsdp.device_mesh.get_parallel_rank">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_parallel_rank</span><span class="p">(</span><span class="n">device_mesh</span><span class="p">:</span> <span class="n">DeviceMesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="p">:</span> <span class="n">ParallelismDegrees</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gets the parallel rank ID for the specified parallelism method.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        device_mesh (DeviceMesh): The device mesh.</span>
+<span class="sd">        parallelism_method (ParallelismDegrees): The parallelism method.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        int: The parallel rank ID for the specified parallelism method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sub_mesh</span> <span class="o">=</span> <span class="n">get_mesh_for_parallelism_method</span><span class="p">(</span><span class="n">device_mesh</span><span class="o">=</span><span class="n">device_mesh</span><span class="p">,</span> <span class="n">parallelism_method</span><span class="o">=</span><span class="n">parallelism_method</span><span class="p">)</span>
+    <span class="n">coordinate</span> <span class="o">=</span> <span class="n">sub_mesh</span><span class="o">.</span><span class="n">get_coordinate</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">coordinate</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current rank is not part of the sub-mesh for </span><span class="si">{</span><span class="n">parallelism_method</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coordinate</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected coordinate length 1 for </span><span class="si">{</span><span class="n">parallelism_method</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">coordinate</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">coordinate</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

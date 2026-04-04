@@ -1,0 +1,77 @@
+modalities.utils.profilers package
+==================================
+
+Submodules
+----------
+
+modalities.utils.profilers.batch\_generator module
+--------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.batch_generator
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.modalities\_profiler module
+------------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.modalities_profiler
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.profiler\_configs module
+---------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.profiler_configs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.profiler\_factory module
+---------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.profiler_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.profilers module
+-------------------------------------------
+
+.. automodule:: modalities.utils.profilers.profilers
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.steppable\_component\_configs module
+---------------------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.steppable_component_configs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.steppable\_components module
+-------------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.steppable_components
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.profilers.steppable\_components\_if module
+-----------------------------------------------------------
+
+.. automodule:: modalities.utils.profilers.steppable_components_if
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.utils.profilers
+   :members:
+   :show-inheritance:
+   :undoc-members:

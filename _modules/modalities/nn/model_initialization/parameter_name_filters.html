@@ -1,0 +1,213 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.nn.model_initialization.parameter_name_filters &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.nn.model_initialization.parameter_name_filters</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.nn.model_initialization.parameter_name_filters</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+
+
+<div class="viewcode-block" id="WeightInitTypes">
+<a class="viewcode-back" href="../../../../api/modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.WeightInitTypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WeightInitTypes</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">PLAIN</span> <span class="o">=</span> <span class="s2">&quot;plain&quot;</span>
+    <span class="n">SCALED</span> <span class="o">=</span> <span class="s2">&quot;scaled&quot;</span>
+    <span class="n">SCALED_EMBED</span> <span class="o">=</span> <span class="s2">&quot;scaled_embed&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="SupportWeightInitModels">
+<a class="viewcode-back" href="../../../../api/modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.SupportWeightInitModels">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SupportWeightInitModels</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">GPT2</span> <span class="o">=</span> <span class="s2">&quot;gpt2&quot;</span>
+    <span class="n">COCA</span> <span class="o">=</span> <span class="s2">&quot;coca&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="RegexFilter">
+<a class="viewcode-back" href="../../../../api/modalities.nn.model_initialization.html#modalities.nn.model_initialization.parameter_name_filters.RegexFilter">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RegexFilter</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">weights</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">biases</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<span class="n">NAMED_PARAMETER_INIT_GROUPS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">SupportWeightInitModels</span><span class="o">.</span><span class="n">GPT2</span><span class="p">:</span> <span class="p">{</span>
+        <span class="c1"># as per https://arxiv.org/abs/2312.16903</span>
+        <span class="c1"># plain: All linear and embedding layers and embedding layers</span>
+        <span class="c1">#        are initialized by sampling from a normal distribution.</span>
+        <span class="c1">#        NOTE: layer norms are ALWAYS initialized beforehand at instantiation time!</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">PLAIN</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span>
+            <span class="n">weights</span><span class="o">=</span><span class="p">[</span>
+                <span class="c1"># attention projection weights</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.weight&quot;</span><span class="p">,</span>
+                <span class="c1"># hidden feed forward in attention block</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.(W|V|W_2)\.weight&quot;</span><span class="p">,</span>  <span class="c1"># SwiGLU</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.(c_fc|c_proj)\.weight&quot;</span><span class="p">,</span>  <span class="c1"># gelu</span>
+                <span class="c1"># embedding weights</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.wte\.weight&quot;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.wpe\.weight&quot;</span><span class="p">,</span>
+                <span class="c1"># lm_head weights (although usually tied with transformer.wte.weight)</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.lm_head\.weight&quot;</span><span class="p">,</span>
+            <span class="p">],</span>
+            <span class="n">biases</span><span class="o">=</span><span class="p">[</span>
+                <span class="c1"># NOTE: some bias terms might not be present due to user configuration</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.bias&quot;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.(W|V|W_2)\.bias&quot;</span><span class="p">,</span>  <span class="c1"># SwiGLU</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.(c_fc|c_proj)\.bias&quot;</span><span class="p">,</span>  <span class="c1"># gelu</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.lm_head\.bias&quot;</span><span class="p">,</span>  <span class="c1"># typically not present</span>
+            <span class="p">],</span>
+        <span class="p">),</span>
+        <span class="c1"># scaled: In the attention block, we scale the final projection in the FFN (W_2)</span>
+        <span class="c1">#         and the projection before the FFN (W_o), as defined in</span>
+        <span class="c1">#         https://arxiv.org/abs/2312.16903</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">SCALED</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span>
+            <span class="n">weights</span><span class="o">=</span><span class="p">[</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\d+\.attn\.c_proj\.weight&quot;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.W_2.weight&quot;</span><span class="p">,</span>  <span class="c1"># SwiGLU</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.h\.\w+\.mlp\.c_proj\.weight&quot;</span><span class="p">,</span>  <span class="c1"># gelu</span>
+            <span class="p">]</span>
+        <span class="p">),</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">SCALED_EMBED</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span>
+            <span class="n">weights</span><span class="o">=</span><span class="p">[</span>
+                <span class="c1"># embedding weights</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.wte\.weight&quot;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.wpe\.weight&quot;</span><span class="p">,</span>
+                <span class="sa">r</span><span class="s2">&quot;transformer\.lm_head\.weight&quot;</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">),</span>
+    <span class="p">},</span>
+    <span class="n">SupportWeightInitModels</span><span class="o">.</span><span class="n">COCA</span><span class="p">:</span> <span class="p">{</span>
+        <span class="c1"># we reject all bias and weight parameters belonging to norms</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">PLAIN</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span>
+            <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;^(?!.*norm)(?!.*ln_).*\.weight$&quot;</span><span class="p">],</span> <span class="n">biases</span><span class="o">=</span><span class="p">[</span><span class="sa">r</span><span class="s2">&quot;^(?!.*norm)(?!.*ln_).*\.bias$&quot;</span><span class="p">]</span>
+        <span class="p">),</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">SCALED</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="p">[],</span> <span class="n">biases</span><span class="o">=</span><span class="p">[]),</span>
+        <span class="n">WeightInitTypes</span><span class="o">.</span><span class="n">SCALED_EMBED</span><span class="p">:</span> <span class="n">RegexFilter</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="p">[],</span> <span class="n">biases</span><span class="o">=</span><span class="p">[]),</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

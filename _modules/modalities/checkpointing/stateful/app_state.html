@@ -1,0 +1,433 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing.stateful.app_state &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing.stateful.app_state</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.checkpointing.stateful.app_state</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.checkpoint.state_dict</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">StateDictOptions</span><span class="p">,</span>
+    <span class="n">get_model_state_dict</span><span class="p">,</span>
+    <span class="n">get_optimizer_state_dict</span><span class="p">,</span>
+    <span class="n">set_model_state_dict</span><span class="p">,</span>
+    <span class="n">set_optimizer_state_dict</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.checkpoint.stateful</span><span class="w"> </span><span class="kn">import</span> <span class="n">Stateful</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optimizer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.optim.lr_scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">LRScheduler</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.optimizers.optimizer_list</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptimizersList</span>
+
+
+<div class="viewcode-block" id="StatefulComponents">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StatefulComponents">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StatefulComponents</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">MODEL</span> <span class="o">=</span> <span class="s2">&quot;model&quot;</span>
+    <span class="n">OPTIMIZER</span> <span class="o">=</span> <span class="s2">&quot;optimizer&quot;</span>
+    <span class="n">LR_SCHEDULER</span> <span class="o">=</span> <span class="s2">&quot;lr_scheduler&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="AppState">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AppState</span><span class="p">(</span><span class="n">Stateful</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is a useful wrapper for checkpointing the application state (i.e., model, optimizer, lr scheduler).</span>
+<span class="sd">    Since this object is compliant with the Stateful protocol, DCP will automatically call</span>
+<span class="sd">    state_dict/load_stat_dict as needed in the dcp.save/load APIs.</span>
+
+<span class="sd">    Note: We take advantage of this wrapper to call distributed state dict methods on the model</span>
+<span class="sd">    and optimizer.</span>
+<span class="sd">    Note: this class has been copied and adapted from</span>
+<span class="sd">    https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span> <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optimizer</span><span class="p">,</span> <span class="n">lr_scheduler</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">LRScheduler</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (nn.Module | list[nn.Module]): The model or model parts can be either</span>
+<span class="sd">                a non-sharded model, FSDP1 or FSDP2 model.</span>
+<span class="sd">            optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.</span>
+<span class="sd">            lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model_parts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">model</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">optimizer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lr_scheduler</span> <span class="o">=</span> <span class="n">lr_scheduler</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_loaded</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_loaded</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns whether the state dict has been loaded.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: Flag indicating whether the state dict has been loaded.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_loaded</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">model_parts</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model_parts</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">optimizer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optimizer</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lr_scheduler</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LRScheduler</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lr_scheduler</span>
+
+<div class="viewcode-block" id="AppState.state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.state_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">state_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the state dict of the AppState object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: The state dict of the AppState object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># this line automatically manages FSDP FQN&#39;s, as well as sets the default</span>
+        <span class="c1"># state dict type to FSDP.SHARDED_STATE_DICT</span>
+        <span class="c1"># model_state_dict, optimizer_state_dict = get_state_dict(self._model, self._optimizer)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">StatefulComponents</span><span class="o">.</span><span class="n">MODEL</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">ModelStateRetriever</span><span class="o">.</span><span class="n">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">),</span>
+            <span class="n">StatefulComponents</span><span class="o">.</span><span class="n">OPTIMIZER</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">OptimizerStateRetriever</span><span class="o">.</span><span class="n">get_state_dict</span><span class="p">(</span>
+                <span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lr_scheduler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sd</span><span class="p">[</span><span class="n">StatefulComponents</span><span class="o">.</span><span class="n">LR_SCHEDULER</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">LRSchedulerStateRetriever</span><span class="o">.</span><span class="n">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sd</span></div>
+
+
+<div class="viewcode-block" id="AppState.load_state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.AppState.load_state_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the state dict into the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_dict (dict[str, Any]): The state dict to load into the AppState object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the state dict has already been loaded.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># sets our state dicts on the model, optimizer and lr scheduler.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_loaded</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot call load_state_dict twice on the same AppState object. &quot;</span> <span class="s2">&quot;State dict has already been loaded.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">ModelStateRetriever</span><span class="o">.</span><span class="n">load_state_dict_</span><span class="p">(</span><span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">[</span><span class="n">StatefulComponents</span><span class="o">.</span><span class="n">MODEL</span><span class="o">.</span><span class="n">value</span><span class="p">])</span>
+        <span class="n">OptimizerStateRetriever</span><span class="o">.</span><span class="n">load_state_dict_</span><span class="p">(</span>
+            <span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span>
+            <span class="n">state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">[</span><span class="n">StatefulComponents</span><span class="o">.</span><span class="n">OPTIMIZER</span><span class="o">.</span><span class="n">value</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lr_scheduler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">LRSchedulerStateRetriever</span><span class="o">.</span><span class="n">load_state_dict_</span><span class="p">(</span>
+                <span class="n">app_state</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">[</span><span class="n">StatefulComponents</span><span class="o">.</span><span class="n">LR_SCHEDULER</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_loaded</span> <span class="o">=</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="StateRetrieverIF">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StateRetrieverIF</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;State retriever interface for loading and getting state dicts of</span>
+<span class="sd">    models, optimizers and lr schedulers. Other stateful components can be added as needed</span>
+<span class="sd">    by having the retriever implement this interface.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="StateRetrieverIF.load_state_dict_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF.load_state_dict_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict_</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the state dict into the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The application state object.</span>
+<span class="sd">            state_dict (dict[str, Any]): The state dict to load into the AppState object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="StateRetrieverIF.get_state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.StateRetrieverIF.get_state_dict">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the state dict of the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The application state object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This abstract method is not implemented and should be overridden in a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: The state dict of the AppState object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ModelStateRetriever">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ModelStateRetriever</span><span class="p">(</span><span class="n">StateRetrieverIF</span><span class="p">):</span>
+<div class="viewcode-block" id="ModelStateRetriever.get_state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever.get_state_dict">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the flattened state dicts of the model parts in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the model.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: The state dict of the model in the AppState object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">state_dicts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">get_model_state_dict</span><span class="p">,</span> <span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">))</span>
+        <span class="n">state_dict_keys</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">((</span><span class="nb">list</span><span class="p">(</span><span class="n">sd</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="k">for</span> <span class="n">sd</span> <span class="ow">in</span> <span class="n">state_dicts</span><span class="p">),</span> <span class="p">[])</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">state_dict_keys</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">state_dict_keys</span><span class="p">)),</span> <span class="s2">&quot;State dict keys are not unique across model parts.&quot;</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">sd</span> <span class="ow">in</span> <span class="n">state_dicts</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">sd</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
+
+
+<div class="viewcode-block" id="ModelStateRetriever.load_state_dict_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.ModelStateRetriever.load_state_dict_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict_</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the state dict into the model in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the model.</span>
+<span class="sd">            state_dict (dict[str, Any]): The state dict to load into the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">:</span>
+            <span class="n">set_model_state_dict</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">model_state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">StateDictOptions</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OptimizerStateRetriever">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OptimizerStateRetriever</span><span class="p">(</span><span class="n">StateRetrieverIF</span><span class="p">):</span>
+<div class="viewcode-block" id="OptimizerStateRetriever.get_state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.get_state_dict">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the state dict of the optimizer in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the optimizer.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: The state dict of the optimizer in the AppState object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">OptimizersList</span><span class="p">):</span>
+            <span class="n">sd</span> <span class="o">=</span> <span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Expected a single model part for non-OptimizersList optimizer.&quot;</span>
+            <span class="n">sd</span> <span class="o">=</span> <span class="n">get_optimizer_state_dict</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">optimizers</span><span class="o">=</span><span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
+                <span class="c1"># NOTE: Flattening is required for pipeline parallelism to work correctly.</span>
+                <span class="c1"># see https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/checkpoint.py#L193-L214</span>
+                <span class="n">options</span><span class="o">=</span><span class="n">StateDictOptions</span><span class="p">(</span><span class="n">flatten_optimizer_state_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">sd</span></div>
+
+
+<div class="viewcode-block" id="OptimizerStateRetriever.load_state_dict_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.OptimizerStateRetriever.load_state_dict_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict_</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the state dict into the optimizer in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the optimizer.</span>
+<span class="sd">            state_dict (dict[str, Any]): The state dict to load into the optimizer.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">OptimizersList</span><span class="p">):</span>
+            <span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">state_dict</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Expected a single model part for non-OptimizersList optimizer.&quot;</span>
+            <span class="n">set_optimizer_state_dict</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">optimizers</span><span class="o">=</span><span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
+                <span class="n">optim_state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">=</span><span class="n">StateDictOptions</span><span class="p">(</span><span class="n">flatten_optimizer_state_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LRSchedulerStateRetriever">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LRSchedulerStateRetriever</span><span class="p">(</span><span class="n">StateRetrieverIF</span><span class="p">):</span>
+<div class="viewcode-block" id="LRSchedulerStateRetriever.get_state_dict">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.get_state_dict">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_state_dict</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the state dict of the lr scheduler in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the lr scheduler.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: The state dict of the lr scheduler in the AppState object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">app_state</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LRSchedulerStateRetriever.load_state_dict_">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.stateful.html#modalities.checkpointing.stateful.app_state.LRSchedulerStateRetriever.load_state_dict_">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict_</span><span class="p">(</span><span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads the state dict into the lr scheduler in the AppState object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            app_state (AppState): The app_state object containing the lr scheduler.</span>
+<span class="sd">            state_dict (dict[str, Any]): The state dict to load into the lr scheduler.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># NOTE from torchtitan:</span>
+        <span class="c1"># https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/components/optimizer.py#L363</span>
+        <span class="c1"># The key value we&#39;re concerned</span>
+        <span class="c1"># within ``LRScheduler.state_dict()`` is ``last_epoch``, which is an integer</span>
+        <span class="c1"># that is immutable. As long as ``steps`` and ``warmup_steps``</span>
+        <span class="c1"># in ``job_config`` remain unchanged when resuming from a checkpoint, this</span>
+        <span class="c1"># approach is safe. We call ``copy()`` here to ensure extra safety.</span>
+        <span class="n">app_state</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">state_dict</span><span class="p">))</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

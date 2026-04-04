@@ -1,0 +1,61 @@
+modalities.conversion.gpt2 package
+==================================
+
+Submodules
+----------
+
+modalities.conversion.gpt2.configuration\_gpt2 module
+-----------------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.configuration_gpt2
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.conversion.gpt2.conversion\_code module
+--------------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.conversion_code
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.conversion.gpt2.conversion\_model module
+---------------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.conversion_model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.conversion.gpt2.conversion\_tokenizer module
+-------------------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.conversion_tokenizer
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.conversion.gpt2.convert\_gpt2 module
+-----------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.convert_gpt2
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.conversion.gpt2.modeling\_gpt2 module
+------------------------------------------------
+
+.. automodule:: modalities.conversion.gpt2.modeling_gpt2
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.conversion.gpt2
+   :members:
+   :show-inheritance:
+   :undoc-members:
