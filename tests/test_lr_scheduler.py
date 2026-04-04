@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, call
 
 import numpy as np
+import torch
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.checkpointing.stateful.app_state import AppState
@@ -8,7 +9,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.evaluator import Evaluator
 from modalities.gym import Gym
 from modalities.loss_functions import Loss
-from modalities.optimizers.lr_schedulers import DummyLRScheduler
+from modalities.optimizers.lr_schedulers import DummyLRScheduler, LRSchedulerFactory
 from modalities.trainer import Trainer
 from tests.utility import configure_dataloader_mock
 
@@ -76,3 +77,27 @@ def test_dummy_lr_scheduler(optimizer_with_param_groups_mock: MagicMock):
     assert np.allclose(scheduler.get_lr(), [0.08, 0.18, 0.28], atol=1e-6)
     assert scheduler._get_closed_form_lr() == [0.1, 0.2, 0.3]
     assert np.allclose(scheduler.get_last_lr(), [0.08, 0.18, 0.28], atol=1e-6)
+
+
+def test_linear_warmup_cosine_annealing_lr_scheduler():
+    parameter = torch.nn.Parameter(torch.tensor([1.0]))
+    optimizer = torch.optim.SGD([parameter], lr=1.0)
+    scheduler = LRSchedulerFactory.get_linear_warmup_cosine_annealing_lr_scheduler(
+        optimizer=optimizer,
+        warmup_steps=2,
+        total_steps=6,
+        initial_lr=0.1,
+        final_lr=0.2,
+        max_lr=1.0,
+    )
+
+    learning_rates = [scheduler.get_last_lr()[0]]
+    for _ in range(6):
+        optimizer.step()
+        scheduler.step()
+        learning_rates.append(scheduler.get_last_lr()[0])
+
+    assert learning_rates[0] < learning_rates[1] < learning_rates[2]
+    assert np.isclose(learning_rates[2], 1.0, atol=1e-6)
+    assert learning_rates[2] > learning_rates[3] > learning_rates[4] > learning_rates[5] > learning_rates[6]
+    assert np.isclose(learning_rates[6], 0.2, atol=1e-6)

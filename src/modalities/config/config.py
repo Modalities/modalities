@@ -188,7 +188,7 @@ class OneCycleLRSchedulerConfig(BaseModel):
     steps_per_epoch: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     pct_start: Annotated[float, Field(strict=True, gt=0.0, le=1.0)]
     anneal_strategy: str
-    cycle_momentum: bool = True
+    cycle_momentum: bool = False
     base_momentum: Annotated[float, Field(strict=True, gt=0)] | list[
         Annotated[float, Field(strict=True, gt=0.0)]
     ] = 0.85
@@ -227,6 +227,22 @@ class CosineAnnealingLRSchedulerConfig(BaseModel):
     t_max: Annotated[int, Field(strict=True, gt=0)]
     eta_min: Annotated[float, Field(strict=True, ge=0.0)]
     last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+
+
+class LinearWarmupCosineAnnealingLRSchedulerConfig(BaseModel):
+    optimizer: PydanticOptimizerIFType
+    warmup_steps: Annotated[int, Field(strict=True, gt=0)]
+    total_steps: Annotated[int, Field(strict=True, gt=0)]
+    initial_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    final_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    max_lr: Annotated[float, Field(strict=True, ge=0.0)]
+    last_epoch: Annotated[int, Field(strict=True, ge=-1)] = -1
+
+    @model_validator(mode="after")
+    def check_total_steps_greater_than_warmup_steps(self) -> "LinearWarmupCosineAnnealingLRSchedulerConfig":
+        if self.total_steps <= self.warmup_steps:
+            raise ValueError("total_steps must be greater than warmup_steps.")
+        return self
 
 
 class FSDP1CheckpointedOptimizerConfig(BaseModel):
