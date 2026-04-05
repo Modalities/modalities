@@ -129,7 +129,11 @@ initialized_model:
         weight_init_type: scaled
         mean: 0.0
         std: 0.02
+        seed: 42
         num_layers: ${model_raw.config.n_layer}
+        device_mesh:
+          instance_key: device_mesh
+          pass_type: BY_REFERENCE
 
 model_raw:
   component_key: model
