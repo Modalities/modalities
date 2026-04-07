@@ -23,8 +23,9 @@ from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.training.training_progress import TrainingProgress
+from modalities.utils.ports import find_free_port
 from tests.conftest import _ROOT_DIR
-from tests.utility import find_free_port, monitor_child_processes
+from tests.utility import monitor_child_processes
 
 
 @pytest.fixture

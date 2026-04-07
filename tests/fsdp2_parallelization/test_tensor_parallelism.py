@@ -17,7 +17,7 @@ from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, Pydant
 from modalities.models.gpt2.gpt2_model import TransformerMLP
 from modalities.models.model import SwiGLU
 from modalities.running_env.cuda_env import MultiProcessingCudaEnv
-from tests.utility import find_free_port
+from modalities.utils.ports import find_free_port
 
 
 def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir: Path) -> Path:

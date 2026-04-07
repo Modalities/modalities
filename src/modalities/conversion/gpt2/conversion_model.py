@@ -16,6 +16,7 @@ from modalities.models.model import SwiGLU
 from modalities.models.utils import ModelTypeEnum, get_model_from_config
 from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import PyTorchDtypes
+from modalities.utils.ports import find_free_port
 
 
 def convert_model_checkpoint(modalities_config: ConfigDictType) -> tuple[GPT2ForCausalLM | LlamaForCausalLM, GPT2LLM]:
@@ -110,7 +111,9 @@ def check_converted_dcp_model(
     vocab_size: int = new_config["model_raw" if "model_raw" in new_config else "model"]["config"]["vocab_size"]
     if isinstance(device_id_modalities, str):
         device_id_modalities = int(device_id_modalities.replace("cuda:", ""))
-    with MultiProcessingCudaEnv(ProcessGroupBackendType.nccl, 0, 0, 1, 24570, device_id=device_id_modalities):
+    with MultiProcessingCudaEnv(
+        ProcessGroupBackendType.nccl, 0, 0, 1, find_free_port(), device_id=device_id_modalities
+    ):
         modalities_model = get_model_from_config(new_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
         check_converted_model(hf_model, modalities_model, num_testruns=num_testruns, vocab_size=vocab_size)
 

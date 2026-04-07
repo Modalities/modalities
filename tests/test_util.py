@@ -13,8 +13,8 @@ from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticAppStateType, PydanticDeviceMeshIFType
 from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
+from modalities.utils.ports import find_free_port
 from modalities.utils.typing_utils import FSDPX
-from tests.utility import find_free_port
 
 
 def test_get_local_number_of_trainable_parameters():
