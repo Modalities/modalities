@@ -451,6 +451,9 @@ class CombinedDataset(Dataset):
 
         Args:
             datasets (list[Dataset]): A list of datasets to combine.
+            log_chunk_switch (bool, optional): Whether to log when switching between dataset chunks. Defaults to False.
+            log_initial_pos (bool, optional): Whether to log the initial position of at the beginning of a training
+                or warmstart. Defaults to False.
         """
         self.log_chunk_switch = log_chunk_switch
         self.log_initial_pos = log_initial_pos
