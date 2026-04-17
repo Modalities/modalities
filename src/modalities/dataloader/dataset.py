@@ -457,6 +457,7 @@ class CombinedDataset(Dataset):
         """
         self.log_chunk_switch = log_chunk_switch
         self.log_initial_pos = log_initial_pos
+        self.already_logged_initial_pos = False
         self.datasets = datasets
         self.cumulative_sizes = np.cumsum([len(ds) for ds in datasets], dtype=np.int64)
         self.logger = get_logger(__name__)
@@ -468,9 +469,16 @@ class CombinedDataset(Dataset):
         dataset_idx = np.searchsorted(self.cumulative_sizes, idx, side="right")
         local_idx = idx - (self.cumulative_sizes[dataset_idx - 1] if dataset_idx > 0 else 0)
         if self.log_chunk_switch and local_idx == 0:
-            self.logger.info(f"global_index={idx} chunk index={dataset_idx}, local index={local_idx}")
+            self.logger.info(
+                f"Chunk switch:   global_index={idx}/{len(self)} chunk index={dataset_idx}/{len(self.datasets)}, "
+                f"local index={local_idx}/{len(self.datasets[dataset_idx])}"
+            )
 
-        if self.log_initial_pos:
-            self.logger.info(f"global_index={idx} chunk index={dataset_idx}, local index={local_idx}")
+        if self.log_initial_pos and not self.already_logged_initial_pos:
+            self.logger.info(
+                f"Initial pos:   global_index={idx}/{len(self)} chunk index={dataset_idx}/{len(self.datasets)}, "
+                f"local index={local_idx}/{len(self.datasets[dataset_idx])}"
+            )
+            self.already_logged_initial_pos = True
 
         return self.datasets[dataset_idx][local_idx]
