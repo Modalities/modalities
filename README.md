@@ -52,6 +52,14 @@ uv sync --extra [cpu|cu126|cu128|cu130] --extra tests --extra linting
 pre-commit install --install-hooks
 ```
 
+Additionally, flash attention 4 can be installed via:
+
+```sh
+uv pip install --prerelease=allow flash-attn-4
+# or (if you want to install the CUDA 13 version)
+uv pip install --prerelease=allow flash-attn-4[cu13]
+```
+
 ### Option 2: Using pip and manual installation of dependencies
 
 ```sh

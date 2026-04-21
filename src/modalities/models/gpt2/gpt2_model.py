@@ -20,9 +20,14 @@ from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
 
 try:
-    from flash_attn import flash_attn_func
+    from flash_attn import flash_attn_func as flash_attn_func_v2
 except ModuleNotFoundError:
-    flash_attn_func = None
+    flash_attn_func_v2 = None
+
+try:
+    from flash_attn.cute import flash_attn_func as flash_attn_func_v4
+except Exception:
+    flash_attn_func_v4 = None
 
 # Logger configuration
 logger = logging.getLogger(__name__)
@@ -249,12 +254,14 @@ class AttentionImplementation(str, Enum):
     Attributes:
         MANUAL (str): Manual attention implementation.
         PYTORCH_FLASH (str): PyTorch's flash attention implementation.
-        DAO_FLASH (str): DAO's flash attention implementation.
+        DAO_FLASH (str): DAO's FlashAttention-2 implementation.
+        DAO_FLASH_V4 (str): DAO's FlashAttention-4 implementation.
     """
 
     MANUAL = "manual"
     PYTORCH_FLASH = "pytorch_flash"
     DAO_FLASH = "dao_flash"
+    DAO_FLASH_V4 = "dao_flash_v4"
 
 
 class AttentionConfig(BaseModel):
@@ -439,6 +446,14 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         assert n_embd % n_head_q == 0, "`n_embd needs` to be divisible by `n_head_q`."
         assert n_head_q % n_head_kv == 0, "`n_head_q needs` to be divisible by `n_head_kv`."
+        if attention_impl == AttentionImplementation.DAO_FLASH:
+            if flash_attn_func_v2 is None:
+                raise NotImplementedError("ERROR! Dao Flash Attention 2 is not installed.")
+        if attention_impl == AttentionImplementation.DAO_FLASH_V4:
+            if flash_attn_func_v4 is None:
+                raise NotImplementedError("ERROR! Dao Flash Attention 4 is not installed.")
+            if dropout > 0.0:
+                raise NotImplementedError("ERROR! Dao Flash Attention 4 does not support attention dropout.")
 
         self.n_rep = n_head_q // n_head_kv
         self.attention_impl = attention_impl
@@ -644,18 +659,49 @@ class CausalSelfAttention(nn.Module):
             # Due to the lack of GPUs in github actions and the requirement of those in the flash-attn library,
             # we have to check if the library is installed and raise an error if not.
             # Note, that the library is not required for the CPU-only tests.
-            if flash_attn_func is None:
-                raise NotImplementedError("ERROR! Dao Flash Attention is not installed.")
-            # the next three lines are only needed for flash-attn from Daio Lab
-            q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-            k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-            v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-            y = flash_attn_func(
-                q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1)
-            )  # (B, T, nh_q, hd)
+            y = cls._execute_dao_flash_v2(q, k, v, dropout)
+        elif attention_impl == AttentionImplementation.DAO_FLASH_V4:
+            if cls._requires_backward(q, k, v) and torch.cuda.get_device_capability(q.device)[0] < 9:
+                y = cls._execute_dao_flash_v2(q, k, v, dropout)
+            else:
+                # TODO added due to upstream failure in its pack_gqa handling,
+                #      can be removed once the issue is resolved:
+                k, v = cls.repeat_kv_heads(q, k, v)
+                q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+                k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+                v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+                y = cls._unwrap_flash_attention_output(
+                    flash_attn_func_v4(
+                        q,
+                        k,
+                        v,
+                        causal=True,
+                        softmax_scale=None,
+                        window_size=(None, None),
+                    )
+                )
         else:
             raise NotImplementedError(f"Attention implementation {attention_impl} not supported")
         return y  # (B, T, nh_q, hd)
+
+    @staticmethod
+    def _unwrap_flash_attention_output(
+        output: torch.Tensor | tuple[torch.Tensor, Optional[torch.Tensor]],
+    ) -> torch.Tensor:
+        if isinstance(output, tuple):
+            return output[0]
+        return output
+
+    @staticmethod
+    def _execute_dao_flash_v2(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
+        q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+        k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
+        return flash_attn_func_v2(q, k, v, dropout_p=dropout, causal=True, softmax_scale=None, window_size=(-1, -1))
+
+    @staticmethod
+    def _requires_backward(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> bool:
+        return torch.is_grad_enabled() and any(tensor.requires_grad for tensor in (q, k, v))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
