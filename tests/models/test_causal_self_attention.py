@@ -3,12 +3,7 @@ Note: test_attention_types_approximate_equality can print the output of differen
       To do so, turn on verbose and run 'pytest tests/models/test_causal_self_attention.py -s'
 """
 
-import os
-import subprocess
-import sys
-import textwrap
 from copy import deepcopy
-from pathlib import Path
 
 import pytest
 import torch
@@ -25,8 +20,6 @@ from modalities.models.gpt2.gpt2_model import (
 torch.manual_seed(0)
 
 FLASH_ATTN_V4_AVAILABLE = is_flash_attn_v4_available()
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = REPO_ROOT / "src"
 
 
 def _get_random_input_seq(embedding_shape):
@@ -287,142 +280,85 @@ def test_qk_norm(n_head_q, n_head_kv, n_embd, attention_impl):
 
 @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
 @pytest.mark.skipif(not FLASH_ATTN_V4_AVAILABLE, reason="FA4 not installed")
-def test_dao_flash_v4_forward_mha_subprocess():
-    result = _run_fa4_subprocess(
-        """
-        import torch
-        from modalities.models.gpt2.gpt2_model import CausalSelfAttention
+def test_dao_flash_v4_forward_mha():
+    q = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device="cuda")
+    k = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device="cuda")
+    v = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device="cuda")
 
-        q = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device='cuda')
-        k = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device='cuda')
-        v = torch.rand(2, 4, 12, 32, dtype=torch.bfloat16, device='cuda')
-        out = CausalSelfAttention.execute_attention(q, k, v, dropout=0.0, attention_impl='dao_flash_v4')
-        torch.cuda.synchronize()
-        assert tuple(out.shape) == (2, 12, 4, 32)
-        print('ok')
-        """
-    )
-    assert result.stdout.strip().endswith("ok")
+    out = CausalSelfAttention.execute_attention(q, k, v, dropout=0.0, attention_impl="dao_flash_v4")
+
+    torch.cuda.synchronize()
+    assert tuple(out.shape) == (2, 12, 4, 32)
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
 @pytest.mark.skipif(not FLASH_ATTN_V4_AVAILABLE, reason="FA4 not installed")
-def test_dao_flash_v4_forward_gqa_subprocess():
-    result = _run_fa4_subprocess(
-        """
-        import torch
-        from modalities.models.gpt2.gpt2_model import CausalSelfAttention
+def test_dao_flash_v4_forward_gqa():
+    q = torch.rand(2, 8, 12, 32, dtype=torch.bfloat16, device="cuda")
+    k = torch.rand(2, 2, 12, 32, dtype=torch.bfloat16, device="cuda")
+    v = torch.rand(2, 2, 12, 32, dtype=torch.bfloat16, device="cuda")
 
-        q = torch.rand(2, 8, 12, 32, dtype=torch.bfloat16, device='cuda')
-        k = torch.rand(2, 2, 12, 32, dtype=torch.bfloat16, device='cuda')
-        v = torch.rand(2, 2, 12, 32, dtype=torch.bfloat16, device='cuda')
-        out = CausalSelfAttention.execute_attention(q, k, v, dropout=0.0, attention_impl='dao_flash_v4')
-        torch.cuda.synchronize()
-        assert tuple(out.shape) == (2, 12, 8, 32)
-        print('ok')
-        """
-    )
-    assert result.stdout.strip().endswith("ok")
+    out = CausalSelfAttention.execute_attention(q, k, v, dropout=0.0, attention_impl="dao_flash_v4")
+
+    torch.cuda.synchronize()
+    assert tuple(out.shape) == (2, 12, 8, 32)
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
 @pytest.mark.skipif(not FLASH_ATTN_V4_AVAILABLE, reason="FA4 not installed")
-def test_dao_flash_v4_qk_norm_subprocess():
-    result = _run_fa4_subprocess(
-        """
-        import torch
-        from modalities.models.gpt2.gpt2_model import (
-            AttentionConfig,
-            CausalSelfAttention,
-            LayerNorms,
-            LayerNormWrapperConfig,
-            PytorchRMSLayerNormConfig,
-        )
-
-        torch.manual_seed(0)
-        attention_config_no_norm = AttentionConfig(qkv_transforms=[])
-        attention_config_with_norm = AttentionConfig(
-            qkv_transforms=[],
-            qk_norm_config=LayerNormWrapperConfig(
-                norm_type=LayerNorms.pytorch_rms_norm,
-                config=PytorchRMSLayerNormConfig(normalized_shape=8),
-            ),
-        )
-
-        torch.manual_seed(0)
-        layer_no_norm = CausalSelfAttention(
-            4, 4, 32, attention_config_no_norm, 'dao_flash_v4', False, 0.0
-        ).cuda().bfloat16()
-        torch.manual_seed(0)
-        layer_with_norm = CausalSelfAttention(
-            4, 4, 32, attention_config_with_norm, 'dao_flash_v4', False, 0.0
-        ).cuda().bfloat16()
-        x = torch.rand((2, 9, 32), dtype=torch.bfloat16, device='cuda')
-        out_no_norm = layer_no_norm(x)
-        out_with_norm = layer_with_norm(x)
-        torch.cuda.synchronize()
-        assert out_no_norm.shape == out_with_norm.shape == (2, 9, 32)
-        assert not torch.allclose(out_no_norm, out_with_norm, atol=1e-6)
-        print('ok')
-        """
+def test_dao_flash_v4_qk_norm():
+    torch.manual_seed(0)
+    attention_config_no_norm = AttentionConfig(qkv_transforms=[])
+    attention_config_with_norm = AttentionConfig(
+        qkv_transforms=[],
+        qk_norm_config=LayerNormWrapperConfig(
+            norm_type=LayerNorms.pytorch_rms_norm,
+            config=PytorchRMSLayerNormConfig(normalized_shape=8),
+        ),
     )
-    assert result.stdout.strip().endswith("ok")
+
+    torch.manual_seed(0)
+    layer_no_norm = (
+        CausalSelfAttention(4, 4, 32, attention_config_no_norm, "dao_flash_v4", False, 0.0).cuda().bfloat16()
+    )
+    torch.manual_seed(0)
+    layer_with_norm = (
+        CausalSelfAttention(4, 4, 32, attention_config_with_norm, "dao_flash_v4", False, 0.0).cuda().bfloat16()
+    )
+    x = torch.rand((2, 9, 32), dtype=torch.bfloat16, device="cuda")
+
+    out_no_norm = layer_no_norm(x)
+    out_with_norm = layer_with_norm(x)
+
+    torch.cuda.synchronize()
+    assert out_no_norm.shape == out_with_norm.shape == (2, 9, 32)
+    assert not torch.allclose(out_no_norm, out_with_norm, atol=1e-6)
 
 
 @pytest.mark.skipif(torch.cuda.device_count() < 1, reason="This test requires 1 GPU.")
 @pytest.mark.skipif(not FLASH_ATTN_V4_AVAILABLE, reason="FA4 not installed")
-def test_dao_flash_v4_backward_approximate_equality_subprocess():
-    result = _run_fa4_subprocess(
-        """
-        import torch
-        from modalities.models.gpt2.gpt2_model import CausalSelfAttention
+def test_dao_flash_v4_backward_approximate_equality():
+    query_ref = torch.rand((2, 8, 12, 64), dtype=torch.bfloat16, device="cuda", requires_grad=True)
+    key_ref = torch.rand((2, 2, 12, 64), dtype=torch.bfloat16, device="cuda", requires_grad=True)
+    value_ref = torch.rand((2, 2, 12, 64), dtype=torch.bfloat16, device="cuda", requires_grad=True)
 
-        query_ref = torch.rand((2, 8, 12, 64), dtype=torch.bfloat16, device='cuda', requires_grad=True)
-        key_ref = torch.rand((2, 2, 12, 64), dtype=torch.bfloat16, device='cuda', requires_grad=True)
-        value_ref = torch.rand((2, 2, 12, 64), dtype=torch.bfloat16, device='cuda', requires_grad=True)
+    query_fa4 = query_ref.detach().clone().requires_grad_(True)
+    key_fa4 = key_ref.detach().clone().requires_grad_(True)
+    value_fa4 = value_ref.detach().clone().requires_grad_(True)
 
-        query_fa4 = query_ref.detach().clone().requires_grad_(True)
-        key_fa4 = key_ref.detach().clone().requires_grad_(True)
-        value_fa4 = value_ref.detach().clone().requires_grad_(True)
-
-        output_ref = CausalSelfAttention.execute_attention(
-            query_ref, key_ref, value_ref, dropout=0.0, attention_impl='pytorch_flash'
-        )
-        output_fa4 = CausalSelfAttention.execute_attention(
-            query_fa4, key_fa4, value_fa4, dropout=0.0, attention_impl='dao_flash_v4'
-        )
-        torch.testing.assert_close(output_ref, output_fa4, atol=2.5e-3, rtol=0.016)
-
-        output_ref.float().sum().backward()
-        output_fa4.float().sum().backward()
-        torch.cuda.synchronize()
-
-        torch.testing.assert_close(query_ref.grad, query_fa4.grad, atol=5e-3, rtol=0.02)
-        torch.testing.assert_close(key_ref.grad, key_fa4.grad, atol=5e-3, rtol=0.02)
-        torch.testing.assert_close(value_ref.grad, value_fa4.grad, atol=5e-3, rtol=0.02)
-        print('ok')
-        """
+    output_ref = CausalSelfAttention.execute_attention(
+        query_ref, key_ref, value_ref, dropout=0.0, attention_impl="pytorch_flash"
     )
-    assert result.stdout.strip().endswith("ok")
-
-
-def _run_fa4_subprocess(code: str) -> subprocess.CompletedProcess[str]:
-    """Run flash attention 4 related code in a subprocess to isolate FA4's CUDA context
-    and avoid conflicts with other tests.
-    The code should print 'ok' if it runs successfully.
-    The function returns the CompletedProcess object,
-    which contains stdout and stderr for further inspection if needed.
-    TODO: This might be an A100 / SM80-specific issue, so we can consider removing this subprocess isolation
-          if we confirm that FA4 works well on newer architectures without it.
-    """
-    env = os.environ.copy()
-    existing_pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = f"{SRC_ROOT}:{existing_pythonpath}" if existing_pythonpath else str(SRC_ROOT)
-    return subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(code)],
-        cwd=REPO_ROOT,
-        env=env,
-        check=True,
-        capture_output=True,
-        text=True,
+    output_fa4 = CausalSelfAttention.execute_attention(
+        query_fa4, key_fa4, value_fa4, dropout=0.0, attention_impl="dao_flash_v4"
     )
+
+    torch.testing.assert_close(output_ref, output_fa4, atol=2.5e-3, rtol=0.016)
+
+    output_ref.float().sum().backward()
+    output_fa4.float().sum().backward()
+    torch.cuda.synchronize()
+
+    torch.testing.assert_close(query_ref.grad, query_fa4.grad, atol=5e-3, rtol=0.02)
+    torch.testing.assert_close(key_ref.grad, key_fa4.grad, atol=5e-3, rtol=0.02)
+    torch.testing.assert_close(value_ref.grad, value_fa4.grad, atol=5e-3, rtol=0.02)
