@@ -3,7 +3,7 @@ import math
 from abc import abstractmethod
 from enum import Enum
 from importlib import import_module
-from typing import Annotated, Callable, Optional, overload
+from typing import Annotated, Callable, Optional, cast, overload
 
 import torch
 import torch.nn as nn
@@ -71,6 +71,31 @@ def _raise_flash_attn_v4_unavailable() -> None:
             f"{type(flash_attn_func_v4_import_error).__name__}: {flash_attn_func_v4_import_error}"
         )
     raise NotImplementedError(error_message)
+
+
+@torch.compiler.disable
+def _execute_dao_flash_v4_eager(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+    flash_attn_v4 = get_flash_attn_func_v4()
+    if flash_attn_v4 is None:
+        _raise_flash_attn_v4_unavailable()
+
+    output = flash_attn_v4(
+        q,
+        k,
+        v,
+        causal=True,
+        softmax_scale=None,
+        window_size=(None, None),
+    )
+    return _unwrap_flash_attention_output(cast(torch.Tensor | tuple[torch.Tensor, Optional[torch.Tensor]], output))
+
+
+def _unwrap_flash_attention_output(
+    output: torch.Tensor | tuple[torch.Tensor, Optional[torch.Tensor]],
+) -> torch.Tensor:
+    if isinstance(output, tuple):
+        return output[0]
+    return output
 
 
 class LayerNorms(LookupEnum):
@@ -698,7 +723,6 @@ class CausalSelfAttention(nn.Module):
             # Note, that the library is not required for the CPU-only tests.
             y = cls._execute_dao_flash_v2(q, k, v, dropout)
         elif attention_impl == AttentionImplementation.DAO_FLASH_V4:
-            flash_attn_v4 = get_flash_attn_func_v4()
             if cls._requires_backward(q, k, v) and torch.cuda.get_device_capability(q.device)[0] < 9:
                 y = cls._execute_dao_flash_v2(q, k, v, dropout)
             else:
@@ -708,27 +732,10 @@ class CausalSelfAttention(nn.Module):
                 q = q.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
                 k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
                 v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
-                y = cls._unwrap_flash_attention_output(
-                    flash_attn_v4(
-                        q,
-                        k,
-                        v,
-                        causal=True,
-                        softmax_scale=None,
-                        window_size=(None, None),
-                    )
-                )
+                y = _execute_dao_flash_v4_eager(q, k, v)
         else:
             raise NotImplementedError(f"Attention implementation {attention_impl} not supported")
         return y  # (B, T, nh_q, hd)
-
-    @staticmethod
-    def _unwrap_flash_attention_output(
-        output: torch.Tensor | tuple[torch.Tensor, Optional[torch.Tensor]],
-    ) -> torch.Tensor:
-        if isinstance(output, tuple):
-            return output[0]
-        return output
 
     @staticmethod
     def _execute_dao_flash_v2(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, dropout: float) -> torch.Tensor:
