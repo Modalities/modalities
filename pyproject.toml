@@ -24,6 +24,7 @@ dependencies = [
     "matplotlib",
     "wandb",
     "einops>=0.7.0",
+    "setuptools",
     "debugpy",  # For VSCode debugging support
 ]
 

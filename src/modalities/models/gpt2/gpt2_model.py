@@ -2,7 +2,8 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Optional, overload
+from importlib import import_module
+from typing import Annotated, Callable, Optional, overload
 
 import torch
 import torch.nn as nn
@@ -26,14 +27,50 @@ except ModuleNotFoundError:
 
 try:
     from flash_attn.cute import flash_attn_func as flash_attn_func_v4
-except Exception:
+except Exception as exc:
     flash_attn_func_v4 = None
+    flash_attn_func_v4_import_error = exc
+else:
+    flash_attn_func_v4_import_error = None
 
 # Logger configuration
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+def get_flash_attn_func_v4() -> Callable[..., object] | None:
+    """Load FlashAttention-4 lazily so optional dependency issues are detected accurately."""
+    global flash_attn_func_v4, flash_attn_func_v4_import_error
+
+    if flash_attn_func_v4 is not None:
+        return flash_attn_func_v4
+
+    try:
+        loaded_flash_attn_func_v4 = getattr(import_module("flash_attn.cute"), "flash_attn_func")
+    except Exception as exc:
+        flash_attn_func_v4_import_error = exc
+        return None
+
+    flash_attn_func_v4 = loaded_flash_attn_func_v4
+    flash_attn_func_v4_import_error = None
+    return flash_attn_func_v4
+
+
+def is_flash_attn_v4_available() -> bool:
+    """Return whether FlashAttention-4 is importable in the current environment."""
+    return get_flash_attn_func_v4() is not None
+
+
+def _raise_flash_attn_v4_unavailable() -> None:
+    error_message = "ERROR! Dao Flash Attention 4 is not installed."
+    if flash_attn_func_v4_import_error is not None:
+        error_message = (
+            f"ERROR! Dao Flash Attention 4 is not available: "
+            f"{type(flash_attn_func_v4_import_error).__name__}: {flash_attn_func_v4_import_error}"
+        )
+    raise NotImplementedError(error_message)
 
 
 class LayerNorms(LookupEnum):
@@ -450,8 +487,8 @@ class CausalSelfAttention(nn.Module):
             if flash_attn_func_v2 is None:
                 raise NotImplementedError("ERROR! Dao Flash Attention 2 is not installed.")
         if attention_impl == AttentionImplementation.DAO_FLASH_V4:
-            if flash_attn_func_v4 is None:
-                raise NotImplementedError("ERROR! Dao Flash Attention 4 is not installed.")
+            if get_flash_attn_func_v4() is None:
+                _raise_flash_attn_v4_unavailable()
             if dropout > 0.0:
                 raise NotImplementedError("ERROR! Dao Flash Attention 4 does not support attention dropout.")
 
@@ -661,6 +698,7 @@ class CausalSelfAttention(nn.Module):
             # Note, that the library is not required for the CPU-only tests.
             y = cls._execute_dao_flash_v2(q, k, v, dropout)
         elif attention_impl == AttentionImplementation.DAO_FLASH_V4:
+            flash_attn_v4 = get_flash_attn_func_v4()
             if cls._requires_backward(q, k, v) and torch.cuda.get_device_capability(q.device)[0] < 9:
                 y = cls._execute_dao_flash_v2(q, k, v, dropout)
             else:
@@ -671,7 +709,7 @@ class CausalSelfAttention(nn.Module):
                 k = k.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
                 v = v.transpose(1, 2).contiguous()  # (B, T, nh_kv, hd)
                 y = cls._unwrap_flash_attention_output(
-                    flash_attn_func_v4(
+                    flash_attn_v4(
                         q,
                         k,
                         v,

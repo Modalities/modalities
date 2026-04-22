@@ -8,7 +8,6 @@ import subprocess
 import sys
 import textwrap
 from copy import deepcopy
-from importlib.util import find_spec
 from pathlib import Path
 
 import pytest
@@ -20,11 +19,12 @@ from modalities.models.gpt2.gpt2_model import (
     LayerNorms,
     LayerNormWrapperConfig,
     PytorchRMSLayerNormConfig,
+    is_flash_attn_v4_available,
 )
 
 torch.manual_seed(0)
 
-FLASH_ATTN_V4_AVAILABLE = find_spec("flash_attn.cute") is not None
+FLASH_ATTN_V4_AVAILABLE = is_flash_attn_v4_available()
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 
