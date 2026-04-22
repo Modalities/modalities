@@ -106,18 +106,19 @@ def test_get_compiled_model_empty_block_names(gpt2_model: GPT2LLM) -> None:
 
 
 @pytest.mark.skipif(not is_flash_attn_v4_available(), reason="FA4 not installed")
-def test_get_compiled_model_disables_fullgraph_for_fa4(monkeypatch: MonkeyPatch, gpt2_model: GPT2LLM) -> None:
-    recorded_fullgraph_values: list[bool] = []
+def test_get_compiled_model_skips_compile_for_fa4(monkeypatch: MonkeyPatch, gpt2_model: GPT2LLM) -> None:
+    compile_call_count = 0
 
     for block in gpt2_model.transformer.h.values():
         block.attn.attention_impl = AttentionImplementation.DAO_FLASH_V4
 
     def fake_compile(module: nn.Module, fullgraph: bool, options: dict[str, object]) -> nn.Module:
-        recorded_fullgraph_values.append(fullgraph)
+        nonlocal compile_call_count
+        compile_call_count += 1
         return module
 
     monkeypatch.setattr(torch, "compile", fake_compile)
 
     ModelFactory.get_compiled_model(gpt2_model, ["GPT2Block"], fullgraph=True)
 
-    assert recorded_fullgraph_values == [False] * len(gpt2_model.transformer.h)
+    assert compile_call_count == 0

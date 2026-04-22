@@ -63,12 +63,17 @@ class ModelFactory:
     """Model factory class to create models."""
 
     @staticmethod
-    def _requires_graph_break_friendly_compile(module: nn.Module) -> bool:
+    def _requires_eager_execution(module: nn.Module) -> bool:
         if isinstance(module, GPT2Block):
             return module.attn.attention_impl == AttentionImplementation.DAO_FLASH_V4
 
         attention_impl = getattr(module, "attention_impl", None)
         return attention_impl == AttentionImplementation.DAO_FLASH_V4
+
+    # TODO remove?
+    # @staticmethod
+    # def _requires_graph_break_friendly_compile(module: nn.Module) -> bool:
+    #     return ModelFactory._requires_eager_execution(module)
 
     @staticmethod
     def _is_model_on_meta_device(model: nn.Module) -> bool:
@@ -410,15 +415,24 @@ class ModelFactory:
 
         for _, module in model.named_modules():
             if isinstance(module, block_types):
-                options = {"trace.enabled": True} if debug else {}
-                compiled_fullgraph = fullgraph
-                if compiled_fullgraph and ModelFactory._requires_graph_break_friendly_compile(module):
-                    compiled_fullgraph = False
+                if ModelFactory._requires_eager_execution(module):
                     logger.warning(
-                        "Disabling `fullgraph=True` for `%s` because FlashAttention-4 currently graph-breaks under "
-                        "torch.compile when tracing into flash_attn.cute internals.",
+                        "Skipping `torch.compile` for `%s` because FlashAttention-4 currently graph-breaks under "
+                        "TorchDynamo when tracing into flash_attn.cute internals.",
                         module.__class__.__name__,
                     )
+                    continue
+
+                options = {"trace.enabled": True} if debug else {}
+                compiled_fullgraph = fullgraph
+                # TODO remove?
+                # if compiled_fullgraph and ModelFactory._requires_graph_break_friendly_compile(module):
+                #     compiled_fullgraph = False
+                #     logger.warning(
+                #         "Disabling `fullgraph=True` for `%s` because FlashAttention-4 currently graph-breaks under "
+                #         "torch.compile when tracing into flash_attn.cute internals.",
+                #         module.__class__.__name__,
+                #     )
 
                 compiled_module = torch.compile(module, fullgraph=compiled_fullgraph, options=options)
                 parent_module, child_name = get_parent_module_and_child_name(child_module=module, model=model)
