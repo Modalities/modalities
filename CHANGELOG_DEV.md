@@ -186,3 +186,35 @@ There are now three AC variants:
 * adds support for Tensor Parallelism (including Sequence Parallelism). 
 * adds a debugging toolkit to track the input and output tensors during a forward pass, gradients during the backward pass and weight tensors.
 Tensors can be either normal Tensors or DTensors.  
+
+
+## PR #389 Benchmark Tooling 
+* adds benchmarking tooling to modalities and allows for scaling benchmarks across varying number of nodes and the cartesian product of configurable hyper parameters.
+
+**Breaking Changes**
+* Renaming: EvaluationResultToDiscSubscriberConfig.output_path -> EvaluationResultToDiscSubscriberConfig.output_file_path
+
+
+
+## PR #410 MFU incorporates dp_degree now instead of world_size
+
+This PR fixes the MFU and throughput calculations by taking the dp degree into account instead of the world size. When we use parallelization strategies on top of FSDP, then the world size is different from the  data parallel degree. This needs to be reflected in throughput and MFU metric calculations, as done by this PR. 
+
+**Breaking Changes**
+* Existing configs need to be adapted to correctly use dp degree rather than world size. 
+
+
+## PR #425 Monitoring improvements
+This PR improves training monitoring and logging across runs besides some other changes we did along while testing out scalability.
+
+**General Changes**
+* Configurable multi-layer FSDP units
+* Option to provide experiment root path to modalities
+* Added steppable profiler (e.g., for tracing of forward/backward passes)
+* Fix: Hybrid sharding now correctly configurable
+* Completely refactored the Profiling 
+* Improved error handling. Errors are now captured and stored as JSON
+* Add tutorials on Einsum Transformer (Example model integration) and profiling
+
+**Breaking Changes**
+* experiments_root_path is now exposed on an API level

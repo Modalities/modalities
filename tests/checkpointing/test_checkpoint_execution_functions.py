@@ -42,15 +42,16 @@ def test_delete_checkpoint(tmpdir):
         num_seen_tokens_current_run=5, num_seen_steps_current_run=10, num_target_tokens=40, num_target_steps=20
     )
     directory = Path(tmpdir)
+    checkpoint_folder_path = directory / experiment_id / "checkpoints"
+    checkpoint_folder_path.mkdir(exist_ok=True, parents=True)
 
-    (directory / experiment_id).mkdir(exist_ok=True)
     optimizer_file_name = (
         f"eid_{experiment_id}-optimizer-seen_steps_{training_progress.num_seen_steps_total}"
         f"-seen_tokens_{training_progress.num_seen_tokens_total}"
         f"-target_steps_{training_progress.num_target_steps}"
         f"-target_tokens_{training_progress.num_target_tokens}.bin"
     )
-    optimizer_path = directory / experiment_id / optimizer_file_name
+    optimizer_path = checkpoint_folder_path / optimizer_file_name
     optimizer_path.write_text(CONTENT)
 
     model_file_name = (
@@ -59,13 +60,15 @@ def test_delete_checkpoint(tmpdir):
         f"-target_steps_{training_progress.num_target_steps}"
         f"-target_tokens_{training_progress.num_target_tokens}.bin"
     )
-    model_path = directory / experiment_id / model_file_name
+    model_path = checkpoint_folder_path / model_file_name
     model_path.write_text(CONTENT)
 
     checkpoint_saving = FSDP1CheckpointSaving(
-        checkpoint_path=directory,
+        checkpoint_path=checkpoint_folder_path,
         experiment_id=experiment_id,
         global_rank=0,
     )
+
+    assert not is_empty_directory((checkpoint_folder_path).__str__())
     checkpoint_saving._delete_checkpoint(training_progress=training_progress)
-    assert is_empty_directory((directory / experiment_id).__str__())
+    assert is_empty_directory((checkpoint_folder_path).__str__())

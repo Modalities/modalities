@@ -1,0 +1,194 @@
+settings:
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+  step_profile:
+    local_train_micro_batch_size: 8
+
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model: 
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+
+scheduled_pipeline:
+  component_key: pipeline
+  variant_key: scheduled
+  config:
+    loss_fn:
+      instance_key: loss_fn
+      pass_type: BY_REFERENCE
+    pp_schedule_name: gpipe
+    batch_size: ${settings.step_profile.local_train_micro_batch_size}
+    microbatch_size: 4
+    pp_degree: ${device_mesh.config.pipeline_parallel_degree}
+     # maybe better to use the fsdp model and the schedule here
+     # instead of passing in the staged pipeline?
+     # If fsdp_model creates a copy then this is not in the scope of 
+     # the staged pipeline. 
+    pipeline:
+      component_key: pipeline
+      variant_key: builder
+      config:
+        pp_stage:
+          component_key: pipeline
+          variant_key: selector
+          config:
+            pipeline:
+              instance_key: staged_pipeline
+              pass_type: BY_REFERENCE
+            selection_type: PP_STAGE
+        model_part:
+          instance_key: fsdp_model
+          pass_type: BY_REFERENCE
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: model_part
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+model_part:
+  component_key: pipeline
+  variant_key: selector
+  config:
+    pipeline:
+      instance_key: staged_pipeline
+      pass_type: BY_REFERENCE
+    selection_type: MODEL_PART
+
+staged_pipeline:
+  component_key: pipeline
+  variant_key: staged
+  config:
+    whole_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    stages_generator:
+      component_key: stages_generator
+      variant_key: gpt2_stages_generator
+      config:
+        num_model_layers: ${model_raw.config.n_layer}
+        input_layer_equivalence: 1
+        output_layer_equivalence: 1
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    local_rank: ${cuda_env:LOCAL_RANK}
+    pp_schedule_name: gpipe
+    num_layers_per_stage: 2
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    sample_key: "input_ids" # TODO reference this
+    poe_type: NOPE
+    prediction_key: "logits" # TODO reference this
+    sequence_length: 256  # TODO reference this (same as sequence length)
+    vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    n_layer: 2
+    n_head_q: 4
+    n_head_kv: 4
+    ffn_hidden: 128
+    n_embd: 128
+    dropout: 0.0
+    bias: true # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q} #it has to be head_q here
+            seq_length_dim: -2
+            base_freq: 10000
+    attention_implementation: manual
+    activation_type: gelu
+    attention_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    ffn_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    lm_head_norm_config:
+      norm_type: rms_norm
+      config:
+        ndim: ${model_raw.config.n_embd}
+        bias: true
+        epsilon: 1e-5
+    use_weight_tying: false
+    use_meta_device: true
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0003
+    betas:
+    - 0.9
+    - 0.95
+    eps: 1.0e-08
+    weight_decay: 0.1
+    weight_decay_groups_excluded:
+    - embedding
+    - layernorm
+    wrapped_model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    pipeline_parallel_degree: 2
+    data_parallel_shard_degree: -1
+    world_size: ${cuda_env:WORLD_SIZE}

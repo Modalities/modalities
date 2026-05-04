@@ -1,10 +1,10 @@
-import logging
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional, Type
 
+import torch.distributed as dist
 import yaml
 from pydantic import BaseModel
 
@@ -20,8 +20,17 @@ from modalities.logging_broker.publisher import MessagePublisher
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_parallel_degree,
+    get_parallel_rank,
+    has_parallelism_method,
+)
 from modalities.trainer import Trainer
 from modalities.util import get_synced_experiment_id_of_run, get_total_number_of_trainable_parameters, print_rank_0
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(name="main")
 
 
 class Main:
@@ -30,14 +39,19 @@ class Main:
     def __init__(
         self,
         config_path: Path,
+        experiments_root_path: Path,
         additional_resolver_funs: Optional[dict[str, Callable]] = None,
         experiment_id: Optional[str] = None,
     ) -> None:
+        self.experiments_root_path = experiments_root_path
         if experiment_id is None:
             experiment_id = get_synced_experiment_id_of_run(config_path)
 
         self.config_dict = load_app_config_dict(
-            config_file_path=config_path, experiment_id=experiment_id, additional_resolver_funs=additional_resolver_funs
+            config_file_path=config_path,
+            experiments_root_path=experiments_root_path,
+            experiment_id=experiment_id,
+            additional_resolver_funs=additional_resolver_funs,
         )
         self.config_path = config_path
 
@@ -93,12 +107,38 @@ class Main:
         Args:
             components (TrainingComponentsInstantiationModel): The components needed for the training process.
         """
-        # save the config file to the checkpointing path
+        # The typical training setup is that the config file is located outside of the experiment folder
+        # and the experiment folder is empty.
+        # Before starting the training, the config file is copied to the experiment folder for reproducibility purposes.
+        # However, for instance for benchmarking, the config file might be already located inside the experiment folder.
+        # In this case, we only allow the config file to be present in the experiment folder.
+        # NOTE: For the future, these constraints might be relaxed, as some components might have to
+        # store meta data in the experiment folder at instantiation time.
+        experiment_path = components.settings.paths.experiments_root_path / components.settings.experiment_id
+        expected_config_file_path = experiment_path / self.config_path.name
+        if experiment_path.is_dir():
+            present_files = list(experiment_path.iterdir())
+            if len(present_files) == 1 and expected_config_file_path not in present_files:
+                logger.warning(
+                    f"The experiment folder {experiment_path} is non-empty and "
+                    f"contains a file {present_files[0].name} that "
+                    f"is not the config file. Please ensure that the config file is the only file present "
+                    "in the experiment folder to alleviate side-effects."
+                )
+            elif len(present_files) > 1:
+                logger.warning(
+                    f"The experiment folder {experiment_path} is non-empty and "
+                    f"contains multiple files: {present_files}. "
+                    f"Please ensure that the config file is the only file present."
+                )
+        dist.barrier()
+
         if components.settings.cuda_env.global_rank == 0:
-            experiment_path = components.settings.paths.checkpoint_saving_path / components.settings.experiment_id
             os.makedirs(experiment_path, exist_ok=True)
-            shutil.copy(self.config_path, experiment_path / self.config_path.name)
-            resolved_config_path = (experiment_path / self.config_path.name).with_suffix(".yaml.resolved")
+            if self.config_path != expected_config_file_path:
+                shutil.copy(self.config_path, expected_config_file_path)
+
+            resolved_config_path = (expected_config_file_path).with_suffix(".yaml.resolved")
             with open(resolved_config_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.config_dict, f)
 
@@ -109,13 +149,29 @@ class Main:
             local_rank=components.settings.cuda_env.local_rank,
         )
 
+        # log parallel ranks
+        log_str = (
+            f"Rank info for current rank:   "
+            f"global_rank={components.settings.cuda_env.global_rank}\t"
+            f"world_size={components.settings.cuda_env.world_size}\t"
+            f"local_rank={components.settings.cuda_env.local_rank}\t"
+        )
+
+        for pm in ParallelismDegrees:
+            if has_parallelism_method(components.device_mesh, pm):
+                log_str += (
+                    f"{pm.value}_degree={get_parallel_degree(components.device_mesh, parallelism_methods=[pm])}\t"
+                    f"{pm.value}_rank={get_parallel_rank(components.device_mesh, parallelism_method=pm)}\t"
+                )
+        get_logger(name="main").info(log_str.strip())
         # Trainer
         global_num_tokens_per_train_step = (
             components.settings.step_profile.local_train_micro_batch_size
             * components.settings.step_profile.sequence_length
             * components.settings.step_profile.gradient_accumulation_steps
-            * components.settings.cuda_env.world_size
+            * components.settings.step_profile.dp_degree
         )
+
         trainer = Trainer(
             global_rank=components.settings.cuda_env.global_rank,
             progress_publisher=progress_publisher,
@@ -127,13 +183,16 @@ class Main:
             gradient_acc_steps=components.settings.step_profile.gradient_accumulation_steps,
             gradient_clipper=components.gradient_clipper,
             global_num_tokens_per_train_step=global_num_tokens_per_train_step,
+            device_mesh=components.device_mesh,
             mfu_calculator=components.mfu_calculator,
+            profiler=components.profiler,
         )
 
         # Evaluator
         evaluator = Evaluator(
             progress_publisher=progress_publisher,
             evaluation_result_publisher=evaluation_result_publisher,
+            device_mesh=components.device_mesh,
         )
 
         # Gym
@@ -143,9 +202,9 @@ class Main:
             loss_fun=components.loss_fn,
             num_ranks=components.settings.cuda_env.world_size,
         )
-        num_params = get_total_number_of_trainable_parameters(components.app_state.model)
+        num_params = get_total_number_of_trainable_parameters(components.app_state.model_parts, components.device_mesh)
         components.evaluation_subscriber.consume_dict({"No. parameters": num_params})
-        logging.info(f"Training model with {num_params} parameters.")
+        logger.info(f"Training model with {num_params} parameters.")
 
         print_rank_0(f"Model initialized at {datetime.now()}.")
 
@@ -169,6 +228,7 @@ class Main:
             checkpointing_interval_in_steps=components.settings.intervals.checkpointing_interval_in_steps,
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
+            scheduled_pipeline=components.scheduled_pipeline,
         )
 
     def get_logging_publishers(

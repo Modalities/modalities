@@ -36,8 +36,9 @@ class MultiProcessingCudaEnv(CudaEnv):
         local_rank: int,
         world_size: int,
         rdvz_port: int,
+        timeout_s: int = 600,
     ) -> None:
-        super().__init__(process_group_backend=process_group_backend)
+        super().__init__(process_group_backend=process_group_backend, timeout_s=timeout_s)
         self.global_rank = global_rank
         self.local_rank = local_rank
         self.world_size = world_size
@@ -60,7 +61,7 @@ class MultiProcessingCudaEnv(CudaEnv):
         super().__enter__()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any | None):
         # Restore original environment variables
         for key, value in self._original_env.items():
             if value is None:

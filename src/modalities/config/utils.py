@@ -16,5 +16,4 @@ def parse_torch_device(device: str | int) -> torch.device:
         device_id = f"cuda:{device}"
     else:
         device_id = "cpu"
-    device = torch.device(device_id)
-    return device
+    return torch.device(device_id)

@@ -2,25 +2,7 @@ import pytest
 
 from modalities.dataloader.sampler_factory import SamplerFactory
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
-
-
-class MockMeshEntry:
-    def __init__(self, coordinate: int, size):
-        self._coordinate = coordinate
-        self._size = size
-
-    def get_coordinate(self) -> tuple[int]:
-        return [self._coordinate]
-
-    def size(self):
-        return self._size
-
-
-class MockDeviceMesh(dict):
-    def __init__(self, mesh_dict: dict[ParallelismDegrees, tuple[int, int]]):
-        super().__init__()
-        for key, (coord, size) in mesh_dict.items():
-            self[key] = MockMeshEntry(coord, size)
+from tests.mocks import MockDeviceMesh
 
 
 @pytest.mark.parametrize(

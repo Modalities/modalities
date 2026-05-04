@@ -57,12 +57,8 @@ class ResultsSubscriberFactory:
         return DummyResultSubscriber()
 
     @staticmethod
-    def get_evaluation_result_to_disc_subscriber(
-        output_folder_path: Path, experiment_id: str
-    ) -> EvaluationResultToDiscSubscriber:
-        return EvaluationResultToDiscSubscriber(
-            output_file_path=output_folder_path / experiment_id / "evaluation_results.jsonl"
-        )
+    def get_evaluation_result_to_disc_subscriber(output_file_path: Path) -> EvaluationResultToDiscSubscriber:
+        return EvaluationResultToDiscSubscriber(output_file_path=output_file_path)
 
     @staticmethod
     def get_wandb_result_subscriber(
@@ -72,6 +68,7 @@ class ResultsSubscriberFactory:
         mode: WandbMode,
         config_file_path: Path,
         directory: Optional[Path] = None,
+        entity: Optional[str] = None,
     ) -> WandBEvaluationResultSubscriber:
         if global_rank == 0 and (mode != WandbMode.DISABLED):
             if directory is not None:
@@ -92,7 +89,12 @@ class ResultsSubscriberFactory:
                 absolute_dir = None
 
             result_subscriber = WandBEvaluationResultSubscriber(
-                project, experiment_id, mode, absolute_dir, config_file_path
+                project=project,
+                experiment_id=experiment_id,
+                mode=mode,
+                logging_directory=absolute_dir,
+                config_file_path=config_file_path,
+                entity=entity,
             )
         else:
             result_subscriber = ResultsSubscriberFactory.get_dummy_result_subscriber()

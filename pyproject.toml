@@ -1,16 +1,16 @@
 [project]
 name = "modalities"
-version = "0.3.2"
-requires-python = ">=3.10,<3.12"
+version = "0.5.0"
+requires-python = ">=3.10,<3.14"
 description = "Modalities, a PyTorch-native framework for distributed and reproducible foundation model training."
 readme = "README.md"
 dependencies = [
-    "numpy<2.0",
-    "torch==2.6.0",
+    "numpy",
+    "ninja",
     "packaging",
     "tqdm",
     "pyyaml",
-    "transformers",
+    "transformers>=4.57.4,<5.0.0",
     "datasets",
     "protobuf",
     "SentencePiece",
@@ -21,18 +21,15 @@ dependencies = [
     "click_pathlib",
     "jq",
     "class_resolver",
+    "matplotlib",
     "wandb",
     "einops>=0.7.0",
+    "debugpy",  # For VSCode debugging support
 ]
 
 [project.urls]
 Homepage = "https://github.com/Modalities/modalities"
 Issues = "https://github.com/Modalities/modalities/issues"
-
-[project.optional-dependencies]
-linting = ["pre-commit"]
-tests = ["pytest", "pytest-cov", "debugpy"]
-install_helper = ["ninja"]
 
 [project.scripts]
 modalities = "modalities.__main__:main"
@@ -40,6 +37,78 @@ modalities = "modalities.__main__:main"
 [build-system]
 requires = ["setuptools >= 61.0.0"]
 build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+linting = ["pre-commit"]
+tests = ["pytest", "pytest-cov", "debugpy"]
+
+cpu = ["torch>=2.10,<2.11.0", "torchvision"]
+cu126 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
+cu128 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
+cu130 = [
+  "torch>=2.10,<2.11.0",
+  "torchvision",
+  "flash-attn==2.8.3; platform_system != 'Darwin' and platform_machine != 'aarch64'"
+]
+
+[tool.uv]
+conflicts = [
+  [
+    { extra = "cpu" },
+    { extra = "cu126" },
+    { extra = "cu128" },
+    { extra = "cu130" },
+  ],
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu128", extra = "cu128" },
+  { index = "pytorch-cu130", extra = "cu130" },
+]
+torchvision = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu126", extra = "cu126" },
+  { index = "pytorch-cu128", extra = "cu128" },
+  { index = "pytorch-cu130", extra = "cu130" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [
+    { requirement = "torch", match-runtime = true },
+    { requirement = "ninja", match-runtime = true },
+]
 
 [tool.black]
 target-version = ["py310"]

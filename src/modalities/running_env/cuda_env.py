@@ -1,4 +1,5 @@
 import os
+import traceback
 from datetime import timedelta
 from typing import Any
 
@@ -6,6 +7,9 @@ import torch
 import torch.distributed as dist
 
 from modalities.config.config import ProcessGroupBackendType
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 class CudaEnv:
@@ -47,11 +51,17 @@ class CudaEnv:
         """
         local_rank = int(os.getenv("LOCAL_RANK", "-1"))
         if exc_type is torch.cuda.OutOfMemoryError:
-            print(f"[Rank {local_rank}] CUDA OOM during block, emptying cache.")
+            logger.error(f"[Rank {local_rank}] CUDA OOM during block, emptying cache.")
             torch.cuda.empty_cache()
+        if exc_type is not None:
+            logger.error(f"[Rank {local_rank}] Exception of type {exc_type} occurred: {exc_val}")
+            tb_str = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
+            logger.error(f"[Rank {local_rank}] Traceback:\n{tb_str}")
 
         try:
             if dist.is_initialized():
                 dist.destroy_process_group()
         except Exception as e:
-            print(f"[Rank {local_rank}] Error during process group cleanup: {e}")
+            logger.error(f"[Rank {local_rank}] Error during process group cleanup: {e}")
+            tb_str = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            logger.error(f"[Rank {local_rank}] Traceback during cleanup:\n{tb_str}")

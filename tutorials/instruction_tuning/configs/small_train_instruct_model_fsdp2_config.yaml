@@ -10,7 +10,8 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: ./checkpoints
+    experiments_root_path: ${modalities_env:experiments_root_path}
+    experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     train_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_train.d91ea04.pbin
     test_dataset_path: ./prepared_data/smol-smoltalk_train_first_10K_d91ea04/smol-smoltalk_train_first_10K_test.d91ea04.pbin
   intervals:
@@ -26,6 +27,9 @@ settings:
     gradient_accumulation_steps: 4
     local_train_micro_batch_size: 1
     sequence_length: 8192 # Qwen2.5 would have 32768
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
   # had to hack here: Value error, Not enough tokens in the dataset. Actual: 57434112, Expected: >=57442304
     num_target_tokens: 655360
@@ -123,7 +127,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: dcp
       config:
-        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        checkpoint_path: ${settings.paths.experiment_folder_path}/checkpoints
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
 
@@ -140,8 +144,18 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.cuda_env.world_size} # i.e., fully sharded
+    data_parallel_shard_degree: -1 # i.e., fully sharded
     world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+    
 app_state:
   component_key: app_state
   variant_key: raw
@@ -218,6 +232,9 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 progress_subscriber:
   component_key: progress_subscriber

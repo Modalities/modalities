@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import torch
 import torch.nn as nn
@@ -11,19 +13,19 @@ from modalities.conversion.gpt2.conversion_model import (
 from tests.conversion.gpt2.helper import check_same_weight_base_modules, check_same_weight_model
 
 
-def test_convert_model_can_generate(gpt2_config_path: str):
+def test_convert_model_can_generate(gpt2_config_path: Path):
     modalities_config = load_app_config_dict(gpt2_config_path)
     hf_model, _ = convert_model_checkpoint(modalities_config)
     assert hf_model.can_generate()
 
 
-def test_convert_model_checkpoint_does_not_change_weights(gpt2_config_path: str):
+def test_convert_model_checkpoint_does_not_change_weights(gpt2_config_path: Path):
     modalities_config = load_app_config_dict(gpt2_config_path)
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
     check_same_weight_model(hf_model, modalities_model)
 
 
-def test_convert_model_checkpoint_produces_same_logits_as_original(gpt2_config_path: str):
+def test_convert_model_checkpoint_produces_same_logits_as_original(gpt2_config_path: Path):
     modalities_config = load_app_config_dict(gpt2_config_path)
     hf_model, modalities_model = convert_model_checkpoint(modalities_config)
     vocab_size = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]["config"]["vocab_size"]
@@ -32,7 +34,7 @@ def test_convert_model_checkpoint_produces_same_logits_as_original(gpt2_config_p
 
 @pytest.mark.parametrize("corrupt_model_head_key_in_state_dict", [True])
 def test_convert_model_with_wrong_key_in_checkpoint_state_dict_fails(
-    gpt2_config_path: str, corrupt_model_head_key_in_state_dict: bool
+    gpt2_config_path: Path, corrupt_model_head_key_in_state_dict: bool
 ):
     modalities_config = load_app_config_dict(gpt2_config_path)
     with pytest.raises(RuntimeError):

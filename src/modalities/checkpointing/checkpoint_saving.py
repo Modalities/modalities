@@ -6,7 +6,7 @@ from modalities.training.training_progress import TrainingProgress
 
 
 class CheckpointSaving:
-    """Class for saving checkpoints based on a savig and execution strategy."""
+    """Class for saving checkpoints based on a saving and execution strategy."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class CheckpointSaving:
         training_progress: TrainingProgress,
         evaluation_result: dict[str, EvaluationResultBatch],
         app_state: AppState,
-        early_stoppping_criterion_fulfilled: bool = False,
+        early_stopping_criterion_fulfilled: bool = False,
     ):
         """
         Saves a checkpoint of the model and optimizer.
@@ -37,13 +37,13 @@ class CheckpointSaving:
             training_progress (TrainingProgress): The training progress.
             evaluation_result (dict[str, EvaluationResultBatch]): The evaluation result.
             app_state (AppState): The application state to be checkpointed.
-            early_stoppping_criterion_fulfilled (bool, optional):
+            early_stopping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.
         """
         checkpointing_instruction = self.checkpoint_saving_strategy.get_checkpoint_instruction(
             training_progress=training_progress,
             evaluation_result=evaluation_result,
-            early_stoppping_criterion_fulfilled=early_stoppping_criterion_fulfilled,
+            early_stopping_criterion_fulfilled=early_stopping_criterion_fulfilled,
         )
 
         self.checkpoint_saving_execution.run_checkpoint_instruction(

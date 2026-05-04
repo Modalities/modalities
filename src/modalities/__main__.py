@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import json
+import os
+import socket
+import traceback
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import click_pathlib
@@ -29,7 +32,13 @@ from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
 from modalities.util import print_rank_0
+from modalities.utils.benchmarking.benchmarking_utils import SweepSets, get_updated_sweep_status
+from modalities.utils.benchmarking.sweep_utils import SweepGenerator
 from modalities.utils.communication_test import run_communication_test
+from modalities.utils.logger_utils import get_logger
+from modalities.utils.profilers.modalities_profiler import ModalitiesProfilerStarter
+
+logger = get_logger("__main__")
 
 
 @click.group()
@@ -45,29 +54,68 @@ def main() -> None:
     help="Path to the YAML training config file.",
 )
 @click.option(
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
+)
+@click.option(
+    "--experiment_id",
+    type=str,
+    default=None,
+    help="Optional experiment ID to use for this run. If not provided, it will be derived from the config file path.",
+)
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
+@click.option(
     "--test_comm",
     is_flag=True,
     default=False,
     help="If set, run a communication test before training.",
 )
-def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = False):
+def CMD_entry_point_run_modalities(
+    config_file_path: Path,
+    experiments_root_path: Path,
+    experiment_id: Optional[str] = None,
+    error_log_folder: Optional[Path] = None,
+    test_comm: bool = False,
+):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
+        experiment_id (Optional[str]): Optional experiment ID to use for this run.
+            If not provided it will be generated. Default is None.
+        error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
+        test_comm (bool): If set, run a communication test before training.
     """
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        if test_comm:
-            print_rank_0("Running communication test...")
-            run_communication_test()
-            print_rank_0("Communication test succeeded.")
 
-        main_obj = Main(config_file_path)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            if test_comm:
+                print_rank_0("Running communication test...")
+                run_communication_test()
+                print_rank_0("Communication test succeeded.")
+
+            main_obj = Main(config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id)
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="warmstart")
+@click.option(
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
+)
 @click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=True),
@@ -80,10 +128,22 @@ def CMD_entry_point_run_modalities(config_file_path: Path, test_comm: bool = Fal
     required=True,
     help="Path to the file containing the model and optimizer checkpoint paths from the last successful checkpoint.",
 )
-def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint_info_file_path: Path):
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
+def CMD_entry_point_warmstart_modalities(
+    experiments_root_path: Path,
+    config_file_path: Path,
+    last_checkpoint_info_file_path: Path,
+    error_log_folder: Optional[Path] = None,
+):
     """Entrypoint to run the model warmstart.
 
     Args:
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
         config_file_path (Path): Path to the YAML warmstart config file.
         last_checkpoint_info_file_path (Path): Path to the file containing the model and
             optimizer checkpoint paths from the last successful checkpoint.
@@ -101,10 +161,15 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj = Main(
+                config_file_path, experiments_root_path=experiments_root_path, additional_resolver_funs=resolver_funs
+            )
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="generate_text")
@@ -521,6 +586,167 @@ def CMD_shuffle_jsonl_data(
         file_existence_policy=file_existence_policy,
         seed=seed,
     )
+
+
+@main.group(name="benchmark")
+def benchmark():
+    """
+    Collection of utilities to prepare and run benchmarks.
+    """
+    pass
+
+
+@benchmark.command(name="prepare_sweep_configs")
+@click.option(
+    "--sweep_config_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to the sweep configuration YAML file.",
+)
+@click.option(
+    "--output_dir",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    required=True,
+    help="Directory to save the generated sweep configurations.",
+)
+@click.option(
+    "--world_sizes",
+    type=str,
+    default="2",
+    help="Comma-separated list of world sizes (must not have spaces), e.g. --world_sizes '2,4,8'",
+)
+def prepare_sweep_configs(sweep_config_path: Path, output_dir: Path, world_sizes: str):
+    """
+    Utility for preparing sweep configurations.
+    """
+    try:
+        world_sizes_list: list[int] = list(map(int, world_sizes.split(",")))
+    except ValueError as e:
+        raise ValueError("Invalid world_sizes format. Please provide a comma-separated list of integers.") from e
+    SweepGenerator.generate_sweep_configs(sweep_config_path, output_dir, world_sizes_list)
+
+
+@benchmark.command(name="list_remaining_runs")
+@click.option(
+    "--exp_root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Path to the root directory of the experiment containing config files.",
+)
+@click.option(
+    "--world_size",
+    type=int,
+    required=False,
+    default=None,
+    help="Number of ranks (world size) to filter the configs for.",
+)
+@click.option(
+    "--file_list_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output file to store paths of configs to run.",
+)
+@click.option(
+    "--expected_steps",
+    type=int,
+    required=True,
+    help="Expected number of steps in evaluation_results.jsonl",
+)
+@click.option(
+    "--create_new_folders_if_partially_done",
+    is_flag=True,
+    default=False,
+    help="Create new experiment folders for remaining configs if some runs already exist.",
+)
+@click.option(
+    "--skip_exception_types",
+    type=str,
+    default="",
+    help="Exception types to skip when checking for successful runs. "
+    "Typically, we would add 'OutOfMemoryError', as rerunning the experiment would result in the same error. "
+    " List of exceptions is comma-separated.",
+)
+def CMD_entry_point_list_remaining_runs(
+    exp_root: Path,
+    file_list_path: Path,
+    expected_steps: int,
+    create_new_folders_if_partially_done: bool,
+    world_size: int | None = None,
+    skip_exception_types: str = "",
+):
+    """
+    Prepare a file list of remaining runs from a grid search experiment directory.
+    """
+    skip_exception_types_list = skip_exception_types.split(",") if skip_exception_types != "" else []
+    file_list_dict = get_updated_sweep_status(
+        exp_root=exp_root,
+        world_size=world_size,
+        expected_steps=expected_steps,
+        skip_exception_types=skip_exception_types_list,
+        create_new_folders_if_partially_done=create_new_folders_if_partially_done,
+    )
+    if SweepSets.UPDATED_CONFIGS.value in file_list_dict:
+        with file_list_path.open("w", encoding="utf-8") as f:
+            for cfg in file_list_dict[SweepSets.UPDATED_CONFIGS.value]:
+                f.write(f"{cfg}\n")
+
+
+@main.group(name="profile")
+def profile():
+    """
+    Collection of utilities to profile modalities.
+    """
+    pass
+
+
+@profile.command(name="distributed")
+@click.option(
+    "--config_file_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the YAML training config file.",
+)
+@click.option(
+    "--experiment_root_path",
+    type=click_pathlib.Path(file_okay=False),
+    required=True,
+    help="Path to the experiment output directory.",
+)
+def CMD_entry_point_run_train_step_profiler(
+    config_file_path: Path,
+    experiment_root_path: Path,
+):
+    """Run train step profiler and write result to JSON if RANK=0."""
+    ModalitiesProfilerStarter.run_distributed(
+        config_file_path=config_file_path,
+        experiment_root_path=experiment_root_path,
+    )
+
+
+def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+    # Format an exception into a structured JSON string with error message, type, and stack trace.
+    error = {
+        "error": str(e),
+        "type": type(e).__name__,
+        "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
+    }
+    return json.dumps({"environment": environment, "error": error}, indent=2)
+
+
+def _exception_handling(e: Exception, error_log_folder: Path | None):
+    if error_log_folder is not None:
+        environment = {
+            "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
+            "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
+            "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
+            "hostname": socket.gethostname(),
+        }
+        error_log_folder = error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
+        error_log_folder.parent.mkdir(parents=True, exist_ok=True)
+        with open(error_log_folder, "w", encoding="utf-8") as f:
+            f.write(_format_exception_as_json(e, environment))
+
+    raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
 
 if __name__ == "__main__":

@@ -235,6 +235,7 @@ class TestMFU:
             config=config, mixed_precision_settings=mixed_precision_settings
         )
         tmp_config_file_path = temporary_folder_path / "config.yaml"
+        tmp_experiment_folder_path = temporary_folder_path / "experimenents"  # merely a placeholder
         TestMFU._save_yaml_config(config_file_path=tmp_config_file_path, config=config_updated)
 
         # run the test in a distributed environment
@@ -248,6 +249,7 @@ class TestMFU:
                 tmp_config_file_path,
                 simulated_gpu_type,
                 expected_theoretical_gpu_peak_performance,
+                tmp_experiment_folder_path,
                 warning_msg,
             ),
             nprocs=world_size_actual,
@@ -263,6 +265,7 @@ class TestMFU:
         tmp_config_file_path: Path,
         simulated_gpu_type: str,
         expected_theoretical_gpu_peak_performance: int,
+        tmp_experiment_folder_path: Path,
         warning_msg: Optional[str],
     ):
         torch.cuda.get_device_name = Mock()
@@ -278,7 +281,7 @@ class TestMFU:
             world_size=world_size_actual,
             rdvz_port=rdvz_port,
         ):
-            main_obj = Main(tmp_config_file_path)
+            main_obj = Main(tmp_config_file_path, tmp_experiment_folder_path)
             components: CustomComponentInstantiationModel = main_obj.build_components(
                 components_model_type=CustomComponentInstantiationModel
             )
@@ -313,7 +316,10 @@ class TestMFU:
         assert theoretical_flops_per_token == expected_theoretical_flops_per_token
 
     @staticmethod
-    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason="This test requires 2 GPUs.")
+    @pytest.mark.skipif(
+        torch.cuda.device_count() < 2 or not torch.cuda.get_device_name().startswith("NVIDIA A100"),
+        reason="This test requires 2 A100 GPUs.",
+    )
     @pytest.mark.parametrize(
         "rdvz_port, relative_config_path, num_samples_per_second_per_gpu, expected_mfu",
         [
@@ -336,14 +342,22 @@ class TestMFU:
         config = TestMFU._load_yaml_config(config_file_path=config_file_path)
         config_updated = config  # TestMFU._update_config_test_compute_mfu(config=config)
         tmp_config_file_path = temporary_folder_path / "config.yaml"
+        tmp_experiment_folder_path = temporary_folder_path / "experiments"
         TestMFU._save_yaml_config(config_file_path=tmp_config_file_path, config=config_updated)
 
         # run the test in a distributed environment
-        world_size = torch.cuda.device_count()
+        world_size = 2  # torch.cuda.device_count()
         num_samples_per_second = num_samples_per_second_per_gpu * world_size
         mp.spawn(
             TestMFU._test_compute_mfu_thread,
-            args=(rdvz_port, world_size, tmp_config_file_path, num_samples_per_second, expected_mfu),
+            args=(
+                rdvz_port,
+                world_size,
+                tmp_config_file_path,
+                num_samples_per_second,
+                expected_mfu,
+                tmp_experiment_folder_path,
+            ),
             nprocs=world_size,
             join=True,
         )
@@ -356,6 +370,7 @@ class TestMFU:
         tmp_config_file_path: Path,
         num_samples_per_second: int,
         expected_mfu: float,
+        tmp_experiment_folder_path: Path,
     ):
         class CustomComponentInstantiationModel(BaseModel):
             mfu_calculator: PydanticMFUCalculatorABCType
@@ -367,7 +382,7 @@ class TestMFU:
             world_size=world_size,
             rdvz_port=rdvz_port,
         ):
-            main_obj = Main(tmp_config_file_path)
+            main_obj = Main(tmp_config_file_path, tmp_experiment_folder_path)
             components: CustomComponentInstantiationModel = main_obj.build_components(
                 components_model_type=CustomComponentInstantiationModel
             )

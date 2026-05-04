@@ -1,5 +1,10 @@
+# Some portions of this implementation are inspired, adapted, or refactored
+# from Meta's open-source project TorchTitan,
+# licensed under the BSD 3-Clause License.
+
 import itertools
 import json
+import time
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
@@ -58,6 +63,15 @@ class ModelFactory:
 
     @staticmethod
     def _is_model_on_meta_device(model: nn.Module) -> bool:
+        """
+        Checks if all parameters and buffers of the model are on the meta device.
+
+        Args:
+            model (nn.Module): The model to check.
+
+        Returns:
+            bool: True if all parameters and buffers are on meta device, False otherwise.
+        """
         meta_counter = 0
         param_counter = 0
         for _, tensor in itertools.chain(model.named_parameters(), model.named_buffers()):
@@ -158,6 +172,7 @@ class ModelFactory:
         device_mesh: DeviceMesh,
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
+        layers_per_fsdp_unit: int = 1,
     ) -> FSDP2:
         """Get the FSDP2-wrapped model.
 
@@ -171,6 +186,7 @@ class ModelFactory:
             device_mesh (DeviceMesh): The device mesh.
             mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.
             reshard_after_forward (bool): Whether to reshard after forward.
+            layers_per_fsdp_unit (int): Number of layers per FSDP unit. Default is 1.
 
         Returns:
             FSDP2: The FSDP2-wrapped model.
@@ -180,7 +196,7 @@ class ModelFactory:
             f"{get_local_number_of_trainable_parameters(model)}"
         )
         # map the block names to the actual block class (e.b., GPT2Block)
-        block_types = tuple([get_module_class_from_name(model, b) for b in block_names])
+        block_types = tuple([t for b in block_names if (t := get_module_class_from_name(model, b)) is not None])
 
         mp_policy = MixedPrecisionPolicy(
             param_dtype=mixed_precision_settings.param_dtype.value,
@@ -189,23 +205,38 @@ class ModelFactory:
         # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
         fsdp2_degrees = (
             (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
-            if ParallelismDegrees.DP_REPLICATE in device_mesh.mesh_dim_names
+            if ParallelismDegrees.DP_REPLICATE.value in device_mesh.mesh_dim_names
             else (ParallelismDegrees.DP_SHARD.value,)
         )
         fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
+
         # we first shard all the blocks
+        grouped_modules: list[nn.Module] = []
+        module_id = 0
         for module_id, module in enumerate(modules):
             if isinstance(module, block_types):
-                # As an optimization, we do not reshard after forward for the last
-                # transformer block since FSDP would prefetch it immediately.
-                reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
-                fully_shard(
-                    module,
-                    **fsdp_config,
-                    reshard_after_forward=reshard_block_after_forward,
-                )
+                grouped_modules.append(module)
+                if len(grouped_modules) == layers_per_fsdp_unit:
+                    # As an optimization, we do not reshard after forward for the last
+                    # transformer block since FSDP would prefetch it immediately.
+                    reshard_block_after_forward = reshard_after_forward and int(module_id) < len(modules) - 1
+                    fully_shard(
+                        grouped_modules,
+                        **fsdp_config,
+                        reshard_after_forward=reshard_block_after_forward,
+                    )
+                    grouped_modules = list()
+
+        if len(grouped_modules) > 0:
+            reshard_block_after_forward = False
+            fully_shard(
+                grouped_modules,
+                **fsdp_config,
+                reshard_after_forward=reshard_block_after_forward,
+            )
+
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
         logger.info(
@@ -411,6 +442,7 @@ class ModelFactory:
 
             global_shape: list[int]
             local_shape: list[int]
+            dtype: str
             is_dtensor: bool
             nan_count: int
             inf_count: int
@@ -447,6 +479,7 @@ class ModelFactory:
             tensor_stats = TensorStats(
                 global_shape=list(tensor.shape),
                 local_shape=list(local_tensor.shape),
+                dtype=str(dtype),
                 is_dtensor=isinstance(tensor, dist.tensor.DTensor),
                 nan_count=torch.isnan(local_tensor).sum().item(),
                 inf_count=torch.isinf(local_tensor).sum().item(),
@@ -457,7 +490,9 @@ class ModelFactory:
             )
             return tensor_stats
 
-        def write_out_tensor_stats(tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int):
+        def write_out_tensor_stats(
+            tensor_stats: TensorStats, counter: int, hook_type: str, tensor_tag: str, rank: int, timestamp_ns: int
+        ):
             """Write out tensor statistics to a file."""
             with open(logging_file_path, "a", encoding="utf-8") as f:
                 tensor_stats_dict = asdict(tensor_stats)
@@ -467,11 +502,13 @@ class ModelFactory:
                     **tensor_stats_dict,
                     "counter": counter,
                     "rank": rank,
+                    "timestamp_ns": timestamp_ns,
                 }
 
                 f.write(json.dumps(tensor_stats_dict) + "\n")
 
         def pre_forward_hook(module: nn.Module, forward_input, counter: CounterRef, log_interval_steps: int):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
@@ -483,7 +520,9 @@ class ModelFactory:
 
             for forward_input in forward_inputs:
                 tensor_stats = get_tensor_stats(forward_input)
-                write_out_tensor_stats(tensor_stats, counter.value, "forward_input", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "forward_input", module._debug_name, rank, timestamp_ns
+                )
 
             # Retrieves statistics of the module's parameters before forward pass.
             for name, param in module.named_parameters(recurse=False):
@@ -495,10 +534,14 @@ class ModelFactory:
                     hook_type="forward_weights",
                     tensor_tag=full_name,
                     rank=rank,
+                    timestamp_ns=timestamp_ns,
                 )
             counter.value += 1
 
-        def forward_hook(module: nn.Module, foward_input, forward_output, counter: CounterRef, log_interval_steps: int):
+        def forward_hook(
+            module: nn.Module, forward_input, forward_output, counter: CounterRef, log_interval_steps: int
+        ):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
@@ -510,17 +553,22 @@ class ModelFactory:
 
             for out in forward_outputs:
                 tensor_stats = get_tensor_stats(out)
-                write_out_tensor_stats(tensor_stats, counter.value, "forward_output", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "forward_output", module._debug_name, rank, timestamp_ns
+                )
             counter.value += 1
 
         def backward_hook(module, grad_input, grad_output, counter: CounterRef, log_interval_steps: int):
+            timestamp_ns = time.perf_counter_ns()
             if log_interval_steps > 0 and counter.value % log_interval_steps != 0:
                 counter.value += 1
                 return
 
             for grad_out in grad_output:
                 tensor_stats = get_tensor_stats(grad_out)
-                write_out_tensor_stats(tensor_stats, counter.value, "backward_output", module._debug_name, rank)
+                write_out_tensor_stats(
+                    tensor_stats, counter.value, "backward_output", module._debug_name, rank, timestamp_ns
+                )
             counter.value += 1
 
         def register_hooks_recursively(module: nn.Module, prefix: str = ""):
@@ -567,7 +615,8 @@ class GPT2ModelFactory:
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
-        seed: int = None,
+        seed: Optional[int] = None,
+        enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -590,6 +639,7 @@ class GPT2ModelFactory:
             lm_head_norm_config=lm_head_norm_config,
             seed=seed,
             use_weight_tying=use_weight_tying,
+            enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
         )
         if use_meta_device and use_weight_tying:
             raise ValueError(
@@ -631,7 +681,7 @@ class GPT2ModelFactory:
             ),
         }
 
-        if isinstance(model.transformer.wpe, nn.Embedding):
+        if hasattr(model.transformer, "wpe") and isinstance(model.transformer.wpe, nn.Embedding):
             # If the position embedding is an nn.Embedding, we can shard it on the sequence dimension
             # to enable sequence parallelism in the downstream transformer blocks.
             # Note, for RoPE the wpe layer is an identity operation, which cannnot be sharded.
@@ -640,11 +690,15 @@ class GPT2ModelFactory:
                 output_layouts=Shard(0),
             )
 
-        parallelize_module(
-            module=model,
-            device_mesh=tp_mesh,
-            parallelize_plan=model_tp_plan,
-        )
+        # only keep the relevant parts of the model parallel plan
+        # (e.g. when using pipeline parallelism and not all modules are present)
+        model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model.transformer, k.split(".")[1])}
+        if model_tp_plan:
+            parallelize_module(
+                module=model,
+                device_mesh=tp_mesh,
+                parallelize_plan=model_tp_plan,
+            )
 
         transformer_block_tp_plan = {
             "attention_norm": SequenceParallel(),
@@ -671,13 +725,13 @@ class GPT2ModelFactory:
                 desired_input_layouts=(Replicate(),),
             ),
         }
-        if isinstance(model.transformer.h[0].mlp, SwiGLU):
+        if isinstance(list(model.transformer.h.values())[0].mlp, SwiGLU):
             mlp_plan = {
                 "mlp.W": ColwiseParallel(),
                 "mlp.W_2": RowwiseParallel(output_layouts=Shard(1)),
                 "mlp.V": ColwiseParallel(),
             }
-        elif isinstance(model.transformer.h[0].mlp, TransformerMLP):
+        elif isinstance(list(model.transformer.h.values())[0].mlp, TransformerMLP):
             mlp_plan = {
                 "mlp.c_fc": ColwiseParallel(),
                 "mlp.c_proj": RowwiseParallel(output_layouts=Shard(1)),
@@ -689,7 +743,7 @@ class GPT2ModelFactory:
             )
         transformer_block_tp_plan.update(mlp_plan)
 
-        for transformer_block in model.transformer.h:
+        for transformer_block in model.transformer.h.values():
             # override the number of q and kv heads
             if transformer_block.attn.n_head_q % tp_mesh.size() != 0:
                 raise ValueError(

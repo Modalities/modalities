@@ -15,7 +15,7 @@ class CheckpointSavingStrategyIF(ABC):
         self,
         training_progress: TrainingProgress,
         evaluation_result: Optional[dict[str, EvaluationResultBatch]] = None,
-        early_stoppping_criterion_fulfilled: bool = False,
+        early_stopping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
         Returns the checkpointing instruction.
@@ -24,7 +24,7 @@ class CheckpointSavingStrategyIF(ABC):
             training_progress (TrainingProgress): The training progress.
             evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
             The evaluation result. Defaults to None.
-            early_stoppping_criterion_fulfilled (bool, optional):
+            early_stopping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.
 
         Returns:
@@ -53,7 +53,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
         self,
         training_progress: TrainingProgress,
         evaluation_result: dict[str, EvaluationResultBatch] | None = None,
-        early_stoppping_criterion_fulfilled: bool = False,
+        early_stopping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
         Generates a checkpointing instruction based on the given parameters.
@@ -62,7 +62,7 @@ class SaveKMostRecentCheckpointsStrategy(CheckpointSavingStrategyIF):
             training_progress (TrainingProgress): The training progress.
             evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
                 The evaluation result. Defaults to None.
-            early_stoppping_criterion_fulfilled (bool, optional):
+            early_stopping_criterion_fulfilled (bool, optional):
                 Whether the early stopping criterion is fulfilled. Defaults to False.
 
         Returns:
@@ -102,7 +102,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
         self,
         training_progress: TrainingProgress,
         evaluation_result: dict[str, EvaluationResultBatch] | None = None,
-        early_stoppping_criterion_fulfilled: bool = False,
+        early_stopping_criterion_fulfilled: bool = False,
     ) -> CheckpointingInstruction:
         """
         Returns a CheckpointingInstruction object.
@@ -111,7 +111,7 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
             training_progress (TrainingProgress): The training progress.
             evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
             The evaluation result. Defaults to None.
-            early_stoppping_criterion_fulfilled (bool, optional):
+            early_stopping_criterion_fulfilled (bool, optional):
             Whether the early stopping criterion is fulfilled. Defaults to False.
 
         Returns:

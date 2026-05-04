@@ -10,7 +10,8 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: ../data/checkpoints
+    experiments_root_path: ${modalities_env:experiments_root_path}
+    experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     train_dataset_path: ../data/mem_map/redpajama_v2_samples_512_train.pbin
   intervals:
     training_log_interval_in_steps: 1
@@ -25,6 +26,9 @@ settings:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 8
     sequence_length: 256
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens: 81920 # num_target_steps * world_size * local_train_micro_batch_size * sequence_length * gradient_accumulation_steps
     num_target_steps: 20
@@ -50,7 +54,7 @@ settings:
       variant_key: last_step_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
-  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}
+  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}  # use modalities warmstart [..] --last_checkpoint_info_file_path [..]
 
 collate_fn:
   component_key: collate_fn
@@ -121,7 +125,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: dcp
       config:
-        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        checkpoint_path: ${settings.paths.experiment_folder_path}/checkpoints
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
 
@@ -138,8 +142,17 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: ${settings.cuda_env.world_size}
+    data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
 
 app_state:
   component_key: app_state
@@ -280,6 +293,9 @@ gradient_clipper:
       pass_type: BY_REFERENCE
     norm_type: P2_NORM
     max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
 
 progress_subscriber:
   component_key: progress_subscriber

@@ -48,6 +48,9 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
         weight_regexes = self.parameter_name_regexes.weights
         bias_regexes = self.parameter_name_regexes.biases
         for parameter_name, p in model.named_parameters():
+            parameter_name = parameter_name.replace(
+                "_orig_mod.", ""
+            )  # remove FQN modification from torch.compile if present
             for weight_regex in weight_regexes:
                 if re.fullmatch(weight_regex, parameter_name):
                     nn.init.normal_(p, mean=self.mean, std=self.std)

@@ -26,6 +26,9 @@ settings:
     gradient_accumulation_steps: 2
     local_train_micro_batch_size: 1
     sequence_length: 256
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
   training_target:
     num_target_tokens:
       component_key: number_conversion
@@ -33,14 +36,18 @@ settings:
       config:
         dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
     num_target_steps:  # for the batch progress subscriber
       component_key: number_conversion
       variant_key: num_steps_from_num_tokens
       config:
-        num_ranks: ${settings.cuda_env.world_size}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         global_num_tokens: ${settings.training_target.num_target_tokens}
         sequence_length: ${settings.step_profile.sequence_length}
@@ -67,8 +74,7 @@ settings:
       variant_key: last_step_from_checkpoint_path
       config:
         checkpoint_path: ${settings.warmstart_checkpoint_paths.checkpoint_folder_path}
-  warmstart_checkpoint_paths: # ${warmstart_env:checkpoint_paths}
-    checkpoint_folder_path: /raid/s3/opengptx/max_lue/repositories/modalities/data/checkpoints/2025-03-14__15-25-59_970fedec/eid_2025-03-14__15-25-59_970fedec-seen_steps_96-seen_tokens_196608-target_steps_162-target_tokens_331776
+  warmstart_checkpoint_paths: ${warmstart_env:checkpoint_paths}  # use modalities warmstart [..] --last_checkpoint_info_file_path [..]
 
 collate_fn:
   component_key: collate_fn
@@ -200,6 +206,15 @@ device_mesh:
     data_parallel_shard_degree: 4
     world_size: ${settings.cuda_env.world_size}
 
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config: # get the parallel degree from the device mesh
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+    
 app_state:
   component_key: app_state
   variant_key: dcp

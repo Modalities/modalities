@@ -43,7 +43,7 @@ def check_existence_and_clear_getting_started_example_output(
         print(f"Error: {e.filename} - {e.strerror}.")
 
     # checkpoint
-    output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
+    output_directory_checkpoints = join(run_getting_started_example_directory, "experiments")
     checkpoints = [elem for elem in os.listdir(output_directory_checkpoints) if elem.startswith("20")]
     checkpoint_to_delete = None
     for checkpoint in checkpoints:
@@ -85,7 +85,7 @@ def check_existence_and_clear_getting_started_example_output(
 
 
 def get_checkpoint_from_getting_started_example(run_getting_started_example_directory: str) -> str:
-    output_directory_checkpoints = join(run_getting_started_example_directory, "checkpoints")
+    output_directory_checkpoints = Path(join(run_getting_started_example_directory, "experiments"))
 
     checkpoint_directories = [
         join(output_directory_checkpoints, elem)
@@ -95,20 +95,13 @@ def get_checkpoint_from_getting_started_example(run_getting_started_example_dire
     assert (
         len(checkpoint_directories) == 1
     ), f"ERROR! found {len(checkpoint_directories)} checkpoint directories for getting started example, expected 1."
-    checkpoint_directory = checkpoint_directories[0]
+    checkpoint_directory = Path(checkpoint_directories[0])
 
-    checkpoints = [
-        join(checkpoint_directory, elem)
-        for elem in os.listdir(checkpoint_directory)
-        if isfile(join(checkpoint_directory, elem))
-    ]
-    checkpoints = [elem for elem in checkpoints if "model" in elem and elem.endswith(".bin")]
+    model_checkpoint_file_paths = list(checkpoint_directory.glob("**/*model*.bin"))
     assert (
-        len(checkpoints) == 1
-    ), f"ERROR! found {len(checkpoints)} checkpoints for getting started example, expected 1."
-    checkpoint = checkpoints[0]
-
-    return checkpoint
+        len(model_checkpoint_file_paths) == 1
+    ), f"ERROR! found {len(model_checkpoint_file_paths)} checkpoints for getting started example, expected 1."
+    return str(model_checkpoint_file_paths[0])
 
 
 def replace_checkpoint_in_conversion_config(
@@ -202,8 +195,6 @@ def main(
                 f"Specified devices = {devices}"
             )
 
-    # only run tests on max 4 devices
-    device_ids = device_ids[:4]
     print("> Test setup: ")
     print(f"> {include_main_tests=}, {include_torchrun_tests=}, {include_examples=}")
     print(f"> {device_ids=}")
@@ -301,6 +292,32 @@ def main(
         )
         # we do not run scripts/03_convert_distributed_model_to_torch.sh and scripts/04_generate_text.sh,
         # as this is only for the end-to-end experience of the tutorial
+
+        # Scaling up example
+        print("\n=== RUN SCALING UP EXAMPLE ===")
+        run_scaling_up_example_directory = _ROOT_DIR / "tutorials" / "scaling_up"
+        run_scaling_up_example_script = (
+            _ROOT_DIR / "tutorials" / "scaling_up" / "scripts" / "run_scaling_up_example_single_node.sh"
+        )
+        assert isfile(run_scaling_up_example_script), f"ERROR! {run_scaling_up_example_script} does not exist."
+        command_scaling_up_example = f"cd {run_scaling_up_example_directory}; "
+        command_scaling_up_example += "bash scripts/run_scaling_up_example_single_node.sh -c"
+        subprocess_run(command_scaling_up_example)
+
+        # Single process profiling example
+        print("\n=== RUN Single Process Profiling EXAMPLE ===")
+        script = _ROOT_DIR / "tutorials/profiling/scripts/single_process/single_process_profiler_starter.sh"
+        assert isfile(script), f"ERROR! {script} does not exist."
+        command = f"sh {script} -c"
+        subprocess_run(command)
+
+        # Distributed profiling example
+        print("\n=== RUN Distributed Profiling EXAMPLE ===")
+        script = _ROOT_DIR / "tutorials/profiling/scripts/distributed/distributed_profiler_starter.sh"
+        assert isfile(script), f"ERROR! {script} does not exist."
+        command = f"sh {script} -c"
+        subprocess_run(command)
+
     print("\n=== DONE ===")
 
 

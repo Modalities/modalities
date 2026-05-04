@@ -51,7 +51,9 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         num_hidden_layers=config["n_layer"],
         num_key_value_heads=config["n_head_kv"],
         num_attention_heads=config["n_head_q"],
-        intermediate_size=SwiGLU._get_hidden_dim(ffn_hidden=config["ffn_hidden"]),
+        intermediate_size=SwiGLU._get_hidden_dim(
+            ffn_hidden=config["ffn_hidden"], enforce_swiglu_hidden_dim_multiple_of=256
+        ),
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
@@ -138,10 +140,10 @@ def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
         modalities_model (GPT2LLM): The modalities model from which the weights will be copied.
     """
     hf_model.model.embed_tokens.weight.data.copy_(modalities_model.transformer.wte.weight.data)
-    for hf_layer, modalities_layer in zip(hf_model.model.layers, modalities_model.transformer.h):
-        _copy_weights_attention(hf_layer, modalities_layer)
-        _copy_weights_mlp(hf_layer, modalities_layer)
-        _copy_weights_layer_norms(hf_layer, modalities_layer)
+    for hf_layer, modalities_layer_idx in zip(hf_model.model.layers, modalities_model.transformer.h):
+        _copy_weights_attention(hf_layer, modalities_model.transformer.h[modalities_layer_idx])
+        _copy_weights_mlp(hf_layer, modalities_model.transformer.h[modalities_layer_idx])
+        _copy_weights_layer_norms(hf_layer, modalities_model.transformer.h[modalities_layer_idx])
     _copy_weights_base_modules(hf_model.lm_head, modalities_model.transformer.lm_head)
     _copy_weights_base_modules(hf_model.model.norm, modalities_model.transformer.lm_head_norm)
 
