@@ -65,14 +65,16 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         project: str,
         experiment_id: str,
         mode: WandbMode,
-        logging_directory: Path,
+        logging_directory: Path | None,
         config_file_path: Path,
+        entity: str | None = None,
     ) -> None:
         super().__init__()
 
         with open(config_file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
         self.run = wandb.init(
+            entity=entity,
             project=project,
             name=experiment_id,
             mode=mode.value.lower(),
@@ -81,7 +83,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             settings=wandb.Settings(init_timeout=120),
         )
 
-        self.run.log_artifact(config_file_path, name=f"config_{wandb.run.id}", type="config")
+        self.run.log_artifact(config_file_path, name=f"config_{self.run.id}", type="config")
 
     def consume_dict(self, message_dict: dict[str, Any]):
         for k, v in message_dict.items():

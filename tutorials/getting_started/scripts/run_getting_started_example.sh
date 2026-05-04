@@ -31,4 +31,4 @@ modalities data create_raw_index --index_path data/mem_map/redpajama_v2_samples_
 modalities data create_raw_index --index_path data/mem_map/redpajama_v2_samples_512_test.idx data/raw/redpajama_v2_samples_512_test.jsonl
 modalities data pack_encoded_data configs/example_dataset_config_train.yaml
 modalities data pack_encoded_data configs/example_dataset_config_test.yaml
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which modalities) run --config_file_path configs/example_config.yaml
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29505 --nnodes 1 --nproc_per_node 2 $(which modalities) run --config_file_path configs/example_config.yaml --experiments_root_path ./experiments

@@ -23,13 +23,19 @@ from tests.end2end_tests.custom_components import (
 )
 class TestFSDPLossConvergence:
     @staticmethod
-    def _test_fsdp_loss_convergence_thread(process_id: int, world_size: int, rdvz_port: int, config_file_path: Path):
+    def _test_fsdp_loss_convergence_thread(
+        process_id: int, world_size: int, rdvz_port: int, config_file_path: Path, tmp_path: Path
+    ):
         # Important: we fix the seed to make sure that the mnodel weights are the same across all ranks
         torch.manual_seed(20)
         torch.cuda.manual_seed(20)
 
         components = TestFSDPLossConvergence._run_modalities_training(
-            process_id=process_id, world_size=world_size, rdvz_port=rdvz_port, config_file_path=config_file_path
+            process_id=process_id,
+            world_size=world_size,
+            rdvz_port=rdvz_port,
+            config_file_path=config_file_path,
+            tmp_path=tmp_path,
         )
         # collect results to assert that the loss has gone down
         result_messages: list[Message[EvaluationResultBatch]] = components.evaluation_subscriber.message_list
@@ -42,7 +48,7 @@ class TestFSDPLossConvergence:
 
     @staticmethod
     def _run_modalities_training(
-        process_id: int, world_size: int, rdvz_port: int, config_file_path: Path
+        process_id: int, world_size: int, rdvz_port: int, config_file_path: Path, tmp_path: Path
     ) -> TrainingComponentsInstantiationModel:
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
@@ -51,7 +57,7 @@ class TestFSDPLossConvergence:
             world_size=world_size,
             rdvz_port=rdvz_port,
         ):
-            main_obj = Main(config_file_path)
+            main_obj = Main(config_file_path, experiments_root_path=tmp_path)
             # register custom results subscriber for tracking all results
             main_obj.add_custom_component(
                 component_key="results_subscriber",
@@ -75,13 +81,13 @@ class TestFSDPLossConvergence:
             (22802, "configs/fsdp2_gpt2_train_num_steps_8.yaml"),
         ],
     )
-    def test_fsdp_loss_convergence(rdvz_port, relative_config_path: str):
+    def test_fsdp_loss_convergence(rdvz_port, relative_config_path: str, tmp_path: Path):
         working_dir = Path(os.path.dirname(__file__))
         config_file_path = working_dir / relative_config_path
         world_size = 2
         mp.spawn(
             TestFSDPLossConvergence._test_fsdp_loss_convergence_thread,
-            args=(world_size, rdvz_port, config_file_path),
+            args=(world_size, rdvz_port, config_file_path, tmp_path),
             nprocs=world_size,
             join=True,
         )

@@ -1,0 +1,60 @@
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: gpt2_llama3_like
+      config:
+        num_layers: ${model_raw.config.n_layer}
+        n_embd: ${model_raw.config.n_embd}
+        depth_init: False
+
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    use_meta_device: true
+    use_weight_tying: false
+    sample_key: "input_ids"
+    poe_type: NOPE
+    sequence_length: 128
+    prediction_key: "logits"
+    vocab_size: 2048 # 2K vocab for testing
+    n_layer: 4  # 4 layers for testing
+    n_head_q: 32
+    n_head_kv: 8
+    ffn_hidden: 128 # 128 ffn hidden dim for testing
+    n_embd: 256 # 256 embedding dim for testing
+    dropout: 0.0
+    bias: false
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q}
+            seq_length_dim: -2
+            base_freq: 500000
+    attention_implementation: pytorch_flash
+    activation_type: swiglu
+    attention_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1.0e-05
+    ffn_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1.0e-05
+    lm_head_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1.0e-05
+

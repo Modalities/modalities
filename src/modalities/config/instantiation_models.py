@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Annotated, Any, Optional
@@ -18,12 +19,16 @@ from modalities.config.pydantic_if_types import (
     PydanticPipelineType,
     PydanticPytorchDeviceType,
     PydanticPytorchModuleType,
+    PydanticSteppableProfilerIFType,
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataset import Dataset
 from modalities.util import warn_rank_0
+from modalities.utils.profilers.profilers import SteppableNoProfiler
+
+logger = logging.getLogger(__name__)
 
 
 class CudaEnvSettings(BaseModel):
@@ -44,6 +49,7 @@ class ConsistencyEnforcement(BaseModel):
     enforce_last_step_logged: bool = True
     enforce_last_step_evaluated: bool = True
     enforce_last_step_checkpointed: bool = True
+    enforce_enough_tokens_in_dataset: bool = True
 
 
 class Intervals(BaseModel):
@@ -67,7 +73,7 @@ class TrainingProgress(BaseModel):
 class TrainingComponentsInstantiationModel(BaseModel):
     class Settings(BaseModel):
         class Paths(BaseModel):
-            checkpoint_saving_path: Path  # Explicitly defined field
+            experiments_root_path: Path  # Explicitly defined field
 
             class Config:
                 extra = "allow"
@@ -182,22 +188,22 @@ class TrainingComponentsInstantiationModel(BaseModel):
     evaluation_subscriber: PydanticMessageSubscriberIFType
     checkpoint_saving: PydanticCheckpointSavingIFType
     gradient_clipper: PydanticGradientClipperIFType
-    mfu_calculator: Optional[PydanticMFUCalculatorABCType] = None
-    scheduled_pipeline: Optional[PydanticPipelineType] = None
-    device_mesh: Optional[PydanticDeviceMeshIFType] = None
+    profiler: PydanticSteppableProfilerIFType = SteppableNoProfiler()
+    mfu_calculator: PydanticMFUCalculatorABCType | None = None
+    scheduled_pipeline: PydanticPipelineType | None = None
+    device_mesh: PydanticDeviceMeshIFType | None = None
     model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")
-    def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel.Settings":
-        if (
-            len(self.train_dataset) * self.settings.step_profile.sequence_length
-            < self.settings.training_target.num_target_tokens
-        ):
-            raise ValueError(
-                "Not enough tokens in the dataset. "
-                f"Actual: {len(self.train_dataset) * self.settings.step_profile.sequence_length}, "
-                f"Expected: >={self.settings.training_target.num_target_tokens}"
-            )
+    def _check_token_amount_in_dataset(self) -> "TrainingComponentsInstantiationModel":
+        dataset_tokens = len(self.train_dataset) * self.settings.step_profile.sequence_length
+        expected_tokens = self.settings.training_target.num_target_tokens
+        if dataset_tokens < expected_tokens:
+            msg = f"Not enough tokens in dataset. Actual: {dataset_tokens}, Expected: >={expected_tokens}"
+            if self.settings.consistency_enforcement.enforce_enough_tokens_in_dataset:
+                raise ValueError(msg)
+            else:
+                logger.warning(msg)
         return self
 
 

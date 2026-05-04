@@ -31,23 +31,23 @@ echo "> run warmstart example on CUDA_VISIBLE_DEVICES="$CUDA_VISIBLE_DEVICES
 cd "$(dirname "$0")"
 
 rm -rf ../data/
+rm -rf ../experiments
 
 
 # run preprocessing
 modalities data create_raw_index --index_path ../data/mem_map/redpajama_v2_samples_512_train.idx ../../getting_started/data/raw/redpajama_v2_samples_512_train.jsonl
 modalities data pack_encoded_data ../configs/tokenization_config_train.yaml
 
+mkdir -p ../experiments
 # run pretraining 
 
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29504 --nnodes 1 --nproc_per_node 2 $(which modalities) run --config_file_path ../configs/pre_training_config.yaml
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29456 --nnodes 1 --nproc_per_node 2 $(which modalities) run --config_file_path ../configs/pre_training_config.yaml --experiments_root_path ../experiments
 
 # run warmstart
-checkpoint_path=$(find ../data/checkpoints -name "last_checkpoint_info.json" -exec realpath {} \;)
-CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29504 --nnodes 1 --nproc_per_node 2 $(which modalities) warmstart --config_file_path ../configs/warmstart_config.yaml --last_checkpoint_info_file_path $checkpoint_path
+checkpoint_path=$(find ../experiments -name "last_checkpoint_info.json" -exec realpath {} \;)
+CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES torchrun --rdzv-endpoint localhost:29457 --nnodes 1 --nproc_per_node 2 $(which modalities) warmstart --config_file_path ../configs/warmstart_config.yaml  --experiments_root_path ../experiments --last_checkpoint_info_file_path $checkpoint_path
 
 # add some consistency checks
 python check_checkpoint_consistency.py
-
-rm -rf ../data/
 
 echo "Finished warmstart example"

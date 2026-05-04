@@ -10,7 +10,8 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: tmp/checkpoints
+    experiments_root_path: ${modalities_env:experiments_root_path}
+    experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     train_dataset_path: tests/end2end_tests/lorem_ipsum.pbin
   intervals:
     training_log_interval_in_steps: 1
@@ -120,7 +121,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: dcp
       config:
-        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        checkpoint_path: ${settings.paths.experiment_folder_path}/checkpoints
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
 

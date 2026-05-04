@@ -18,7 +18,8 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
-    checkpoint_saving_path: ${modalities_env:config_folder_path}
+    experiments_root_path: ${modalities_env:experiments_root_path}
+    experiment_folder_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 1000
@@ -110,7 +111,7 @@ checkpoint_saving:
       component_key: checkpoint_saving_execution
       variant_key: dcp
       config:
-        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        checkpoint_path: ${settings.paths.experiment_folder_path}/checkpoints
         global_rank: ${settings.cuda_env.global_rank}
         experiment_id: ${settings.experiment_id}
 
@@ -285,7 +286,7 @@ evaluation_subscriber:
   component_key: results_subscriber
   variant_key: to_disc
   config:
-    output_file_path: ${settings.paths.checkpoint_saving_path}/evaluation_results.jsonl
+    output_file_path: ${settings.paths.experiment_folder_path}/evaluation_results.jsonl
 
 mfu_calculator:
   component_key: mfu_calculator

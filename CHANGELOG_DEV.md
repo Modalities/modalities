@@ -202,3 +202,19 @@ This PR fixes the MFU and throughput calculations by taking the dp degree into a
 
 **Breaking Changes**
 * Existing configs need to be adapted to correctly use dp degree rather than world size. 
+
+
+## PR #425 Monitoring improvements
+This PR improves training monitoring and logging across runs besides some other changes we did along while testing out scalability.
+
+**General Changes**
+* Configurable multi-layer FSDP units
+* Option to provide experiment root path to modalities
+* Added steppable profiler (e.g., for tracing of forward/backward passes)
+* Fix: Hybrid sharding now correctly configurable
+* Completely refactored the Profiling 
+* Improved error handling. Errors are now captured and stored as JSON
+* Add tutorials on Einsum Transformer (Example model integration) and profiling
+
+**Breaking Changes**
+* experiments_root_path is now exposed on an API level

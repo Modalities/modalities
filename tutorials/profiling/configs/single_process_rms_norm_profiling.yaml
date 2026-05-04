@@ -3,6 +3,24 @@ settings:
     hidden_dim: 4096  # LLama 8B hidden dimension
     sequence_length: 4096
     batch_size: 2
+  paths: 
+    experiment_root_path: ${modalities_env:config_folder_path}
+
+profiler:
+  component_key: steppable_profiler
+  variant_key: kernel_tracing
+  config:
+    num_wait_steps: 5
+    num_warmup_steps: 5
+    num_active_steps: 3
+    profiler_activities: [CPU, CUDA]
+    record_shapes: false
+    profile_memory: false
+    with_stack: false
+    with_flops: false
+    with_modules: false
+    tracked_ranks: [0, 1]
+    output_folder_path: ${settings.paths.experiment_root_path}/kernel_traces
 
 steppable_component:
   component_key: steppable_component
@@ -27,7 +45,7 @@ steppable_component:
 
 norm:
   component_key: layer_norm
-  variant_key: rms_norm_pytorch
+  variant_key: pytorch_rms_norm
   config:
     normalized_shape: ${settings.benchmark.hidden_dim}
   

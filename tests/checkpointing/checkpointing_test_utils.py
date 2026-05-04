@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 from pydantic import BaseModel
 from torch.distributed.tensor import DTensor
@@ -7,6 +9,7 @@ from torch.optim import Optimizer
 from modalities.config.component_factory import ComponentFactory
 from modalities.config.config import PydanticPytorchModuleType
 from modalities.models.gpt2.gpt2_model import GPT2LLM
+from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.utils.typing_utils import FSDPX
@@ -14,7 +17,7 @@ from modalities.utils.typing_utils import FSDPX
 
 class CheckpointingTestUtils:
     @staticmethod
-    def generate_batch(gpt2_model_config: dict):
+    def generate_batch(gpt2_model_config: dict[str, Any]) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
         # prepare input and targets
         if "settings" in gpt2_model_config:
             batch_size = gpt2_model_config["settings"]["step_profile"]["local_train_micro_batch_size"]
@@ -36,12 +39,15 @@ class CheckpointingTestUtils:
     @staticmethod
     def forward_backward_pass(
         prediction_key: str,
-        model: FSDPX,
+        model: FSDPX | list[FSDPX],
         optimizer: Optimizer,
-        batch_input_ids_dict: dict,
+        batch_input_ids_dict: dict[str, torch.Tensor],
         batch_target_ids: torch.Tensor,
     ) -> torch.Tensor:
         ce_loss = CrossEntropyLoss()
+        if isinstance(model, list):
+            assert len(model) == 1, "Only single model part supported in this utility function."
+            model = model[0]
 
         # clear the gradients
         optimizer.zero_grad()
@@ -59,25 +65,25 @@ class CheckpointingTestUtils:
 
     @staticmethod
     def forward_backward_pp_pass(
-        scheduled_pipeline,
+        scheduled_pipeline: Pipeline,
         optimizer: Optimizer,
-        batch_input_ids_dict: dict,
+        batch_input_ids_dict: dict[str, torch.Tensor],
         batch_target_ids: torch.Tensor,
     ):
         pp_schedule = scheduled_pipeline.pp_schedule
         # Pipeline Parallel forward / backward inside step() call
         # with self.train_context(optional_context_parallel_ctx):
-        targets, losses = (batch_target_ids.contiguous(), []) if scheduled_pipeline.is_last_pp_stage else (None, None)
+        targets, losses = (batch_target_ids.contiguous(), []) if scheduled_pipeline.has_last_pp_stage else (None, None)
 
-        if scheduled_pipeline.is_first_pp_stage:
+        if scheduled_pipeline.has_first_pp_stage:
             pp_schedule.step(
-                batch_input_ids_dict[scheduled_pipeline.model_part.sample_key].contiguous(),
+                batch_input_ids_dict[scheduled_pipeline.model_parts[0].sample_key].contiguous(),
                 target=targets,
                 losses=losses,
             )
         else:
             pp_schedule.step(target=targets, losses=losses)
-        loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.is_last_pp_stage else None
+        loss = torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.has_last_pp_stage else None
         optimizer.step()
         # clear the gradients
         optimizer.zero_grad()
@@ -85,7 +91,7 @@ class CheckpointingTestUtils:
         return loss
 
     @staticmethod
-    def get_gpt2_model_from_config(gpt2_model_config_dict: dict) -> GPT2LLM:
+    def get_gpt2_model_from_config(gpt2_model_config_dict: dict[str, Any]) -> GPT2LLM:
         class GPT2InstantationModel(BaseModel):
             model: PydanticPytorchModuleType
 
@@ -100,25 +106,55 @@ class CheckpointingTestUtils:
         return model
 
     @staticmethod
-    def clone_parameters(fsdp_wrapped_model: FSDPX):
-        return [p.clone() for p in fsdp_wrapped_model.parameters() if p.requires_grad and p.numel() > 0]
+    def clone_parameters(fsdp_wrapped_model: FSDPX | list[FSDPX]) -> list[list[torch.Tensor]]:
+        if not isinstance(fsdp_wrapped_model, list):
+            fsdp_wrapped_model = [fsdp_wrapped_model]
+        return [[p.clone() for p in m.parameters() if p.requires_grad and p.numel() > 0] for m in fsdp_wrapped_model]
 
     @staticmethod
     def assert_equality_optimizer_param_group(
-        optimizer_1_state_dict: dict, optimizer_2_state_dict: dict, must_be_equal: bool
+        optimizer_1_state_dict: dict[str, Any], optimizer_2_state_dict: dict[str, Any], must_be_equal: bool
     ):
+        # Need to differentiate between normal optimizer state dicts and flattened ones.
+        if "param_groups" in optimizer_1_state_dict:
+            assert "param_groups" in optimizer_2_state_dict
+            optimizer_1_state_dict = optimizer_1_state_dict["param_groups"]
+            optimizer_2_state_dict = optimizer_2_state_dict["param_groups"]
+        else:
+            optimizer_1_state_dict = {k: v for k, v in optimizer_1_state_dict.items() if k.startswith("param_groups")}
+            optimizer_2_state_dict = {k: v for k, v in optimizer_2_state_dict.items() if k.startswith("param_groups")}
+            assert len(optimizer_1_state_dict) > 0, "No param_groups found in flattened optimizer state dict."
         if must_be_equal:
             assert (
-                optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+                optimizer_1_state_dict == optimizer_2_state_dict
             ), "_assert_equality_optimizer_param_group failed (must_be_equal = True)"
         else:
             assert not (
-                optimizer_1_state_dict["param_groups"] == optimizer_2_state_dict["param_groups"]
+                optimizer_1_state_dict == optimizer_2_state_dict
             ), "_assert_equality_optimizer_param_group failed (must_be_equal = False)"
 
     @staticmethod
     def assert_equality_optimizer_state(
-        optimizer_1_state_dict: dict, optimizer_2_state_dict: dict, must_be_equal: bool
+        optimizer_1_state_dict: dict[str, Any], optimizer_2_state_dict: dict[str, Any], must_be_equal: bool
+    ):
+        # Need to differentiate between normal optimizer state dicts and flattened ones.
+        if "state" in optimizer_1_state_dict:
+            assert "state" in optimizer_2_state_dict
+            CheckpointingTestUtils.assert_equality_non_flattened_optimizer_state(
+                optimizer_1_state_dict=optimizer_1_state_dict,
+                optimizer_2_state_dict=optimizer_2_state_dict,
+                must_be_equal=must_be_equal,
+            )
+        else:
+            CheckpointingTestUtils.assert_equality_flattened_optimizer_state(
+                optimizer_1_state_dict=optimizer_1_state_dict,
+                optimizer_2_state_dict=optimizer_2_state_dict,
+                must_be_equal=must_be_equal,
+            )
+
+    @staticmethod
+    def assert_equality_non_flattened_optimizer_state(
+        optimizer_1_state_dict: dict[str, Any], optimizer_2_state_dict: dict[str, Any], must_be_equal: bool
     ):
         optimizer_1_state = optimizer_1_state_dict["state"]
         optimizer_2_state = optimizer_2_state_dict["state"]
@@ -137,14 +173,38 @@ class CheckpointingTestUtils:
                 )
 
     @staticmethod
-    def assert_equality_two_models(params_1: list[torch.Tensor], params_2: list[torch.Tensor], must_be_equal: bool):
-        for p1, p2 in zip(params_1, params_2):
+    def assert_equality_flattened_optimizer_state(
+        optimizer_1_state_dict: dict[str, Any], optimizer_2_state_dict: dict[str, Any], must_be_equal: bool
+    ):
+        optimizer_1_state = {k: v for k, v in optimizer_1_state_dict.items() if k.startswith("state")}
+        optimizer_2_state = {k: v for k, v in optimizer_2_state_dict.items() if k.startswith("state")}
+        assert len(optimizer_1_state) > 0, "No state found in flattened optimizer state dict."
+        assert set(optimizer_1_state.keys()) == set(optimizer_2_state.keys())
+        for state_key in optimizer_1_state.keys():
             CheckpointingTestUtils.assert_equality_two_tensors(
-                tensor_1=p1,
-                tensor_2=p2,
+                tensor_1=optimizer_1_state[state_key],
+                tensor_2=optimizer_2_state[state_key],
                 must_be_equal=must_be_equal,
-                msg_on_failure="_assert_equality_two_models failed",
+                msg_on_failure="_assert_equality_optimizer_state failed",
             )
+
+    @staticmethod
+    def assert_equality_two_models(
+        params_1: list[torch.Tensor] | list[list[torch.Tensor]],
+        params_2: list[torch.Tensor] | list[list[torch.Tensor]],
+        must_be_equal: bool,
+    ):
+        for p1, p2 in zip(params_1, params_2):
+            if isinstance(p1, list):
+                assert isinstance(p2, list), "_assert_equality_two_models failed (type mismatch with list)"
+                CheckpointingTestUtils.assert_equality_two_models(params_1=p1, params_2=p2, must_be_equal=must_be_equal)
+            else:
+                CheckpointingTestUtils.assert_equality_two_tensors(
+                    tensor_1=p1,
+                    tensor_2=p2,
+                    must_be_equal=must_be_equal,
+                    msg_on_failure="_assert_equality_two_models failed",
+                )
 
     @staticmethod
     def assert_equality_two_tensors(
@@ -157,4 +217,5 @@ class CheckpointingTestUtils:
         if must_be_equal:
             assert torch.equal(tensor_1, tensor_2), f"{msg_on_failure} (must_be_equal = True)"
         else:
+            assert not torch.equal(tensor_1, tensor_2), f"{msg_on_failure} (must_be_equal = False)"
             assert not torch.equal(tensor_1, tensor_2), f"{msg_on_failure} (must_be_equal = False)"

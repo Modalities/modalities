@@ -54,10 +54,10 @@ def main() -> None:
     help="Path to the YAML training config file.",
 )
 @click.option(
-    "--test_comm",
-    is_flag=True,
-    default=False,
-    help="If set, run a communication test before training.",
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
 )
 @click.option(
     "--experiment_id",
@@ -71,31 +71,29 @@ def main() -> None:
     default=None,
     help="Optional path to a folder where error logs will be written.",
 )
+@click.option(
+    "--test_comm",
+    is_flag=True,
+    default=False,
+    help="If set, run a communication test before training.",
+)
 def CMD_entry_point_run_modalities(
     config_file_path: Path,
-    test_comm: bool = False,
+    experiments_root_path: Path,
     experiment_id: Optional[str] = None,
     error_log_folder: Optional[Path] = None,
+    test_comm: bool = False,
 ):
     """Entrypoint to run the model training.
 
     Args:
         config_file_path (Path): Path to the YAML training config file.
-        test_comm (bool): If set, run a communication test before training.
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
         experiment_id (Optional[str]): Optional experiment ID to use for this run.
             If not provided it will be generated. Default is None.
         error_log_folder (Optional[Path]): Optional path to a folder where error logs will be written.
+        test_comm (bool): If set, run a communication test before training.
     """
-
-    def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
-        # Format an exception into a structured JSON string with error message, type, and stack trace.
-        error = {
-            "error": str(e),
-            "type": type(e).__name__,
-            "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
-        }
-
-        return json.dumps({"environment": environment, "error": error}, indent=2)
 
     try:
         with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
@@ -104,28 +102,20 @@ def CMD_entry_point_run_modalities(
                 run_communication_test()
                 print_rank_0("Communication test succeeded.")
 
-            main_obj = Main(config_file_path, experiment_id=experiment_id)
+            main_obj = Main(config_file_path, experiments_root_path=experiments_root_path, experiment_id=experiment_id)
             components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
             main_obj.run(components)
     except Exception as e:
-        if error_log_folder is not None:
-            environment = {
-                "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
-                "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
-                "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
-                "hostname": socket.gethostname(),
-            }
-            error_log_folder = (
-                error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
-            )
-            error_log_folder.parent.mkdir(parents=True, exist_ok=True)
-            with open(error_log_folder, "w", encoding="utf-8") as f:
-                f.write(_format_exception_as_json(e, environment))
-
-        raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="warmstart")
+@click.option(
+    "--experiments_root_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the root directory where experiment folders will be created.",
+)
 @click.option(
     "--config_file_path",
     type=click_pathlib.Path(exists=True),
@@ -138,10 +128,22 @@ def CMD_entry_point_run_modalities(
     required=True,
     help="Path to the file containing the model and optimizer checkpoint paths from the last successful checkpoint.",
 )
-def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint_info_file_path: Path):
+@click.option(
+    "--error_log_folder",
+    type=click_pathlib.Path(),
+    default=None,
+    help="Optional path to a folder where error logs will be written.",
+)
+def CMD_entry_point_warmstart_modalities(
+    experiments_root_path: Path,
+    config_file_path: Path,
+    last_checkpoint_info_file_path: Path,
+    error_log_folder: Optional[Path] = None,
+):
     """Entrypoint to run the model warmstart.
 
     Args:
+        experiments_root_path (Path): Path to the root directory where experiment folders will be created.
         config_file_path (Path): Path to the YAML warmstart config file.
         last_checkpoint_info_file_path (Path): Path to the file containing the model and
             optimizer checkpoint paths from the last successful checkpoint.
@@ -159,10 +161,15 @@ def CMD_entry_point_warmstart_modalities(config_file_path: Path, last_checkpoint
             get_last_checkpoint_resolver_fun, last_checkpoint_info_file_path=last_checkpoint_info_file_path
         )
     }
-    with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
-        main_obj = Main(config_file_path, additional_resolver_funs=resolver_funs)
-        components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
-        main_obj.run(components)
+    try:
+        with CudaEnv(process_group_backend=ProcessGroupBackendType.nccl):
+            main_obj = Main(
+                config_file_path, experiments_root_path=experiments_root_path, additional_resolver_funs=resolver_funs
+            )
+            components = main_obj.build_components(components_model_type=TrainingComponentsInstantiationModel)
+            main_obj.run(components)
+    except Exception as e:
+        _exception_handling(e, error_log_folder)
 
 
 @main.command(name="generate_text")
@@ -705,53 +712,41 @@ def profile():
     required=True,
     help="Path to the experiment output directory.",
 )
-@click.option(
-    "--num_wait_steps",
-    type=int,
-    default=1,
-    show_default=True,
-    help="Number of wait steps to skip in profiling.",
-)
-@click.option(
-    "--num_warmup_steps",
-    type=int,
-    default=1,
-    show_default=True,
-    help="Number of warmup steps to skip in profiling. Already recording but dropping the data.",
-)
-@click.option(
-    "--num_measurement_steps",
-    type=int,
-    default=3,
-    show_default=True,
-    help="Number of steps to measure during profiling.",
-)
-@click.option(
-    "--profiled_ranks",
-    type=str,
-    default="0",
-    help="Comma-separated list of profiled ranks (must not have spaces), e.g. --profiled_ranks '2,4,8'",
-)
 def CMD_entry_point_run_train_step_profiler(
     config_file_path: Path,
     experiment_root_path: Path,
-    num_wait_steps: int,
-    num_warmup_steps: int,
-    num_measurement_steps: int,
-    profiled_ranks: str,
 ):
     """Run train step profiler and write result to JSON if RANK=0."""
-    profiled_ranks_list = [int(i) for i in profiled_ranks.split(",")] if profiled_ranks != "" else [0]
-    logger.info(f"Running distributed profiling on ranks {profiled_ranks_list}")
-
     ModalitiesProfilerStarter.run_distributed(
         config_file_path=config_file_path,
-        num_measurement_steps=num_measurement_steps,
-        num_wait_steps=num_wait_steps,
-        num_warmup_steps=num_warmup_steps,
         experiment_root_path=experiment_root_path,
-        profiled_ranks=profiled_ranks_list,
     )
+
+
+def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
+    # Format an exception into a structured JSON string with error message, type, and stack trace.
+    error = {
+        "error": str(e),
+        "type": type(e).__name__,
+        "stacktrace": traceback.format_exception(type(e), e, e.__traceback__),
+    }
+    return json.dumps({"environment": environment, "error": error}, indent=2)
+
+
+def _exception_handling(e: Exception, error_log_folder: Path | None):
+    if error_log_folder is not None:
+        environment = {
+            "rank": int(os.environ["RANK"] if "RANK" in os.environ else -1),
+            "local_rank": int(os.environ["LOCAL_RANK"] if "LOCAL_RANK" in os.environ else -1),
+            "world_size": int(os.environ["WORLD_SIZE"] if "WORLD_SIZE" in os.environ else -1),
+            "hostname": socket.gethostname(),
+        }
+        error_log_folder = error_log_folder / f"error_logs_{environment['hostname']}_{environment['local_rank']}.log"
+        error_log_folder.parent.mkdir(parents=True, exist_ok=True)
+        with open(error_log_folder, "w", encoding="utf-8") as f:
+            f.write(_format_exception_as_json(e, environment))
+
+    raise RuntimeError(f"An error occurred while running the training: {e}. ") from e
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ from modalities.training.gradient_clipping.gradient_clipper import GradientClipp
 from modalities.utils.debug_components import Debugging
 from modalities.utils.mfu import MFUCalculatorABC
 from modalities.utils.profilers.batch_generator import DatasetBatchGeneratorIF
+from modalities.utils.profilers.profilers import SteppableProfilerIF
 from modalities.utils.profilers.steppable_components import SteppableComponentIF
 
 
@@ -66,6 +67,7 @@ PydanticCheckpointSavingExecutionIFType = Annotated[
     CheckpointSavingExecutionABC, PydanticThirdPartyTypeIF(CheckpointSavingExecutionABC)
 ]
 PydanticPytorchModuleType = Annotated[nn.Module, PydanticThirdPartyTypeIF(nn.Module)]
+PydanticPytorchModuleOrListType = PydanticPytorchModuleType | list[PydanticPytorchModuleType]
 PydanticFSDP1ModuleType = Annotated[FSDP1, PydanticThirdPartyTypeIF(FSDP1)]
 PydanticFSDP2ModuleType = Annotated[FSDP2, PydanticThirdPartyTypeIF(FSDP2)]
 PydanticTokenizerIFType = Annotated[TokenizerWrapper, PydanticThirdPartyTypeIF(TokenizerWrapper)]
@@ -91,6 +93,7 @@ PydanticStagesGeneratorType = Annotated[StagesGenerator, PydanticThirdPartyTypeI
 PydanticPipelineType = Annotated[Pipeline, PydanticThirdPartyTypeIF(Pipeline)]
 PydanticPipelineStageType = Annotated[PipelineStage, PydanticThirdPartyTypeIF(PipelineStage)]
 PydanticSteppableComponentIFType = Annotated[SteppableComponentIF, PydanticThirdPartyTypeIF(SteppableComponentIF)]
+PydanticSteppableProfilerIFType = Annotated[SteppableProfilerIF, PydanticThirdPartyTypeIF(SteppableProfilerIF)]
 PydanticRemovableHandleType = Annotated[
     torch.utils.hooks.RemovableHandle, PydanticThirdPartyTypeIF(torch.utils.hooks.RemovableHandle)
 ]

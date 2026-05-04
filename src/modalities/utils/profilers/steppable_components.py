@@ -15,7 +15,13 @@ class SteppableForwardPass(SteppableComponentIF):
     The component is used for profiling.
     """
 
-    def __init__(self, model: nn.Module, dataset_batch_generator: DatasetBatchGeneratorIF, loss_fn: Loss | None = None):
+    def __init__(
+        self,
+        model: nn.Module,
+        dataset_batch_generator: DatasetBatchGeneratorIF,
+        loss_fn: Loss | None = None,
+        optimizer: torch.optim.Optimizer | None = None,
+    ):
         """Initializes the SteppableForwardPass component.
 
         Args:
@@ -27,6 +33,7 @@ class SteppableForwardPass(SteppableComponentIF):
         self.loss_fn = loss_fn
         self.dataset_batch_generator = dataset_batch_generator
         self.device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
+        self.optimizer = optimizer
 
     def step(
         self,
@@ -37,4 +44,8 @@ class SteppableForwardPass(SteppableComponentIF):
         predictions = self.model(batch.samples)
         result_batch = InferenceResultBatch(targets=batch.targets, predictions=predictions)
         if self.loss_fn is not None:
-            self.loss_fn(result_batch)
+            loss = self.loss_fn(result_batch)
+            loss.backward()
+            if self.optimizer is not None:
+                self.optimizer.step()
+                self.optimizer.zero_grad()

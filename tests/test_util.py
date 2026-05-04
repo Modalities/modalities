@@ -107,12 +107,11 @@ class TestUtils:
         config_updated = update_config(config=config, sharding_strategy=sharding_strategy)
         tmp_config_file_path = temporary_folder_path / "config.yaml"
         save_yaml_config(config_file_path=tmp_config_file_path, config=config_updated)
-
         # run the test in a distributed environment
         world_size = torch.cuda.device_count()
         mp.spawn(
             TestUtils._test_get_total_number_of_trainable_parameters_thread,
-            args=(world_size, find_free_port(), tmp_config_file_path, expected_nr_parameters),
+            args=(world_size, find_free_port(), tmp_config_file_path, expected_nr_parameters, temporary_folder_path),
             nprocs=world_size,
             join=True,
         )
@@ -124,6 +123,7 @@ class TestUtils:
         rdvz_port: int,
         tmp_config_file_path: Path,
         expected_nr_parameters: int,
+        temporary_folder_path: Path,
     ):
         class CustomComponentInstantiationModel(BaseModel):
             app_state: PydanticAppStateType
@@ -136,20 +136,20 @@ class TestUtils:
             world_size=world_size,
             rdvz_port=rdvz_port,
         ):
-            main_obj = Main(tmp_config_file_path)
+            main_obj = Main(tmp_config_file_path, experiments_root_path=temporary_folder_path)
             components: CustomComponentInstantiationModel = main_obj.build_components(
                 components_model_type=CustomComponentInstantiationModel
             )
-            wrapped_model = components.app_state.model
+            wrapped_model = components.app_state.model_parts
 
             TestUtils._assert_correct_total_number_of_trainable_parameters(
                 wrapped_model=wrapped_model,
-                device_mesh=components.device_mesh,
                 expected_nr_parameters=expected_nr_parameters,
+                device_mesh=components.device_mesh,
             )
 
     def _assert_correct_total_number_of_trainable_parameters(
-        wrapped_model: FSDPX, expected_nr_parameters: int, device_mesh: PydanticDeviceMeshIFType | None
+        wrapped_model: FSDPX | list[FSDPX], expected_nr_parameters: int, device_mesh: PydanticDeviceMeshIFType | None
     ):
         nr_parameters = get_total_number_of_trainable_parameters(model=wrapped_model, device_mesh=device_mesh)
         assert nr_parameters == expected_nr_parameters
