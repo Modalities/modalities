@@ -1,6 +1,6 @@
 import math
 import re
-from typing import Annotated, Optional
+from typing import Annotated
 
 import torch
 import torch.nn as nn
@@ -14,7 +14,7 @@ class PlainInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     parameter_name_regexes: list[str]  # here we filter for the parameter names, e.g., "c_proj.weight"
-    hidden_dim: Optional[int] = None
+    hidden_dim: int | None = None
 
     @model_validator(mode="after")
     def check_std_and_hidden_dim(self):
@@ -40,7 +40,7 @@ class ScaledEmbedInitializationConfig(BaseModel):
 
 
 class NamedParameterwiseNormalInitialization(ModelInitializationIF):
-    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter, seed: Optional[int] = None):
+    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter, seed: int | None = None):
         self.mean = mean
         self.std = std
         self.parameter_name_regexes = parameter_name_regexes
@@ -77,8 +77,8 @@ class InitializationRoutines:
         mean: float,
         std: float | str,
         parameter_name_regexes: RegexFilter,
-        hidden_dim: Optional[int] = None,
-        seed: Optional[int] = None,
+        hidden_dim: int | None = None,
+        seed: int | None = None,
     ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
@@ -108,7 +108,7 @@ class InitializationRoutines:
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, std: float, num_layers: int, parameter_name_regexes: RegexFilter, seed: Optional[int] = None
+        mean: float, std: float, num_layers: int, parameter_name_regexes: RegexFilter, seed: int | None = None
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -133,7 +133,7 @@ class InitializationRoutines:
 
     @staticmethod
     def get_scaled_embed_initialization(
-        mean: float, parameter_name_regexes: RegexFilter, seed: Optional[int] = None
+        mean: float, parameter_name_regexes: RegexFilter, seed: int | None = None
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).

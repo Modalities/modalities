@@ -36,7 +36,7 @@ class ComposedModelInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
-    seed: Optional[int] = None
+    seed: int | None = None
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
@@ -124,10 +124,10 @@ class ComposedInitializationRoutines:
         weight_init_type: WeightInitTypes,
         mean: float,
         std: float | str,
-        hidden_dim: Optional[int] = None,
-        num_layers: Optional[int] = None,
+        hidden_dim: int | None = None,
+        num_layers: int | None = None,
         device_mesh: Optional[DeviceMesh] = None,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
