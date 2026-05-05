@@ -3,7 +3,7 @@ import multiprocessing as py_mp
 import os
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import torch
@@ -67,13 +67,18 @@ class TestParallelSeedInitialization:
     def _seed_distribution_impl(self, world_size: int, tmp_path: Path):
         # initialize components
         class ComponentsInstantiationModel(BaseModel):
-            fsdp_model: PydanticFSDP2ModuleType
+            fsdp_model: PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
             device_mesh: PydanticDeviceMeshIFType
 
         config_file_path = self._get_tmp_sharding_config_path(dp_degree=2, tp_degree=2, pp_degree=2, tmp_path=tmp_path)
-        main_obj = Main(config_file_path)
-        components = main_obj.build_components(components_model_type=ComponentsInstantiationModel)
-        model = components.fsdp_model
+        main_obj = Main(config_file_path, experiments_root_path=tmp_path)
+        components = cast(
+            ComponentsInstantiationModel,
+            main_obj.build_components(components_model_type=ComponentsInstantiationModel),
+        )
+        model = cast(
+            Any, components.fsdp_model[0] if isinstance(components.fsdp_model, list) else components.fsdp_model
+        )
         device_mesh = components.device_mesh
         # for each pp stage get first transformer block's MLP weight parameter shards and full tensor
         block_key = next(iter(model.transformer.h.keys()))
@@ -89,12 +94,12 @@ class TestParallelSeedInitialization:
             "block_key": block_key,
         }
 
-        gather_list: list[dict[str, Any]] | None = [None] * world_size if dist.get_rank() == 0 else None
+        gather_list = cast(list[dict[str, Any] | None] | None, [None] * world_size if dist.get_rank() == 0 else None)
         dist.gather_object(payload, gather_list, dst=0)
 
         if dist.get_rank() == 0:
             assert gather_list is not None
-            TestParallelSeedInitialization._assert_parameter_distribution(gather_list)
+            TestParallelSeedInitialization._assert_parameter_distribution(cast(list[dict[str, Any]], gather_list))
         dist.barrier()
 
     @staticmethod
