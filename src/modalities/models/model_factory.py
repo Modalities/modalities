@@ -615,7 +615,6 @@ class GPT2ModelFactory:
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
-        seed: Optional[int] = None,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ) -> GPT2LLM:
         config = dict(
@@ -637,7 +636,6 @@ class GPT2ModelFactory:
             attention_norm_config=attention_norm_config,
             ffn_norm_config=ffn_norm_config,
             lm_head_norm_config=lm_head_norm_config,
-            seed=seed,
             use_weight_tying=use_weight_tying,
             enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
         )

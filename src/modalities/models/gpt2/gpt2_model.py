@@ -342,7 +342,6 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-        seed: Optional[int] = None: The random seed for reproducibility.
         enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
             in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
             activation_type is SwiGLU. Defaults to 256.
@@ -370,7 +369,6 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
-    seed: Optional[int] = None
     enforce_swiglu_hidden_dim_multiple_of: int = 256
 
     @model_validator(mode="after")
@@ -837,7 +835,6 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: Optional[int] = None,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ):
         """
@@ -862,7 +859,6 @@ class GPT2LLM(NNModel):
             attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
             ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
-            seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
             enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
@@ -873,7 +869,7 @@ class GPT2LLM(NNModel):
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.sequence_length = sequence_length
