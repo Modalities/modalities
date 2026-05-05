@@ -44,13 +44,10 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
         self.mean = mean
         self.std = std
         self.parameter_name_regexes = parameter_name_regexes
-        self.seed = seed
+        self.seed = torch.initial_seed() if seed is None else seed
         self._generators: dict[str, torch.Generator] = {}
 
-    def _get_generator(self, parameter: torch.Tensor) -> Optional[torch.Generator]:
-        if self.seed is None:
-            return None
-
+    def _get_generator(self, parameter: torch.Tensor) -> torch.Generator:
         device_key = str(parameter.device)
         generator = self._generators.get(device_key)
         if generator is None:
