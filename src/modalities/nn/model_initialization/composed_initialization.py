@@ -1,5 +1,6 @@
 from typing import Optional
 
+import torch
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from torch.distributed.device_mesh import DeviceMesh
@@ -14,6 +15,9 @@ from modalities.nn.model_initialization.parameter_name_filters import (
     WeightInitTypes,
 )
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank, has_parallelism_method
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 class ModelInitializerWrapperConfig(BaseModel):
@@ -92,6 +96,24 @@ class ModelInitializerWrapper(ModelInitializationIF):
 
 class ComposedInitializationRoutines:
     @staticmethod
+    def _warn_pp_topology_dependent_seed(device_mesh: Optional[DeviceMesh], seed: Optional[int]) -> None:
+        if seed is None or not has_parallelism_method(
+            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
+        ):
+            return
+
+        if torch.distributed.is_initialized() and torch.distributed.get_rank() != 0:
+            return
+
+        logger.warning(
+            "Seeded weight initialization is topology-dependent when pipeline parallelism is active. "
+            "Modalities offsets the initialization seed by PP rank to avoid identical stage-local weights, "
+            "so the same seed can produce different initialized weights for different PP configurations. "
+            "For topology-independent reproducibility, create and reuse a distributed checkpoint directly "
+            "after weight initialization."
+        )
+
+    @staticmethod
     def get_model_initializer_wrapper(model_initializers: list[ModelInitializationIF]) -> ModelInitializationIF:
         initializer_wrapper = ModelInitializerWrapper(model_initializers)
         return initializer_wrapper
@@ -103,7 +125,7 @@ class ComposedInitializationRoutines:
         mean: float,
         std: float | str,
         hidden_dim: Optional[int] = None,
-        num_layers: int = None,
+        num_layers: Optional[int] = None,
         device_mesh: Optional[DeviceMesh] = None,
         seed: Optional[int] = None,
     ) -> ModelInitializationIF:
@@ -121,15 +143,21 @@ class ComposedInitializationRoutines:
             num_layers (int, optional): Number of layers in the model (required for scaled and scaled_embed only).
                 Defaults to None.
             device_mesh (Optional[DeviceMesh], optional): Device mesh used for parallelization.
-            seed (Optional[int], optional): Seed for random initialization. Defaults to None.
+            seed (Optional[int], optional): Seed for random initialization. Defaults to None. When pipeline
+                parallelism is active, the effective seed is offset by PP rank to avoid identical stage-local
+                initialization, so the same seed does not guarantee identical initialized weights across different
+                PP topologies.
 
         Returns:
             ModelInitializationIF: The Weight Initializer performing the initialization as specified.
         """
+        ComposedInitializationRoutines._warn_pp_topology_dependent_seed(device_mesh=device_mesh, seed=seed)
+
         # Set different random seed for each PP rank to ensure diversity
         if seed is not None and has_parallelism_method(
             device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
         ):
+            assert device_mesh is not None
             seed += get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
 
         model_initializers = []
@@ -148,6 +176,7 @@ class ComposedInitializationRoutines:
 
         if weight_init_type in [WeightInitTypes.SCALED, WeightInitTypes.SCALED_EMBED]:
             # scaled
+            assert num_layers is not None
             scaled_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED]
             scaled_init = InitializationRoutines.get_scaled_initialization(
                 mean=mean,
