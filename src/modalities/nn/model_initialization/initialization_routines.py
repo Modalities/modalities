@@ -40,21 +40,35 @@ class ScaledEmbedInitializationConfig(BaseModel):
 
 
 class NamedParameterwiseNormalInitialization(ModelInitializationIF):
-    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter):
+    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter, seed: Optional[int] = None):
         self.mean = mean
         self.std = std
         self.parameter_name_regexes = parameter_name_regexes
+        self.seed = seed
+        self._generators: dict[str, torch.Generator] = {}
+
+    def _get_generator(self, parameter: torch.Tensor) -> Optional[torch.Generator]:
+        if self.seed is None:
+            return None
+
+        device_key = str(parameter.device)
+        generator = self._generators.get(device_key)
+        if generator is None:
+            generator = torch.Generator(device=parameter.device)
+            generator.manual_seed(self.seed)
+            self._generators[device_key] = generator
+        return generator
 
     def initialize_in_place(self, model: nn.Module):
         weight_regexes = self.parameter_name_regexes.weights
-        bias_regexes = self.parameter_name_regexes.biases
+        bias_regexes = self.parameter_name_regexes.biases or []
         for parameter_name, p in model.named_parameters():
             parameter_name = parameter_name.replace(
                 "_orig_mod.", ""
             )  # remove FQN modification from torch.compile if present
             for weight_regex in weight_regexes:
                 if re.fullmatch(weight_regex, parameter_name):
-                    nn.init.normal_(p, mean=self.mean, std=self.std)
+                    nn.init.normal_(p, mean=self.mean, std=self.std, generator=self._get_generator(p))
             for bias_regex in bias_regexes:
                 if re.fullmatch(bias_regex, parameter_name):
                     nn.init.zeros_(p)
@@ -65,7 +79,7 @@ class InitializationRoutines:
     def get_plain_initialization(
         mean: float,
         std: float | str,
-        parameter_name_regexes: list[str],
+        parameter_name_regexes: RegexFilter,
         hidden_dim: Optional[int] = None,
         seed: Optional[int] = None,
     ) -> NamedParameterwiseNormalInitialization:
@@ -82,22 +96,22 @@ class InitializationRoutines:
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
         """
-        InitializationRoutines._set_seed(seed)
         # auto: choose std automatically
         if std == "auto":
             if hidden_dim is None:
                 raise ValueError("ERROR! weight_init.std = auto not implemented")
             # as per  https://arxiv.org/abs/2312.16903
             std = math.sqrt(2 / (5 * hidden_dim))
+        assert isinstance(std, float)
 
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes
+            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes, seed=seed
         )
         return initialization
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, std: float, num_layers: int, parameter_name_regexes: list[str], seed: Optional[int] = None
+        mean: float, std: float, num_layers: int, parameter_name_regexes: RegexFilter, seed: Optional[int] = None
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -112,18 +126,17 @@ class InitializationRoutines:
         Returns:
             WeightInitializationIF: Weight initialization object
         """
-        InitializationRoutines._set_seed(seed)
         # see https://arxiv.org/abs/2312.16903
         scaled_std = std / math.sqrt(2 * num_layers)
 
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=scaled_std, parameter_name_regexes=parameter_name_regexes
+            mean=mean, std=scaled_std, parameter_name_regexes=parameter_name_regexes, seed=seed
         )
         return initialization
 
     @staticmethod
     def get_scaled_embed_initialization(
-        mean: float, parameter_name_regexes: list[str], seed: Optional[int] = None
+        mean: float, parameter_name_regexes: RegexFilter, seed: Optional[int] = None
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
@@ -137,14 +150,8 @@ class InitializationRoutines:
         Returns:
             WeightInitializationIF: Weight initialization object
         """
-        InitializationRoutines._set_seed(seed)
         std = math.sqrt(0.4)
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes
+            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes, seed=seed
         )
         return initialization
-
-    @staticmethod
-    def _set_seed(seed: Optional[int]):
-        if seed is not None:
-            torch.manual_seed(seed)
