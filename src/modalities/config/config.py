@@ -494,6 +494,7 @@ class EvaluationResultToDiscSubscriberConfig(BaseModel):
 
 class WandBEvaluationResultSubscriberConfig(BaseModel):
     global_rank: int
+    entity: Optional[str] = None
     project: str
     experiment_id: str
     mode: WandbMode
@@ -547,7 +548,7 @@ def load_app_config_dict(
     """
 
     def cuda_env_resolver_fun(var_name: str) -> int | str | None:
-        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK"]
+        int_env_variable_names = ["LOCAL_RANK", "WORLD_SIZE", "RANK", "LOCAL_WORLD_SIZE"]
         return int(os.environ[var_name]) if var_name in int_env_variable_names else os.getenv(var_name)
 
     def modalities_env_resolver_fun(var_name: str, kwargs: dict[str, Any]) -> str | Path:
