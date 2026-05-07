@@ -68,7 +68,7 @@ class TestParallelSeedInitialization:
     def _seed_distribution_impl(self, world_size: int, tmp_path: Path):
         # initialize components
         class ComponentsInstantiationModel(BaseModel):
-            fsdp_model: PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
+            initialized_model: PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
             device_mesh: PydanticDeviceMeshIFType
 
         config_file_path = self._get_tmp_sharding_config_path(dp_degree=2, tp_degree=2, pp_degree=2, tmp_path=tmp_path)
@@ -78,7 +78,10 @@ class TestParallelSeedInitialization:
             main_obj.build_components(components_model_type=ComponentsInstantiationModel),
         )
         model = cast(
-            Any, components.fsdp_model[0] if isinstance(components.fsdp_model, list) else components.fsdp_model
+            Any,
+            components.initialized_model[0]
+            if isinstance(components.initialized_model, list)
+            else components.initialized_model,
         )
         device_mesh = components.device_mesh
         # for each pp stage get first transformer block's MLP weight parameter shards and full tensor
@@ -148,7 +151,8 @@ class TestParallelSeedInitialization:
         temp_file_path = tmp_path / "pp_tp_sharding_config.yaml"
         working_dir = Path(os.path.dirname(__file__))
         config_file_path = (
-            working_dir / "pipeline_parallelism/configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass.yaml"
+            working_dir
+            / "pipeline_parallelism/configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass_defer_init.yaml"
         )
 
         with open(config_file_path, "r") as file:
