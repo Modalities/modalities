@@ -12,6 +12,7 @@ import torch.multiprocessing as mp
 import yaml
 from pydantic import BaseModel
 from torch.distributed._tensor.placement_types import Replicate
+from torch.distributed.checkpoint.state_dict import StateDictOptions, get_state_dict
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
@@ -158,6 +159,75 @@ class TestParallelSeedInitialization:
             config_dict["device_mesh"]["config"]["pipeline_parallel_degree"] = pp_degree
 
         # save to temporary file
+        with open(temp_file_path, "w") as file:
+            yaml.dump(config_dict, file)
+
+        return temp_file_path
+
+
+@pytest.mark.skipif(
+    torch.cuda.device_count() < 1,
+    reason="This test requires at least 1 GPU.",
+)
+class TestSeededModelReproducibility:
+    RDVZ_PORT = 24575
+
+    def test_same_seed_same_weights(self, tmp_path: Path):
+        with MultiProcessingCudaEnv(
+            process_group_backend=ProcessGroupBackendType.nccl,
+            global_rank=0,
+            local_rank=0,
+            world_size=1,
+            rdvz_port=TestSeededModelReproducibility.RDVZ_PORT,
+        ):
+            self._same_seed_same_weights_impl(tmp_path=tmp_path)
+
+    def _same_seed_same_weights_impl(self, tmp_path: Path):
+        class ComponentsInstantiationModel(BaseModel):
+            initialized_model: PydanticFSDP2ModuleType
+
+        config_file_path = self._get_tmp_seeded_config_path(tmp_path=tmp_path, seed=1234)
+
+        main_obj_1 = Main(config_file_path, experiments_root_path=tmp_path)
+        components_1 = cast(
+            ComponentsInstantiationModel,
+            main_obj_1.build_components(components_model_type=ComponentsInstantiationModel),
+        )
+        state_dict_1 = get_state_dict(
+            model=cast(Any, components_1.initialized_model),
+            optimizers=[],
+            options=StateDictOptions(full_state_dict=True, broadcast_from_rank0=True),
+        )[0]
+
+        main_obj_2 = Main(config_file_path, experiments_root_path=tmp_path)
+        components_2 = cast(
+            ComponentsInstantiationModel,
+            main_obj_2.build_components(components_model_type=ComponentsInstantiationModel),
+        )
+        state_dict_2 = get_state_dict(
+            model=cast(Any, components_2.initialized_model),
+            optimizers=[],
+            options=StateDictOptions(full_state_dict=True, broadcast_from_rank0=True),
+        )[0]
+
+        assert set(state_dict_1.keys()) == set(state_dict_2.keys()), "State dict keys differ between initializations"
+        for key in state_dict_1:
+            tensor_1 = state_dict_1[key]
+            tensor_2 = state_dict_2[key]
+            assert isinstance(tensor_1, torch.Tensor), f"Expected Tensor in first state dict for key {key}"
+            assert isinstance(tensor_2, torch.Tensor), f"Expected Tensor in second state dict for key {key}"
+            assert torch.equal(tensor_1, tensor_2), f"Mismatch for parameter {key}"
+
+        dist.barrier()
+
+    def _get_tmp_seeded_config_path(self, tmp_path: Path, seed: int) -> Path:
+        temp_file_path = tmp_path / "seeded_reproducibility.yaml"
+        config_file_path = Path(os.path.dirname(__file__)) / "../checkpointing/fsdp2_gpt2_config.yaml"
+
+        with open(config_file_path, "r") as file:
+            config_dict = yaml.safe_load(file.read())
+            config_dict["initialized_model"]["config"]["model_initializer"]["config"]["seed"] = seed
+
         with open(temp_file_path, "w") as file:
             yaml.dump(config_dict, file)
 
