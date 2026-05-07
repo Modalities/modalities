@@ -116,7 +116,7 @@ class InitializationRoutines:
             mean (float): Mean of the normal distribution
             std (float): Standard deviation of the normal distribution used to initialize the other weights
             num_layers (int): Number of layers in the model which we use to downscale std with
-            parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
+            parameter_name_regexes (RegexFilter): List of parameter name regexes to which the initialization
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
 
