@@ -1,6 +1,7 @@
 import math
 import re
-from typing import Annotated
+import warnings
+from typing import Annotated, Literal
 
 import torch
 import torch.nn as nn
@@ -40,17 +41,34 @@ class ScaledEmbedInitializationConfig(BaseModel):
 
 
 class NamedParameterwiseNormalInitialization(ModelInitializationIF):
-    def __init__(self, mean: float, std: float, parameter_name_regexes: RegexFilter, seed: int | None = None):
+    def __init__(
+        self,
+        mean: float,
+        std: float,
+        parameter_name_regexes: RegexFilter,
+        seed: int | None = None,
+        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+    ):
         self.mean = mean
         self.std = std
         self.parameter_name_regexes = parameter_name_regexes
         self.seed = torch.initial_seed() if seed is None else seed
+        self.multi_device_generator_policy = multi_device_generator_policy
         self._generators: dict[str, torch.Generator] = {}
 
     def _get_generator(self, parameter: torch.Tensor) -> torch.Generator:
         device_key = str(parameter.device)
         generator = self._generators.get(device_key)
         if generator is None:
+            if len(self._generators) > 0:
+                message = (
+                    "NamedParameterwiseNormalInitialization created generators for multiple devices in one process "
+                    f"(existing={list(self._generators.keys())}, new={device_key})."
+                )
+                if self.multi_device_generator_policy == "error":
+                    raise RuntimeError(message)
+                if self.multi_device_generator_policy == "warn":
+                    warnings.warn(message, stacklevel=2)
             generator = torch.Generator(device=parameter.device)
             generator.manual_seed(self.seed)
             self._generators[device_key] = generator
@@ -79,6 +97,7 @@ class InitializationRoutines:
         parameter_name_regexes: RegexFilter,
         hidden_dim: int | None = None,
         seed: int | None = None,
+        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
     ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
@@ -92,6 +111,8 @@ class InitializationRoutines:
             parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
+            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+                device-local RNG generator is created in the same process.
         """
         # auto: choose std automatically
         if std == "auto":
@@ -102,13 +123,22 @@ class InitializationRoutines:
         assert isinstance(std, float)
 
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes, seed=seed
+            mean=mean,
+            std=std,
+            parameter_name_regexes=parameter_name_regexes,
+            seed=seed,
+            multi_device_generator_policy=multi_device_generator_policy,
         )
         return initialization
 
     @staticmethod
     def get_scaled_initialization(
-        mean: float, std: float, num_layers: int, parameter_name_regexes: RegexFilter, seed: int | None = None
+        mean: float,
+        std: float,
+        num_layers: int,
+        parameter_name_regexes: RegexFilter,
+        seed: int | None = None,
+        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -119,6 +149,8 @@ class InitializationRoutines:
             parameter_name_regexes (RegexFilter): List of parameter name regexes to which the initialization
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
+            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+                device-local RNG generator is created in the same process.
 
         Returns:
             WeightInitializationIF: Weight initialization object
@@ -127,13 +159,20 @@ class InitializationRoutines:
         scaled_std = std / math.sqrt(2 * num_layers)
 
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=scaled_std, parameter_name_regexes=parameter_name_regexes, seed=seed
+            mean=mean,
+            std=scaled_std,
+            parameter_name_regexes=parameter_name_regexes,
+            seed=seed,
+            multi_device_generator_policy=multi_device_generator_policy,
         )
         return initialization
 
     @staticmethod
     def get_scaled_embed_initialization(
-        mean: float, parameter_name_regexes: RegexFilter, seed: int | None = None
+        mean: float,
+        parameter_name_regexes: RegexFilter,
+        seed: int | None = None,
+        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
@@ -143,12 +182,18 @@ class InitializationRoutines:
             parameter_name_regexes (list[str], optional): List of parameter name regexes to which the initialization
                 should be applied Defaults to None.
             seed (Optional[int]): Random seed for initialization. Defaults to None.
+            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+                device-local RNG generator is created in the same process.
 
         Returns:
             WeightInitializationIF: Weight initialization object
         """
         std = math.sqrt(0.4)
         initialization = NamedParameterwiseNormalInitialization(
-            mean=mean, std=std, parameter_name_regexes=parameter_name_regexes, seed=seed
+            mean=mean,
+            std=std,
+            parameter_name_regexes=parameter_name_regexes,
+            seed=seed,
+            multi_device_generator_policy=multi_device_generator_policy,
         )
         return initialization

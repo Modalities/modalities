@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 import torch.nn as nn
@@ -37,6 +37,7 @@ class ComposedModelInitializationConfig(BaseModel):
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     seed: int | None = None
+    multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn"
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
@@ -128,6 +129,7 @@ class ComposedInitializationRoutines:
         num_layers: int | None = None,
         device_mesh: Optional[DeviceMesh] = None,
         seed: int | None = None,
+        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
     ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
@@ -147,6 +149,9 @@ class ComposedInitializationRoutines:
                 parallelism is active, the effective seed is offset by PP rank to avoid identical stage-local
                 initialization, so the same seed does not guarantee identical initialized weights across different
                 PP topologies.
+            multi_device_generator_policy (Literal["ignore", "warn", "error"], optional): Behavior when
+                initialization creates per-device RNG generators for more than one device in the same process.
+                Defaults to "warn".
 
         Returns:
             ModelInitializationIF: The Weight Initializer performing the initialization as specified.
@@ -170,6 +175,7 @@ class ComposedInitializationRoutines:
             hidden_dim=hidden_dim,
             parameter_name_regexes=plain_parameter_name_regexes,
             seed=seed,
+            multi_device_generator_policy=multi_device_generator_policy,
         )
         working_std = plain_init.std
         model_initializers.append(plain_init)
@@ -184,6 +190,7 @@ class ComposedInitializationRoutines:
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
                 seed=seed,
+                multi_device_generator_policy=multi_device_generator_policy,
             )
             model_initializers.append(scaled_init)
 
@@ -194,6 +201,7 @@ class ComposedInitializationRoutines:
                 mean=mean,
                 parameter_name_regexes=scaled_embed_parameter_name_regexes,
                 seed=seed,
+                multi_device_generator_policy=multi_device_generator_policy,
             )
             model_initializers.append(scaled_embed_init)
 
