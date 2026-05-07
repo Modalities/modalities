@@ -2,11 +2,13 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Optional, overload
+from types import SimpleNamespace
+from typing import Annotated, Any, Optional, overload
 
 import torch
 import torch.nn as nn
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator, validator
+from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
@@ -120,7 +122,15 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
+    def __init__(
+        self,
+        n_embd: int,
+        n_head: int,
+        seq_length_dim: int = -2,
+        base_freq: int = 10000,
+        rope_scaling: Optional[dict[str, Any]] = None,
+        max_position_embeddings: Optional[int] = None,
+    ):
         """
         Initializes the RotaryTransform object.
 
@@ -129,6 +139,8 @@ class RotaryTransform(QueryKeyValueTransform):
             n_head (int): The number of attention heads.
             seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
             base_freq (int): Base frequency for RoPE. Defaults to 10000.
+            rope_scaling (Optional[dict[str, Any]]): Optional HF-compatible RoPE scaling config.
+            max_position_embeddings (Optional[int]): Maximum position embeddings used by rope scaling.
         """
         super().__init__()
         # this also holds when using TP, since n_embd is the total embedding size and
@@ -136,21 +148,60 @@ class RotaryTransform(QueryKeyValueTransform):
         self.dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
         self.base_freq = base_freq
+        self.rope_scaling = self._normalize_rope_scaling(rope_scaling)
+        self.max_position_embeddings = max_position_embeddings
+        if self.max_position_embeddings is None:
+            self.max_position_embeddings = int(self.rope_scaling.get("original_max_position_embeddings", 2048))
+        self.attention_scaling = 1.0
 
         self.reset_parameters()
 
     def reset_parameters(self):
         # If previously initialized on or moved to a device, reuse that device.
         # Otherwise, use the default device of the current environment.
-        device = self.inv_freq.device if hasattr(self, "inv_freq") else None
-        inv_freq = 1.0 / (
-            self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
-        )
+        device: Optional[torch.device] = None
+        if hasattr(self, "inv_freq") and isinstance(self.inv_freq, torch.Tensor):
+            device = self.inv_freq.device
+        inv_freq = self._build_inv_freq(device=device)
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
         self._cos_cached = None
         self._sin_cached = None
+
+    @staticmethod
+    def _normalize_rope_scaling(rope_scaling: Optional[dict[str, Any]]) -> dict[str, Any]:
+        if rope_scaling is None:
+            return {}
+
+        normalized = dict(rope_scaling)
+        if "type" in normalized and "rope_type" not in normalized:
+            normalized["rope_type"] = normalized["type"]
+        return normalized
+
+    def _build_inv_freq(self, device: Optional[torch.device]) -> torch.Tensor:
+        if not self.rope_scaling:
+            return 1.0 / (
+                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+            )
+
+        rope_type = self.rope_scaling.get("rope_type", "default")
+        if rope_type not in ROPE_INIT_FUNCTIONS:
+            raise ValueError(f"Unsupported rope_scaling rope_type '{rope_type}'.")
+
+        rope_config = SimpleNamespace(
+            rope_theta=float(self.base_freq),
+            rope_scaling=self.rope_scaling,
+            head_dim=self.dim_model,
+            hidden_size=self.dim_model,
+            num_attention_heads=1,
+            max_position_embeddings=self.max_position_embeddings,
+            partial_rotary_factor=1.0,
+        )
+
+        inv_freq, attention_scaling = ROPE_INIT_FUNCTIONS[rope_type](rope_config, device)
+        self.attention_scaling = float(attention_scaling)
+        return inv_freq
 
     def rotate_half(self, x: torch.Tensor):
         """
@@ -172,15 +223,21 @@ class RotaryTransform(QueryKeyValueTransform):
 
         # Reset the tables if the sequence length has changed,
         # or if we're on a new device (possibly due to tracing for instance)
-        if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
+        if (
+            self._cos_cached is None
+            or self._sin_cached is None
+            or seq_len != self._seq_len_cached
+            or self._cos_cached.device != x.device
+            or self._cos_cached.dtype != x.dtype
+        ):
             self._seq_len_cached = seq_len
             t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
             freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
             emb = torch.cat((freqs, freqs), dim=-1).to(
                 x.device
             )  # here, we combine the two matrices (not zipping them).
-            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
-            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
+            self._cos_cached = (emb.cos() * self.attention_scaling)[None, None, :, :].to(x.dtype)
+            self._sin_cached = (emb.sin() * self.attention_scaling)[None, None, :, :].to(x.dtype)
 
         return self._cos_cached, self._sin_cached
 
@@ -288,6 +345,8 @@ class AttentionConfig(BaseModel):
                 n_head (int): Number of attention heads.
                 seq_length_dim (int): Dimension of the sequence length.
                 base_freq (int): Base frequency for RoPE.
+                rope_scaling (Optional[dict[str, Any]]): Optional HF-compatible RoPE scaling configuration.
+                max_position_embeddings (Optional[int]): Max position embeddings used by rope scaling.
 
             """
 
@@ -295,6 +354,46 @@ class AttentionConfig(BaseModel):
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
             base_freq: Annotated[int, Field(strict=True, ge=10000)]
+            rope_scaling: Optional[dict[str, Any]] = None
+            max_position_embeddings: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
+
+            @field_validator("rope_scaling", mode="before")
+            @classmethod
+            def normalize_rope_scaling_keys(cls, value):
+                if value is None:
+                    return None
+                if not isinstance(value, dict):
+                    raise ValueError("rope_scaling must be a dictionary.")
+
+                normalized = dict(value)
+                if "type" in normalized and "rope_type" not in normalized:
+                    normalized["rope_type"] = normalized["type"]
+                return normalized
+
+            @model_validator(mode="after")
+            def validate_rope_scaling(self):
+                if self.rope_scaling is None:
+                    return self
+
+                rope_type = self.rope_scaling.get("rope_type", "default")
+                if rope_type not in {"default", "yarn"}:
+                    raise ValueError("rope_scaling.rope_type must be one of ['default', 'yarn'] for GPT2 training.")
+
+                if rope_type == "yarn":
+                    factor = self.rope_scaling.get("factor")
+                    if factor is None or not isinstance(factor, (int, float)) or factor <= 1.0:
+                        raise ValueError("For yarn rope scaling, rope_scaling.factor must be a float > 1.0.")
+
+                    beta_fast = self.rope_scaling.get("beta_fast")
+                    beta_slow = self.rope_scaling.get("beta_slow")
+                    if beta_fast is not None and (not isinstance(beta_fast, (int, float)) or beta_fast <= 0):
+                        raise ValueError("rope_scaling.beta_fast must be a positive float when set.")
+                    if beta_slow is not None and (not isinstance(beta_slow, (int, float)) or beta_slow <= 0):
+                        raise ValueError("rope_scaling.beta_slow must be a positive float when set.")
+                    if beta_fast is not None and beta_slow is not None and beta_fast < beta_slow:
+                        raise ValueError("rope_scaling.beta_fast must be greater than or equal to beta_slow.")
+
+                return self
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):

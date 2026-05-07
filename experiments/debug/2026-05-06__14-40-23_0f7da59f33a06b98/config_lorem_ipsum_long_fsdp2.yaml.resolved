@@ -1,0 +1,404 @@
+app_state:
+  component_key: app_state
+  config:
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+  variant_key: raw
+checkpoint_saving:
+  component_key: checkpoint_saving
+  config:
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      config:
+        checkpoint_path: data/checkpoints
+        experiment_id: 2026-05-06__14-40-23_0f7da59f33a06b98
+        global_rank: 0
+      variant_key: dcp
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      config:
+        k: -1
+      variant_key: save_k_most_recent_checkpoints_strategy
+  variant_key: default
+collate_fn:
+  component_key: collate_fn
+  config:
+    sample_key: input_ids
+    target_key: target_ids
+  variant_key: gpt_2_llm_collator
+device_mesh:
+  component_key: device_mesh
+  config:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    device_type: cuda
+    world_size: 3
+  variant_key: default
+dp_degree:
+  component_key: number_conversion
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods:
+    - dp_shard
+    - dp_replicate
+  variant_key: parallel_degree
+eval_dataloaders:
+- instance_key: test_dataloader
+  pass_type: BY_REFERENCE
+evaluation_subscriber:
+  component_key: results_subscriber
+  config:
+    config_file_path: &id001 !!python/object/apply:pathlib.PosixPath
+    - config_files
+    - training
+    - config_lorem_ipsum_long_fsdp2.yaml
+    directory: wandb_storage
+    experiment_id: 2026-05-06__14-40-23_0f7da59f33a06b98
+    global_rank: 0
+    mode: OFFLINE
+    project: modalities_dcp_tests
+  variant_key: wandb
+fsdp_model:
+  component_key: model
+  config:
+    block_names:
+    - GPT2Block
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+  variant_key: fsdp2_wrapped
+gradient_clipper:
+  component_key: gradient_clipper
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    max_norm: 1.0
+    norm_type: P2_NORM
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+  variant_key: fsdp2
+initialized_model:
+  component_key: model
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      config:
+        mean: 0.0
+        model_type: gpt2
+        num_layers: 2
+        std: 0.02
+        weight_init_type: scaled
+      variant_key: composed
+  variant_key: model_initialized
+loss_fn:
+  component_key: loss
+  config:
+    prediction_key: logits
+    target_key: target_ids
+  variant_key: clm_cross_entropy_loss
+lr_scheduler:
+  component_key: scheduler
+  config:
+    anneal_strategy: cos
+    div_factor: 10
+    final_div_factor: 1
+    last_epoch: -1
+    max_lr: 0.0006
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    pct_start: 0.01
+    total_steps:
+      component_key: number_conversion
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        global_num_tokens:
+          component_key: number_conversion
+          config:
+            dataset_path: ./data/lorem_ipsum_long.pbin
+            dp_degree:
+              instance_key: dp_degree
+              pass_type: BY_REFERENCE
+            gradient_accumulation_steps: 1
+            local_micro_batch_size: 1
+            sequence_length: 256
+          variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+        gradient_accumulation_steps: 1
+        local_micro_batch_size: 1
+        sequence_length: 256
+      variant_key: num_steps_from_num_tokens
+  variant_key: onecycle_lr
+mfu_calculator:
+  component_key: mfu_calculator
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    n_embd: 128
+    n_layer: 2
+    sequence_length: 256
+    world_size: 3
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+  variant_key: gpt2
+model_raw:
+  component_key: model
+  config:
+    activation_type: swiglu
+    attention_config:
+      qkv_transforms:
+      - config:
+          base_freq: 10000
+          n_embd: 128
+          n_head: 8
+          seq_length_dim: -2
+        type_hint: RotaryTransform
+    attention_implementation: manual
+    attention_norm_config:
+      config:
+        eps: 1.0e-05
+        normalized_shape: 128
+      norm_type: layer_norm
+    bias: true
+    dropout: 0.0
+    ffn_hidden: 128
+    ffn_norm_config:
+      config:
+        eps: 1.0e-05
+        normalized_shape: 128
+      norm_type: layer_norm
+    lm_head_norm_config:
+      config:
+        eps: 1.0e-05
+        normalized_shape: 128
+      norm_type: layer_norm
+    n_embd: 128
+    n_head_kv: 4
+    n_head_q: 8
+    n_layer: 2
+    poe_type: NOPE
+    prediction_key: logits
+    sample_key: input_ids
+    sequence_length: 256
+    use_meta_device: true
+    use_weight_tying: false
+    vocab_size: 50304
+  variant_key: gpt2
+optimizer:
+  component_key: optimizer
+  config:
+    betas:
+    - 0.9
+    - 0.95
+    eps: 1.0e-08
+    lr: 0.0001
+    weight_decay: 0.1
+    weight_decay_groups_excluded:
+    - embedding
+    - layernorm
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+  variant_key: adam_w
+progress_subscriber:
+  component_key: progress_subscriber
+  config:
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+    global_rank: 0
+    num_seen_steps: 0
+    num_target_steps:
+      component_key: number_conversion
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        global_num_tokens:
+          component_key: number_conversion
+          config:
+            dataset_path: ./data/lorem_ipsum_long.pbin
+            dp_degree:
+              instance_key: dp_degree
+              pass_type: BY_REFERENCE
+            gradient_accumulation_steps: 1
+            local_micro_batch_size: 1
+            sequence_length: 256
+          variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+        gradient_accumulation_steps: 1
+        local_micro_batch_size: 1
+        sequence_length: 256
+      variant_key: num_steps_from_num_tokens
+    train_dataloader_tag: train
+  variant_key: rich
+settings:
+  config_file_path: *id001
+  consistency_enforcement:
+    enforce_last_step_checkpointed: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_logged: false
+    enforce_tokens_per_step_consistency: false
+  cuda_env:
+    global_rank: 0
+    local_rank: 0
+    world_size: 3
+  experiment_id: 2026-05-06__14-40-23_0f7da59f33a06b98
+  intervals:
+    checkpointing_interval_in_steps: 32
+    evaluation_interval_in_steps: 32
+    training_log_interval_in_steps: 1
+  paths:
+    checkpoint_saving_path: data/checkpoints
+    experiments_root_path: !!python/object/apply:pathlib.PosixPath
+    - experiments
+    - debug
+    test_dataset_path: ./data/lorem_ipsum.pbin
+    train_dataset_path: ./data/lorem_ipsum_long.pbin
+  referencing_keys:
+    prediction_key: logits
+    sample_key: input_ids
+    target_key: target_ids
+  step_profile:
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 1
+    sequence_length: 256
+  training_progress:
+    global_num_seen_tokens: 0
+    last_step: -1
+    num_seen_samples: 0
+    num_seen_steps: 0
+  training_target:
+    num_target_steps:
+      component_key: number_conversion
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        global_num_tokens:
+          component_key: number_conversion
+          config:
+            dataset_path: ./data/lorem_ipsum_long.pbin
+            dp_degree:
+              instance_key: dp_degree
+              pass_type: BY_REFERENCE
+            gradient_accumulation_steps: 1
+            local_micro_batch_size: 1
+            sequence_length: 256
+          variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+        gradient_accumulation_steps: 1
+        local_micro_batch_size: 1
+        sequence_length: 256
+      variant_key: num_steps_from_num_tokens
+    num_target_tokens:
+      component_key: number_conversion
+      config:
+        dataset_path: ./data/lorem_ipsum_long.pbin
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        gradient_accumulation_steps: 1
+        local_micro_batch_size: 1
+        sequence_length: 256
+      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+test_dataloader:
+  component_key: data_loader
+  config:
+    batch_sampler:
+      component_key: batch_sampler
+      config:
+        batch_size: 1
+        drop_last: true
+        sampler:
+          component_key: sampler
+          config:
+            dataset:
+              instance_key: test_dataset
+              pass_type: BY_REFERENCE
+            drop_last: true
+            num_replicas: 3
+            rank: 0
+            shuffle: false
+          variant_key: distributed_sampler
+      variant_key: default
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+    dataloader_tag: test
+    dataset:
+      instance_key: test_dataset
+      pass_type: BY_REFERENCE
+    num_workers: 2
+    pin_memory: true
+  variant_key: default
+test_dataset:
+  component_key: dataset
+  config:
+    raw_data_path: ./data/lorem_ipsum.pbin
+    sample_key: input_ids
+    sequence_length: 256
+  variant_key: packed_mem_map_dataset_continuous
+train_dataloader:
+  component_key: data_loader
+  config:
+    batch_sampler:
+      component_key: batch_sampler
+      config:
+        batch_size: 1
+        drop_last: true
+        sampler:
+          component_key: sampler
+          config:
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+            drop_last: true
+            num_replicas: 3
+            rank: 0
+            seed: 42
+            shuffle: true
+            skip_num_global_samples: 0
+          variant_key: resumable_distributed_sampler
+      variant_key: default
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    num_workers: 2
+    pin_memory: true
+  variant_key: default
+train_dataset:
+  component_key: dataset
+  config:
+    raw_data_path: ./data/lorem_ipsum_long.pbin
+    sample_key: input_ids
+    sequence_length: 256
+  variant_key: packed_mem_map_dataset_continuous
