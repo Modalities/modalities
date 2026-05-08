@@ -172,7 +172,7 @@ class KeepEveryKStepsAndMMostRecentCheckpointingStrategy(CheckpointSavingStrateg
             if len(self._saved_recent_checkpoints) > self._num_recent_checkpoints_to_keep
             else ([], self._saved_recent_checkpoints)
         )
-        # Do not delete checkpoints that are divisible by k.
-        checkpoints_to_delete = [cp for cp in checkpoints_to_delete if cp.num_seen_steps_current_run % self._k != 0]
+        # Do not delete checkpoints that are divisible by k in total training steps.
+        checkpoints_to_delete = [cp for cp in checkpoints_to_delete if cp.num_seen_steps_total % self._k != 0]
 
         return CheckpointingInstruction(save_current=True, checkpoints_to_delete=checkpoints_to_delete)
