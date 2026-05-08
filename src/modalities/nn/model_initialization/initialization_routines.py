@@ -1,7 +1,8 @@
 import math
 import re
 import warnings
-from typing import Annotated, Literal
+from enum import Enum
+from typing import Annotated
 
 import torch
 import torch.nn as nn
@@ -9,6 +10,12 @@ from pydantic import BaseModel, Field, model_validator
 
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.nn.model_initialization.parameter_name_filters import RegexFilter
+
+
+class MultiDeviceGeneratorPolicy(str, Enum):
+    IGNORE = "ignore"
+    WARN = "warn"
+    ERROR = "error"
 
 
 class PlainInitializationConfig(BaseModel):
@@ -47,7 +54,7 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
         std: float,
         parameter_name_regexes: RegexFilter,
         seed: int | None = None,
-        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ):
         self.mean = mean
         self.std = std
@@ -65,9 +72,9 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
                     "NamedParameterwiseNormalInitialization created generators for multiple devices in one process "
                     f"(existing={list(self._generators.keys())}, new={device_key})."
                 )
-                if self.multi_device_generator_policy == "error":
+                if self.multi_device_generator_policy == MultiDeviceGeneratorPolicy.ERROR:
                     raise RuntimeError(message)
-                if self.multi_device_generator_policy == "warn":
+                if self.multi_device_generator_policy == MultiDeviceGeneratorPolicy.WARN:
                     warnings.warn(message, stacklevel=2)
             generator = torch.Generator(device=parameter.device)
             generator.manual_seed(self.seed)
@@ -97,7 +104,7 @@ class InitializationRoutines:
         parameter_name_regexes: RegexFilter,
         hidden_dim: int | None = None,
         seed: int | None = None,
-        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ) -> NamedParameterwiseNormalInitialization:
         """Initializes the weights of a model by sampling from a normal distribution.
         NOTE: This class supports the initialization of nn.Linear and nn.Embedding layers.
@@ -111,7 +118,7 @@ class InitializationRoutines:
             parameter_name_regexes (list[str]): List of parameter name regexes to which the initialization
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
-            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+            multi_device_generator_policy (MultiDeviceGeneratorPolicy): Behavior when more than one
                 device-local RNG generator is created in the same process.
         """
         # auto: choose std automatically
@@ -138,7 +145,7 @@ class InitializationRoutines:
         num_layers: int,
         parameter_name_regexes: RegexFilter,
         seed: int | None = None,
-        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization. As defined in https://arxiv.org/abs/2312.16903
 
@@ -149,7 +156,7 @@ class InitializationRoutines:
             parameter_name_regexes (RegexFilter): List of parameter name regexes to which the initialization
                 should be applied
             seed (Optional[int]): Random seed for initialization. Defaults to None.
-            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+            multi_device_generator_policy (MultiDeviceGeneratorPolicy): Behavior when more than one
                 device-local RNG generator is created in the same process.
 
         Returns:
@@ -172,7 +179,7 @@ class InitializationRoutines:
         mean: float,
         parameter_name_regexes: RegexFilter,
         seed: int | None = None,
-        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ) -> ModelInitializationIF:
         """Implementation of scaled weight initialization for embeddings, see https://arxiv.org/abs/2312.16903
         We fix the standard deviation to sqrt(0.4).
@@ -182,7 +189,7 @@ class InitializationRoutines:
             parameter_name_regexes (list[str], optional): List of parameter name regexes to which the initialization
                 should be applied Defaults to None.
             seed (Optional[int]): Random seed for initialization. Defaults to None.
-            multi_device_generator_policy (Literal["ignore", "warn", "error"]): Behavior when more than one
+            multi_device_generator_policy (MultiDeviceGeneratorPolicy): Behavior when more than one
                 device-local RNG generator is created in the same process.
 
         Returns:

@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -8,7 +8,10 @@ from typing_extensions import Annotated
 
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticModelInitializationIFType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
-from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
+from modalities.nn.model_initialization.initialization_routines import (
+    InitializationRoutines,
+    MultiDeviceGeneratorPolicy,
+)
 from modalities.nn.model_initialization.parameter_name_filters import (
     NAMED_PARAMETER_INIT_GROUPS,
     SupportWeightInitModels,
@@ -37,7 +40,7 @@ class ComposedModelInitializationConfig(BaseModel):
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     seed: int | None = None
-    multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn"
+    multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
@@ -129,7 +132,7 @@ class ComposedInitializationRoutines:
         num_layers: int | None = None,
         device_mesh: Optional[DeviceMesh] = None,
         seed: int | None = None,
-        multi_device_generator_policy: Literal["ignore", "warn", "error"] = "warn",
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
@@ -149,9 +152,9 @@ class ComposedInitializationRoutines:
                 parallelism is active, the effective seed is offset by PP rank to avoid identical stage-local
                 initialization, so the same seed does not guarantee identical initialized weights across different
                 PP topologies.
-            multi_device_generator_policy (Literal["ignore", "warn", "error"], optional): Behavior when
+            multi_device_generator_policy (MultiDeviceGeneratorPolicy, optional): Behavior when
                 initialization creates per-device RNG generators for more than one device in the same process.
-                Defaults to "warn".
+                Defaults to MultiDeviceGeneratorPolicy.WARN.
 
         Returns:
             ModelInitializationIF: The Weight Initializer performing the initialization as specified.
