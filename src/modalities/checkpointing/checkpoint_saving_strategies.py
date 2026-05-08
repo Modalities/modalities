@@ -119,3 +119,60 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
         """
         save_current = training_progress.num_seen_steps_total % self.k == 0
         return CheckpointingInstruction(save_current=save_current, checkpoints_to_delete=[])
+
+
+class KeepEveryKStepsAndMMostRecentCheckpointingStrategy(CheckpointSavingStrategyIF):
+    """Strategy for keeping every k steps permanently and additionally the most recent checkpoints."""
+
+    def __init__(self, k: int, num_recent_checkpoints_to_keep: int = 2):
+        """
+        Initializes the CheckpointSavingStrategy object.
+
+        Args:
+            k (int): The interval of steps to keep.
+            num_recent_checkpoints_to_keep (int, optional): The number of recent checkpoints to keep.
+                This includes all checkpoints but only the ones not divisible by k will actually be deleted.
+                Defaults to 2.
+
+        Returns:
+            None
+        """
+        super().__init__()
+        self._k = k
+        self._num_recent_checkpoints_to_keep = num_recent_checkpoints_to_keep
+        self._saved_recent_checkpoints: list[TrainingProgress] = []
+        assert self._k > 0, "k must be greater than 0"
+        assert self._num_recent_checkpoints_to_keep >= 1, "num_recent_checkpoints_to_keep must be at least 1"
+
+    def get_checkpoint_instruction(
+        self,
+        training_progress: TrainingProgress,
+        evaluation_result: dict[str, EvaluationResultBatch] | None = None,
+        early_stopping_criterion_fulfilled: bool = False,
+    ) -> CheckpointingInstruction:
+        """
+        Returns a CheckpointingInstruction object.
+
+        Args:
+            training_progress (TrainingProgress): The training progress.
+            evaluation_result (dict[str, EvaluationResultBatch] | None, optional):
+            The evaluation result. Defaults to None.
+            early_stopping_criterion_fulfilled (bool, optional):
+            Whether the early stopping criterion is fulfilled. Defaults to False.
+
+        Returns:
+            CheckpointingInstruction: The checkpointing instruction object.
+        """
+        self._saved_recent_checkpoints.append(dataclasses.replace(training_progress))
+        checkpoints_to_delete, self._saved_recent_checkpoints = (
+            (
+                self._saved_recent_checkpoints[: -self._num_recent_checkpoints_to_keep],
+                self._saved_recent_checkpoints[-self._num_recent_checkpoints_to_keep :],
+            )
+            if len(self._saved_recent_checkpoints) > self._num_recent_checkpoints_to_keep
+            else ([], self._saved_recent_checkpoints)
+        )
+        # Do not delete checkpoints that are divisible by k.
+        checkpoints_to_delete = [cp for cp in checkpoints_to_delete if cp.num_seen_steps_current_run % self._k != 0]
+
+        return CheckpointingInstruction(save_current=True, checkpoints_to_delete=checkpoints_to_delete)
