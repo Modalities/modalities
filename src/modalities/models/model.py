@@ -26,16 +26,13 @@ class ActivationType(str, Enum):
 class NNModel(nn.Module):
     """NNModel class to define a base model."""
 
-    def __init__(self, seed: int = None, weight_decay_groups: Optional[WeightDecayGroups] = None):
+    def __init__(self, weight_decay_groups: Optional[WeightDecayGroups] = None):
         """
         Initializes an NNModel object.
 
         Args:
-            seed (int, optional): The seed value for random number generation. Defaults to None.
             weight_decay_groups (Optional[WeightDecayGroups], optional): The weight decay groups. Defaults to None.
         """
-        if seed is not None:
-            torch.manual_seed(seed)
         self._weight_decay_groups = weight_decay_groups if weight_decay_groups is not None else {}
         super(NNModel, self).__init__()
 

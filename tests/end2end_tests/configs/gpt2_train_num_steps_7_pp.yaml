@@ -270,7 +270,6 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    seed: 42
     use_meta_device: true
     use_weight_tying: false
     sample_key: ${settings.referencing_keys.sample_key}
