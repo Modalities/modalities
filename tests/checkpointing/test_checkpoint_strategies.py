@@ -59,7 +59,9 @@ def test_checkpoint_strategy_k(
         (4, 3, 15),
     ],
 )
-def test_keep_every_k_steps_keeps_every_k_steps(k: int, num_recent_checkpoints_to_keep: int, num_steps: int) -> None:
+def test_keep_every_k_strategy_has_no_unexpected_checkpoints(
+    k: int, num_recent_checkpoints_to_keep: int, num_steps: int
+) -> None:
     checkpoint_strategy = KeepEveryKStepsAndMMostRecentCheckpointingStrategy(
         k=k, num_recent_checkpoints_to_keep=num_recent_checkpoints_to_keep
     )
@@ -81,6 +83,40 @@ def test_keep_every_k_steps_keeps_every_k_steps(k: int, num_recent_checkpoints_t
         # Check that only checkpoints that are divisible by k or the most recent ones are kept.
         last_checkpoints = set(range(num_steps - num_recent_checkpoints_to_keep + 1, num_steps + 1))
         assert ckpt.num_seen_steps_total % k == 0 or ckpt.num_seen_steps_total in last_checkpoints
+
+
+@pytest.mark.parametrize(
+    "k, num_recent_checkpoints_to_keep, num_steps",
+    [
+        (3, 2, 11),
+        (2, 1, 10),
+        (4, 3, 15),
+    ],
+)
+def test_keep_every_k_strategy_has_no_unexpected_deletions(
+    k: int, num_recent_checkpoints_to_keep: int, num_steps: int
+) -> None:
+    checkpoint_strategy = KeepEveryKStepsAndMMostRecentCheckpointingStrategy(
+        k=k, num_recent_checkpoints_to_keep=num_recent_checkpoints_to_keep
+    )
+    training_progress = TrainingProgress(
+        num_seen_steps_current_run=0,
+        num_seen_tokens_current_run=0,
+        num_target_steps=20,
+        num_target_tokens=40,
+    )
+
+    # Simulate training progress and checkpointing
+    simulator = _CheckpointSavingSimulator()
+    for step in range(1, num_steps + 1):
+        training_progress.num_seen_steps_current_run = step
+        checkpoint_instruction = checkpoint_strategy.get_checkpoint_instruction(training_progress=training_progress)
+        simulator.simulate_training_step(training_progress, checkpoint_instruction)
+
+    for i in range(1, num_steps + 1):
+        # Check that checkpoints that are divisible by k or the most recent ones are not deleted.
+        if i % k == 0 or i > num_steps - num_recent_checkpoints_to_keep:
+            assert any(ckpt.num_seen_steps_total == i for ckpt in simulator.saved_checkpoints)
 
 
 def test_keep_every_k_steps_checkpointing_strategy_invalid_arguments() -> None:
