@@ -120,7 +120,15 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
+    def __init__(
+        self,
+        n_embd: int,
+        n_head: int,
+        seq_length_dim: int = -2,
+        base_freq: int = 10000,
+        rope_scaling: Optional[dict[str, float | int | str | bool]] = None,
+        max_position_embeddings: int = 2048,
+    ):
         """
         Initializes the RotaryTransform object.
 
@@ -129,6 +137,9 @@ class RotaryTransform(QueryKeyValueTransform):
             n_head (int): The number of attention heads.
             seq_length_dim (int, optional): The dimension along which the sequence length is defined. Defaults to -2.
             base_freq (int): Base frequency for RoPE. Defaults to 10000.
+            rope_scaling (dict[str, float | int | str | bool], optional): HF-style RoPE scaling config.
+                Supports `rope_type` values `default` and `yarn`.
+            max_position_embeddings (int): Context length used for RoPE scaling defaults. Defaults to 2048.
         """
         super().__init__()
         # this also holds when using TP, since n_embd is the total embedding size and
@@ -136,16 +147,109 @@ class RotaryTransform(QueryKeyValueTransform):
         self.dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
         self.base_freq = base_freq
+        self.max_position_embeddings = max_position_embeddings
+
+        self.rope_scaling = dict(rope_scaling) if rope_scaling is not None else None
+        if self.rope_scaling is not None and "type" in self.rope_scaling and "rope_type" not in self.rope_scaling:
+            self.rope_scaling["rope_type"] = self.rope_scaling["type"]
+        self.rope_type = self.rope_scaling.get("rope_type", "default") if self.rope_scaling is not None else "default"
+        self.attention_scaling = 1.0
 
         self.reset_parameters()
+
+    def _compute_yarn_parameters(self, device: torch.device) -> tuple[torch.Tensor, float]:
+        if self.rope_scaling is None:
+            raise ValueError("YaRN requires a rope_scaling config.")
+
+        factor = self.rope_scaling.get("factor")
+        if factor is None or not isinstance(factor, (int, float)) or factor <= 1.0:
+            raise ValueError("YaRN requires rope_scaling.factor to be a float > 1.0")
+
+        attention_factor = self.rope_scaling.get("attention_factor")
+        mscale = self.rope_scaling.get("mscale")
+        mscale_all_dim = self.rope_scaling.get("mscale_all_dim")
+        original_max_position_embeddings = (
+            self.rope_scaling.get("original_max_position_embeddings") or self.max_position_embeddings
+        )
+        beta_fast = self.rope_scaling.get("beta_fast") or 32
+        beta_slow = self.rope_scaling.get("beta_slow") or 1
+        truncate = self.rope_scaling.get("truncate", True)
+
+        def get_mscale(scale: float, mscale_value: float = 1) -> float:
+            if scale <= 1:
+                return 1.0
+            return 0.1 * mscale_value * math.log(scale) + 1.0
+
+        if attention_factor is None:
+            if mscale and mscale_all_dim:
+                attention_factor = float(
+                    get_mscale(float(factor), float(mscale)) / get_mscale(float(factor), float(mscale_all_dim))
+                )
+            else:
+                attention_factor = get_mscale(float(factor))
+
+        def find_correction_dim(num_rotations: float, dim: int, base: float, max_position_embeddings: int) -> float:
+            return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (2 * math.log(base))
+
+        def find_correction_range(
+            low_rot: float,
+            high_rot: float,
+            dim: int,
+            base: float,
+            max_position_embeddings: int,
+            truncate_bounds: bool,
+        ) -> tuple[float, float]:
+            low = find_correction_dim(low_rot, dim, base, max_position_embeddings)
+            high = find_correction_dim(high_rot, dim, base, max_position_embeddings)
+            if truncate_bounds:
+                low = math.floor(low)
+                high = math.ceil(high)
+            return max(low, 0), min(high, dim - 1)
+
+        def linear_ramp_factor(min_value: float, max_value: float, dim: int) -> torch.Tensor:
+            if min_value == max_value:
+                max_value += 0.001
+            linear_func = (torch.arange(dim, dtype=torch.float32, device=device) - min_value) / (max_value - min_value)
+            return torch.clamp(linear_func, 0, 1)
+
+        dim = self.dim_model
+        base = float(self.base_freq)
+        pos_freqs = base ** (torch.arange(0, dim, 2, device=device, dtype=torch.float) / dim)
+        inv_freq_extrapolation = 1.0 / pos_freqs
+        inv_freq_interpolation = 1.0 / (float(factor) * pos_freqs)
+
+        low, high = find_correction_range(
+            float(beta_fast),
+            float(beta_slow),
+            dim,
+            base,
+            int(original_max_position_embeddings),
+            bool(truncate),
+        )
+        inv_freq_extrapolation_factor = 1 - linear_ramp_factor(low, high, dim // 2).to(device=device, dtype=torch.float)
+        inv_freq = (
+            inv_freq_interpolation * (1 - inv_freq_extrapolation_factor)
+            + inv_freq_extrapolation * inv_freq_extrapolation_factor
+        )
+        return inv_freq, float(attention_factor)
 
     def reset_parameters(self):
         # If previously initialized on or moved to a device, reuse that device.
         # Otherwise, use the default device of the current environment.
         device = self.inv_freq.device if hasattr(self, "inv_freq") else None
-        inv_freq = 1.0 / (
-            self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
-        )
+
+        if self.rope_type == "default":
+            inv_freq = 1.0 / (
+                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+            )
+            self.attention_scaling = 1.0
+        elif self.rope_type == "yarn":
+            rope_device = device if device is not None else torch.device("cpu")
+            inv_freq, attention_scaling = self._compute_yarn_parameters(device=rope_device)
+            self.attention_scaling = float(attention_scaling)
+        else:
+            raise ValueError(f"Unsupported rope_type '{self.rope_type}'. Supported values are 'default' and 'yarn'.")
+
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -179,8 +283,8 @@ class RotaryTransform(QueryKeyValueTransform):
             emb = torch.cat((freqs, freqs), dim=-1).to(
                 x.device
             )  # here, we combine the two matrices (not zipping them).
-            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
-            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
+            self._cos_cached = (emb.cos() * self.attention_scaling)[None, None, :, :].to(x.dtype)
+            self._sin_cached = (emb.sin() * self.attention_scaling)[None, None, :, :].to(x.dtype)
 
         return self._cos_cached, self._sin_cached
 
@@ -295,6 +399,38 @@ class AttentionConfig(BaseModel):
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
             base_freq: Annotated[int, Field(strict=True, ge=10000)]
+            max_position_embeddings: Annotated[int, Field(strict=True, ge=1)] = 2048
+            rope_scaling: Optional[dict[str, float | int | str | bool]] = None
+
+            @model_validator(mode="before")
+            @classmethod
+            def normalize_rope_scaling_type_alias(cls, values):
+                if not isinstance(values, dict):
+                    return values
+                rope_scaling = values.get("rope_scaling")
+                if isinstance(rope_scaling, dict) and "type" in rope_scaling and "rope_type" not in rope_scaling:
+                    rope_scaling = dict(rope_scaling)
+                    rope_scaling["rope_type"] = rope_scaling["type"]
+                    values = dict(values)
+                    values["rope_scaling"] = rope_scaling
+                return values
+
+            @model_validator(mode="after")
+            def validate_rope_scaling(self) -> "AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig":
+                if self.rope_scaling is None:
+                    return self
+
+                rope_type = self.rope_scaling.get("rope_type", "default")
+                if rope_type not in {"default", "yarn"}:
+                    raise ValueError(
+                        f"Unsupported rope_scaling.rope_type '{rope_type}'. Supported values are 'default' and 'yarn'."
+                    )
+                if rope_type == "yarn":
+                    factor = self.rope_scaling.get("factor")
+                    if factor is None or not isinstance(factor, (int, float)) or factor <= 1.0:
+                        raise ValueError("YaRN requires rope_scaling.factor to be a float > 1.0")
+
+                return self
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
