@@ -122,7 +122,9 @@ class SaveEveryKStepsCheckpointingStrategy(CheckpointSavingStrategyIF):
 
 
 class KeepEveryKStepsAndMMostRecentCheckpointingStrategy(CheckpointSavingStrategyIF):
-    """Strategy for keeping every k steps permanently and additionally the most recent checkpoints."""
+    """Checkpointing strategy that always saves the current checkpoint,
+    keeps the m most recent checkpoints, and retains older checkpoints at multiples of k.
+    """
 
     def __init__(self, k: int, num_recent_checkpoints_to_keep: int = 2):
         """
