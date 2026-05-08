@@ -80,7 +80,7 @@ def test_keep_every_k_steps_keeps_every_k_steps(k: int, num_recent_checkpoints_t
     for ckpt in simulator.saved_checkpoints:
         # Check that only checkpoints that are divisible by k or the most recent ones are kept.
         last_checkpoints = set(range(num_steps - num_recent_checkpoints_to_keep + 1, num_steps + 1))
-        assert ckpt.num_seen_steps_current_run % k == 0 or ckpt.num_seen_steps_current_run in last_checkpoints
+        assert ckpt.num_seen_steps_total % k == 0 or ckpt.num_seen_steps_total in last_checkpoints
 
 
 def test_keep_every_k_steps_checkpointing_strategy_invalid_arguments() -> None:
