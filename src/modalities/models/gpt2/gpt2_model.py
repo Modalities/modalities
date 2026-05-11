@@ -157,7 +157,7 @@ class RotaryTransform(QueryKeyValueTransform):
 
         self.reset_parameters()
 
-    def _compute_yarn_parameters(self, device: torch.device) -> tuple[torch.Tensor, float]:
+    def _compute_yarn_parameters(self, device: torch.device | None) -> tuple[torch.Tensor, float]:
         if self.rope_scaling is None:
             raise ValueError("YaRN requires a rope_scaling config.")
 
@@ -244,8 +244,7 @@ class RotaryTransform(QueryKeyValueTransform):
             )
             self.attention_scaling = 1.0
         elif self.rope_type == "yarn":
-            rope_device = device if device is not None else torch.device("cpu")
-            inv_freq, attention_scaling = self._compute_yarn_parameters(device=rope_device)
+            inv_freq, attention_scaling = self._compute_yarn_parameters(device=device)
             self.attention_scaling = float(attention_scaling)
         else:
             raise ValueError(f"Unsupported rope_type '{self.rope_type}'. Supported values are 'default' and 'yarn'.")
