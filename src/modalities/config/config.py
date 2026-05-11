@@ -7,8 +7,8 @@ import torch
 from omegaconf import OmegaConf, Resolver
 from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
-from transformers import GPT2TokenizerFast
-from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from transformers import GPT2Tokenizer as GPT2TokenizerFast
+from transformers import LlamaTokenizer as LlamaTokenizerFast
 from typing_extensions import deprecated
 
 from modalities.config.lookup_enum import LookupEnum

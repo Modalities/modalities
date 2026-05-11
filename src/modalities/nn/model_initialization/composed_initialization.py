@@ -1,17 +1,26 @@
 from typing import Optional
 
+import torch
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from torch.distributed.device_mesh import DeviceMesh
 from typing_extensions import Annotated
 
-from modalities.config.pydantic_if_types import PydanticModelInitializationIFType
+from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticModelInitializationIFType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
-from modalities.nn.model_initialization.initialization_routines import InitializationRoutines
+from modalities.nn.model_initialization.initialization_routines import (
+    InitializationRoutines,
+    MultiDeviceGeneratorPolicy,
+)
 from modalities.nn.model_initialization.parameter_name_filters import (
     NAMED_PARAMETER_INIT_GROUPS,
     SupportWeightInitModels,
     WeightInitTypes,
 )
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank, has_parallelism_method
+from modalities.utils.logger_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 class ModelInitializerWrapperConfig(BaseModel):
@@ -30,6 +39,9 @@ class ComposedModelInitializationConfig(BaseModel):
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
     hidden_dim: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
     num_layers: Optional[Annotated[int, Field(strict=True, gt=0)]] = None
+    seed: int | None = None
+    multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
 
     # avoid warning about protected namespace 'model_', see
     # https://docs.pydantic.dev/2.7/api/config/#pydantic.config.ConfigDict.protected_namespaces
@@ -88,6 +100,24 @@ class ModelInitializerWrapper(ModelInitializationIF):
 
 class ComposedInitializationRoutines:
     @staticmethod
+    def _warn_pp_topology_dependent_seed(device_mesh: Optional[DeviceMesh], seed: Optional[int]) -> None:
+        if seed is None or not has_parallelism_method(
+            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
+        ):
+            return
+
+        if torch.distributed.is_initialized() and torch.distributed.get_rank() != 0:
+            return
+
+        logger.warning(
+            "Seeded weight initialization is topology-dependent when pipeline parallelism is active. "
+            "Modalities offsets the initialization seed by PP rank to avoid identical stage-local weights, "
+            "so the same seed can produce different initialized weights for different PP configurations. "
+            "For topology-independent reproducibility, create and reuse a distributed checkpoint directly "
+            "after weight initialization."
+        )
+
+    @staticmethod
     def get_model_initializer_wrapper(model_initializers: list[ModelInitializationIF]) -> ModelInitializationIF:
         initializer_wrapper = ModelInitializerWrapper(model_initializers)
         return initializer_wrapper
@@ -98,8 +128,11 @@ class ComposedInitializationRoutines:
         weight_init_type: WeightInitTypes,
         mean: float,
         std: float | str,
-        hidden_dim: Optional[int] = None,
-        num_layers: int = None,
+        hidden_dim: int | None = None,
+        num_layers: int | None = None,
+        device_mesh: Optional[DeviceMesh] = None,
+        seed: int | None = None,
+        multi_device_generator_policy: MultiDeviceGeneratorPolicy = MultiDeviceGeneratorPolicy.WARN,
     ) -> ModelInitializationIF:
         """This initialization allows to intialize a model with plain, scaled or scaled_embed initialization.
         Note that plain initialization is always performed in the beginning. In case of scaled_embed,
@@ -114,28 +147,53 @@ class ComposedInitializationRoutines:
                 Defaults to None.
             num_layers (int, optional): Number of layers in the model (required for scaled and scaled_embed only).
                 Defaults to None.
+            device_mesh (Optional[DeviceMesh], optional): Device mesh used for parallelization.
+            seed (Optional[int], optional): Seed for random initialization. Defaults to None. When pipeline
+                parallelism is active, the effective seed is offset by PP rank to avoid identical stage-local
+                initialization, so the same seed does not guarantee identical initialized weights across different
+                PP topologies.
+            multi_device_generator_policy (MultiDeviceGeneratorPolicy, optional): Behavior when
+                initialization creates per-device RNG generators for more than one device in the same process.
+                Defaults to MultiDeviceGeneratorPolicy.WARN.
 
         Returns:
             ModelInitializationIF: The Weight Initializer performing the initialization as specified.
         """
+        ComposedInitializationRoutines._warn_pp_topology_dependent_seed(device_mesh=device_mesh, seed=seed)
+
+        # Set different random seed for each PP rank to ensure diversity
+        if seed is not None and has_parallelism_method(
+            device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP
+        ):
+            assert device_mesh is not None
+            seed += get_parallel_rank(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.PP)
+
         model_initializers = []
 
         # plain
         plain_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.PLAIN]
         plain_init = InitializationRoutines.get_plain_initialization(
-            mean=mean, std=std, hidden_dim=hidden_dim, parameter_name_regexes=plain_parameter_name_regexes
+            mean=mean,
+            std=std,
+            hidden_dim=hidden_dim,
+            parameter_name_regexes=plain_parameter_name_regexes,
+            seed=seed,
+            multi_device_generator_policy=multi_device_generator_policy,
         )
         working_std = plain_init.std
         model_initializers.append(plain_init)
 
         if weight_init_type in [WeightInitTypes.SCALED, WeightInitTypes.SCALED_EMBED]:
             # scaled
+            assert num_layers is not None
             scaled_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED]
             scaled_init = InitializationRoutines.get_scaled_initialization(
                 mean=mean,
                 std=working_std,
                 num_layers=num_layers,
                 parameter_name_regexes=scaled_parameter_name_regexes,
+                seed=seed,
+                multi_device_generator_policy=multi_device_generator_policy,
             )
             model_initializers.append(scaled_init)
 
@@ -143,7 +201,10 @@ class ComposedInitializationRoutines:
             # scaled embed
             scaled_embed_parameter_name_regexes = NAMED_PARAMETER_INIT_GROUPS[model_type][WeightInitTypes.SCALED_EMBED]
             scaled_embed_init = InitializationRoutines.get_scaled_embed_initialization(
-                mean=mean, parameter_name_regexes=scaled_embed_parameter_name_regexes
+                mean=mean,
+                parameter_name_regexes=scaled_embed_parameter_name_regexes,
+                seed=seed,
+                multi_device_generator_policy=multi_device_generator_policy,
             )
             model_initializers.append(scaled_embed_init)
 

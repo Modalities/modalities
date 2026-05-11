@@ -105,7 +105,6 @@ def _build_gpt2_model() -> GPT2LLM:
         ffn_norm_config=ln_cfg,
         lm_head_norm_config=ln_cfg,
         use_weight_tying=False,
-        seed=42,
         enforce_swiglu_hidden_dim_multiple_of=256,
     )
     return model
