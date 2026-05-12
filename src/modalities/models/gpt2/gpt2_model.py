@@ -152,6 +152,7 @@ class RotaryTransform(QueryKeyValueTransform):
         self.reset_parameters()
 
     def _compute_yarn_parameters(self, device: torch.device | None) -> tuple[torch.Tensor, float]:
+        """Compute YaRN inverse frequencies and the attention scaling factor."""
         if self.rope_scaling is None:
             raise ValueError("YaRN requires a rope_scaling config.")
         if self.max_position_embeddings is None:
@@ -182,6 +183,7 @@ class RotaryTransform(QueryKeyValueTransform):
         truncate = self.rope_scaling.get("truncate", True)
 
         def get_mscale(scale: float, mscale: float = 1.0) -> float:
+            """Return the YaRN mscale coefficient for a given scaling factor."""
             if scale <= 1:
                 return 1.0
             return 0.1 * mscale * math.log(scale) + 1.0
@@ -197,6 +199,7 @@ class RotaryTransform(QueryKeyValueTransform):
             raise ValueError("YaRN requires rope_scaling.attention_factor to be a float > 0")
 
         def find_correction_dim(num_rotations: float, dim: int, base: int, max_position_embeddings: int) -> float:
+            """Map a target number of rotations to a rotary dimension index."""
             return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (2 * math.log(base))
 
         def find_correction_range(
@@ -207,6 +210,7 @@ class RotaryTransform(QueryKeyValueTransform):
             max_position_embeddings: int,
             truncate: bool,
         ) -> tuple[float, float]:
+            """Compute the lower and upper rotary-dimension correction bounds for YaRN."""
             low = find_correction_dim(low_rot, dim, base, max_position_embeddings)
             high = find_correction_dim(high_rot, dim, base, max_position_embeddings)
             if truncate:
@@ -215,6 +219,7 @@ class RotaryTransform(QueryKeyValueTransform):
             return max(low, 0), min(high, dim - 1)
 
         def linear_ramp_factor(min_value: float, max_value: float, dim: int) -> torch.Tensor:
+            """Create a clamped linear ramp used to blend interpolation and extrapolation."""
             if min_value == max_value:
                 max_value += 0.001
             linear_func = (torch.arange(dim, dtype=torch.float32, device=device) - min_value) / (max_value - min_value)
@@ -421,6 +426,7 @@ class AttentionConfig(BaseModel):
 
             @model_validator(mode="after")
             def validate_rope_scaling(self) -> "AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig":
+                """Validate and normalize rope_scaling, including YaRN-specific constraints."""
                 if self.rope_scaling is None:
                     return self
 
