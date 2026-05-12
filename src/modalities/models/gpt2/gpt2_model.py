@@ -175,8 +175,10 @@ class RotaryTransform(QueryKeyValueTransform):
         attention_factor = self.rope_scaling.get("attention_factor")
         mscale = self.rope_scaling.get("mscale")
         mscale_all_dim = self.rope_scaling.get("mscale_all_dim")
-        beta_fast = self.rope_scaling.get("beta_fast") or 32
-        beta_slow = self.rope_scaling.get("beta_slow") or 1
+        beta_fast_raw = self.rope_scaling.get("beta_fast")
+        beta_slow_raw = self.rope_scaling.get("beta_slow")
+        beta_fast = float(beta_fast_raw) if isinstance(beta_fast_raw, (int, float)) else 32.0
+        beta_slow = float(beta_slow_raw) if isinstance(beta_slow_raw, (int, float)) else 1.0
         truncate = self.rope_scaling.get("truncate", True)
 
         def get_mscale(scale: float, mscale: float = 1.0) -> float:
@@ -194,10 +196,17 @@ class RotaryTransform(QueryKeyValueTransform):
         elif not isinstance(attention_factor, (int, float)) or attention_factor <= 0:
             raise ValueError("YaRN requires rope_scaling.attention_factor to be a float > 0")
 
-        def find_correction_dim(num_rotations, dim, base, max_position_embeddings):
+        def find_correction_dim(num_rotations: float, dim: int, base: int, max_position_embeddings: int) -> float:
             return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (2 * math.log(base))
 
-        def find_correction_range(low_rot, high_rot, dim, base, max_position_embeddings, truncate):
+        def find_correction_range(
+            low_rot: float,
+            high_rot: float,
+            dim: int,
+            base: int,
+            max_position_embeddings: int,
+            truncate: bool,
+        ) -> tuple[float, float]:
             low = find_correction_dim(low_rot, dim, base, max_position_embeddings)
             high = find_correction_dim(high_rot, dim, base, max_position_embeddings)
             if truncate:
@@ -205,7 +214,7 @@ class RotaryTransform(QueryKeyValueTransform):
                 high = math.ceil(high)
             return max(low, 0), min(high, dim - 1)
 
-        def linear_ramp_factor(min_value, max_value, dim):
+        def linear_ramp_factor(min_value: float, max_value: float, dim: int) -> torch.Tensor:
             if min_value == max_value:
                 max_value += 0.001
             linear_func = (torch.arange(dim, dtype=torch.float32, device=device) - min_value) / (max_value - min_value)
