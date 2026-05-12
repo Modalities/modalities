@@ -20,14 +20,15 @@ from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.utility import find_free_port
 
 
-def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir: Path) -> Path:
+def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir: Path, file_tag: str = "") -> Path:
     """Patches the original configuration file to set a custom activation type."""
     with original_config_path.open("r", encoding="utf-8") as f:
         config_dict = yaml.safe_load(f)
 
     config_dict["model_raw"]["config"]["activation_type"] = activation_type
 
-    tmp_file_path = tmp_dir / original_config_path.name
+    file_suffix = f"_{file_tag}" if file_tag else ""
+    tmp_file_path = tmp_dir / f"{original_config_path.stem}{file_suffix}{original_config_path.suffix}"
     with tmp_file_path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(config_dict, f)
 
@@ -103,12 +104,16 @@ class TestTensorParallelism:
         ):
             # Seed before FSDP2 instantiation
             torch.manual_seed(42)
-            fsdp2_path = patch_config_file(fsdp2_config_path, activation_type, tmp_config_dir)
+            fsdp2_path = patch_config_file(
+                fsdp2_config_path, activation_type, tmp_config_dir, file_tag=f"{activation_type}_rank{process_id}_fsdp2"
+            )
             fsdp2_model, fsdp2_mesh = self._get_components(fsdp2_path, tmp_path)
 
             # Seed again before TP instantiation to match
             torch.manual_seed(42)
-            tp_path = patch_config_file(tp_config_path, activation_type, tmp_config_dir)
+            tp_path = patch_config_file(
+                tp_config_path, activation_type, tmp_config_dir, file_tag=f"{activation_type}_rank{process_id}_tp"
+            )
             tp_model, tp_mesh = self._get_components(tp_path, tmp_path)
 
             # Ensure models use the correct MLP
