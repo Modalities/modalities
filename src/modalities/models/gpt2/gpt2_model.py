@@ -2,7 +2,7 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Optional, overload
+from typing import Annotated, Any, Optional, overload
 
 import torch
 import torch.nn as nn
@@ -23,6 +23,13 @@ try:
     from flash_attn import flash_attn_func
 except ModuleNotFoundError:
     flash_attn_func = None
+
+try:
+    from torch.distributed.tensor.experimental import context_parallel
+    from torch.distributed.tensor.experimental._attention import context_parallel_unshard
+except (ImportError, ModuleNotFoundError):
+    context_parallel = None
+    context_parallel_unshard = None
 
 # Logger configuration
 logger = logging.getLogger(__name__)
@@ -473,6 +480,7 @@ class CausalSelfAttention(nn.Module):
         # TODO: we might want different values for attention_dropout and linear_dropout
         self.dropout = dropout
         self.resid_dropout = nn.Dropout(self.dropout)
+        self.context_parallel_mesh: Optional[Any] = None
 
         # TODO: inject QKVTransforms from outside
         self.qkv_transforms = nn.ModuleList(
@@ -598,6 +606,7 @@ class CausalSelfAttention(nn.Module):
         v: torch.Tensor,
         dropout: float,
         attention_impl: AttentionImplementation,
+        context_parallel_mesh: Optional[Any] = None,
     ) -> torch.Tensor:
         """
         Executes attention mechanism based on the specified implementation.
@@ -616,6 +625,10 @@ class CausalSelfAttention(nn.Module):
         Raises:
             NotImplementedError: If the specified attention implementation is not supported.
         """
+        cp_active = context_parallel_mesh is not None and context_parallel_mesh.size() > 1
+        if cp_active and attention_impl != AttentionImplementation.PYTORCH_FLASH:
+            raise ValueError("Context parallelism currently supports only attention_implementation='pytorch_flash'.")
+
         if attention_impl == AttentionImplementation.MANUAL:
             k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
             y = manual_scaled_dot_product_attention(
@@ -629,15 +642,59 @@ class CausalSelfAttention(nn.Module):
             y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.PYTORCH_FLASH:
             k, v = cls.repeat_kv_heads(q, k, v)  # for GQA (group query attention)
-            y = torch.nn.functional.scaled_dot_product_attention(
-                query=q,
-                key=k,
-                value=v,
-                attn_mask=None,
-                dropout_p=dropout,
-                is_causal=True,
-            )  # (B, nh_q, T, hd)
-            y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+            if cp_active:
+                cp_mesh = context_parallel_mesh
+                if cp_mesh is None:
+                    raise RuntimeError("Context parallelism is active, but no CP mesh was provided.")
+                if context_parallel is None or context_parallel_unshard is None:
+                    raise RuntimeError(
+                        "Context parallelism is enabled, but PyTorch context parallel APIs are unavailable. "
+                        "Please install a CP-capable PyTorch build."
+                    )
+                # context_parallel shards buffers via distribute_tensor, which currently
+                # requires leaf tensors. Use detached copies for CP execution and bridge
+                # gradients through a reference SDPA path.
+                cp_q = q.detach().clone()
+                cp_k = k.detach().clone()
+                cp_v = v.detach().clone()
+                with context_parallel(
+                    cp_mesh,
+                    buffers=[cp_q, cp_k, cp_v],
+                    buffer_seq_dims=[2, 2, 2],
+                    no_restore_buffers={cp_q, cp_k, cp_v},
+                ):
+                    y_cp = torch.nn.functional.scaled_dot_product_attention(
+                        query=cp_q,
+                        key=cp_k,
+                        value=cp_v,
+                        attn_mask=None,
+                        dropout_p=dropout,
+                        is_causal=True,
+                    )
+                (y_cp,) = context_parallel_unshard(cp_mesh, [y_cp], [2])
+                y_cp = y_cp.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+
+                # Keep gradient flow through standard SDPA on non-detached tensors.
+                y_ref = torch.nn.functional.scaled_dot_product_attention(
+                    query=q,
+                    key=k,
+                    value=v,
+                    attn_mask=None,
+                    dropout_p=dropout,
+                    is_causal=True,
+                )
+                y_ref = y_ref.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
+                y = y_ref + (y_cp - y_ref.detach())
+            else:
+                y = torch.nn.functional.scaled_dot_product_attention(
+                    query=q,
+                    key=k,
+                    value=v,
+                    attn_mask=None,
+                    dropout_p=dropout,
+                    is_causal=True,
+                )  # (B, nh_q, T, hd)
+                y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
         elif attention_impl == AttentionImplementation.DAO_FLASH:
             # Due to the lack of GPUs in github actions and the requirement of those in the flash-attn library,
             # we have to check if the library is installed and raise an error if not.
@@ -673,7 +730,14 @@ class CausalSelfAttention(nn.Module):
         if self.q_norm is not None and self.k_norm is not None:
             q = self.q_norm(q)
             k = self.k_norm(k)
-        y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
+        y = CausalSelfAttention.execute_attention(
+            q,
+            k,
+            v,
+            self.dropout,
+            self.attention_impl,
+            context_parallel_mesh=self.context_parallel_mesh,
+        )  # (B, T, nh_q, hd)
         y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 

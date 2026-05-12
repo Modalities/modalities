@@ -43,7 +43,11 @@ from modalities.models.gpt2.gpt2_model import (
 from modalities.models.model import ActivationType
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    has_parallelism_method,
+)
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
     ActivationCheckpointing,
@@ -594,6 +598,24 @@ class ModelFactory:
 
 class GPT2ModelFactory:
     @staticmethod
+    def _set_context_parallel_mesh_(model: GPT2LLM, device_mesh: DeviceMesh) -> None:
+        cp_mesh = None
+        if has_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.CP):
+            cp_mesh_candidate = get_mesh_for_parallelism_method(
+                device_mesh=device_mesh,
+                parallelism_method=ParallelismDegrees.CP,
+            )
+            if cp_mesh_candidate.size() > 1:
+                cp_mesh = cp_mesh_candidate
+
+        for transformer_block in model.transformer.h.values():
+            if cp_mesh is not None and transformer_block.attn.attention_impl != AttentionImplementation.PYTORCH_FLASH:
+                raise ValueError(
+                    "Context parallelism currently supports only attention_implementation='pytorch_flash'."
+                )
+            transformer_block.attn.context_parallel_mesh = cp_mesh
+
+    @staticmethod
     def get_gpt2_model(
         sample_key: str,
         prediction_key: str,
@@ -654,6 +676,7 @@ class GPT2ModelFactory:
 
     @staticmethod
     def get_gpt2_tensor_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
+        GPT2ModelFactory._set_context_parallel_mesh_(model=model, device_mesh=device_mesh)
         tp_mesh = device_mesh[ParallelismDegrees.TP.value]
         model_tp_plan = {
             # Row-wise parallelism might seem counterintuitive here,
@@ -761,4 +784,10 @@ class GPT2ModelFactory:
                 parallelize_plan=transformer_block_tp_plan,
             )
 
+        return model
+
+    @staticmethod
+    def get_gpt2_context_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
+        """Attach context parallel mesh runtime state to GPT-2 attention blocks."""
+        GPT2ModelFactory._set_context_parallel_mesh_(model=model, device_mesh=device_mesh)
         return model

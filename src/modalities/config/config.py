@@ -341,6 +341,20 @@ class GPT2ModelTPConfig(BaseModel):
         return self
 
 
+class GPT2ModelCPConfig(BaseModel):
+    model: PydanticPytorchModuleOrListType  # TODO set proper type
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_cp_mesh_existence(self) -> "GPT2ModelCPConfig":
+        mesh_dim_names = self.device_mesh.mesh_dim_names
+        if mesh_dim_names is None:
+            raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
+        if ParallelismDegrees.CP.value not in mesh_dim_names:
+            raise ValueError(f"Context parallelism key '{ParallelismDegrees.CP.value}' not in {self.device_mesh=}")
+        return self
+
+
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     block_names: list[str]
