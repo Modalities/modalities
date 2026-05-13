@@ -38,21 +38,26 @@ class ComponentsInstantiationModel(BaseModel):
 )
 class TestPipelineParallelism:
     @pytest.mark.parametrize(
-        "fsdp_degree, tp_degree, pp_degree, world_size",
+        "fsdp_degree, tp_degree, cp_degree, pp_degree, world_size",
         [
-            (2, 1, 2, 4),
-            (2, 2, 2, 8),
+            (2, 1, 1, 2, 4),
+            (2, 2, 1, 2, 8),
+            (2, 1, 2, 2, 8),
         ],
     )
     def test_compare_pp_step_with_fsdp2_only_forward_backward_step(
-        self, fsdp_degree: int, tp_degree: int, pp_degree: int, world_size: int, tmp_path: Path
+        self, fsdp_degree: int, tp_degree: int, cp_degree: int, pp_degree: int, world_size: int, tmp_path: Path
     ):
         tmp_sharding_config_path = self._get_tmp_sharding_config_path(
-            fsdp_degree=fsdp_degree, tp_degree=tp_degree, pp_degree=pp_degree, tmp_path=tmp_path
+            fsdp_degree=fsdp_degree,
+            tp_degree=tp_degree,
+            cp_degree=cp_degree,
+            pp_degree=pp_degree,
+            tmp_path=tmp_path,
         )
         mp.spawn(
             self._test_pp_impl,
-            args=(world_size, tmp_sharding_config_path, tmp_path),
+            args=(world_size, cp_degree, tmp_sharding_config_path, tmp_path),
             nprocs=world_size,
             join=True,
         )
@@ -68,7 +73,9 @@ class TestPipelineParallelism:
         inputs = sequences[:, :-1].contiguous()
         return inputs, targets
 
-    def _test_pp_impl(self, process_id: int, world_size: int, pp_model_config_path: Path, tmp_path: Path):
+    def _test_pp_impl(
+        self, process_id: int, world_size: int, cp_degree: int, pp_model_config_path: Path, tmp_path: Path
+    ):
         # wraps the actual test function to be able to run it in a distributed multiprocessing setup
         with MultiProcessingCudaEnv(
             process_group_backend=ProcessGroupBackendType.nccl,
@@ -78,7 +85,7 @@ class TestPipelineParallelism:
             rdvz_port=22359,
         ):
             is_last_pp_stage, loss_pp = self._forward_step_with_pp(pp_model_config_path, tmp_path)
-            fsdp2_loss = self._forward_step_without_pp(tmp_path)
+            fsdp2_loss = self._forward_step_without_pp(tmp_path=tmp_path, cp_degree=cp_degree)
 
             if is_last_pp_stage:
                 assert torch.allclose(
@@ -116,9 +123,12 @@ class TestPipelineParallelism:
             else torch.tensor([-1.0], device=inputs.device)
         )
 
-    def _forward_step_without_pp(self, tmp_path: Path) -> torch.Tensor:
+    def _forward_step_without_pp(self, tmp_path: Path, cp_degree: int) -> torch.Tensor:
         working_dir = Path(os.path.dirname(__file__))
-        fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
+        if cp_degree > 1:
+            fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_cp_fwd_bwd_pass.yaml"
+        else:
+            fsdp2_model_config_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_fwd_bwd_pass.yaml"
         components = self._get_components(fsdp2_model_config_path, use_pp=False, tmp_path=tmp_path)
         dp_rank = get_parallel_rank(components.device_mesh, ParallelismDegrees.DP_SHARD)
         inputs, targets = self._get_data(dp_rank=dp_rank)
@@ -131,10 +141,14 @@ class TestPipelineParallelism:
         fsdp2_loss = fsdp2_loss_fn(forward_batch)
         return fsdp2_loss
 
-    def _get_tmp_sharding_config_path(self, fsdp_degree: int, tp_degree: int, pp_degree: int, tmp_path: Path) -> Path:
+    def _get_tmp_sharding_config_path(
+        self, fsdp_degree: int, tp_degree: int, cp_degree: int, pp_degree: int, tmp_path: Path
+    ) -> Path:
         temp_file_path = tmp_path / "pp_sharding_config.yaml"
         working_dir = Path(os.path.dirname(__file__))
-        if tp_degree > 1:
+        if cp_degree > 1:
+            config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_cp_fwd_bwd_pass.yaml"
+        elif tp_degree > 1:
             config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_tp_fwd_bwd_pass.yaml"
         else:
             config_file_path = working_dir / "configs/config_lorem_ipsum_long_fsdp2_pp_fwd_bwd_pass.yaml"
@@ -144,6 +158,7 @@ class TestPipelineParallelism:
             config_dict = yaml.safe_load(config_string)
             config_dict["device_mesh"]["config"]["data_parallel_shard_degree"] = fsdp_degree
             config_dict["device_mesh"]["config"]["tensor_parallel_degree"] = tp_degree
+            config_dict["device_mesh"]["config"]["context_parallel_degree"] = cp_degree
             config_dict["device_mesh"]["config"]["pipeline_parallel_degree"] = pp_degree
 
         # save to temporary file
