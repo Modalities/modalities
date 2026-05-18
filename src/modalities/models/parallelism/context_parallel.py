@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 
+import torch
 import torch.nn as nn
 from torch.distributed.device_mesh import DeviceMesh
 
@@ -53,3 +54,56 @@ def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], c
 
     CausalSelfAttention.execute_attention = classmethod(cp_execute_attention)
     CausalSelfAttention._cp_execute_attention_wrapped = True
+
+
+def shard_tensor_buffers_for_context_parallel(
+    cp_mesh: DeviceMesh,
+    buffers: tuple[torch.Tensor, ...],
+    seq_dims: tuple[int, ...],
+    load_balancer_type: str | None = "headtail",
+    shard_impl=None,
+) -> tuple[torch.Tensor, ...]:
+    """Shard tensor buffers across CP ranks along sequence dimensions.
+
+    This mirrors TorchTitan's input sharding pattern while keeping the current
+    codebase focused on plain tensor inputs/targets (no attention mask sharding yet).
+    """
+    if len(buffers) != len(seq_dims):
+        raise ValueError(f"Expected len(buffers) == len(seq_dims), got {len(buffers)} and {len(seq_dims)}.")
+    if len(buffers) == 0:
+        return tuple()
+
+    if shard_impl is None:
+        try:
+            from torch.distributed.tensor.experimental._attention import _context_parallel_shard, _HeadTailLoadBalancer
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise RuntimeError(
+                "Context parallel input sharding requires PyTorch experimental DTensor attention APIs."
+            ) from exc
+        shard_impl = _context_parallel_shard
+
+        if load_balancer_type == "headtail":
+            seq_len = buffers[0].size(seq_dims[0])
+            cp_world_size = cp_mesh.size()
+            load_balancer = _HeadTailLoadBalancer(seq_len, cp_world_size, cp_mesh.device_type)
+        elif load_balancer_type is None:
+            load_balancer = None
+        elif load_balancer_type == "ptrr":
+            raise ValueError(
+                "PTRR load balancing is not supported for plain tensor input/target sharding without block masks."
+            )
+        else:
+            raise ValueError(
+                f"Invalid load_balancer_type '{load_balancer_type}'. Must be one of: 'headtail', 'ptrr', or None"
+            )
+    else:
+        # Tests can inject shard_impl and bypass private PyTorch imports.
+        load_balancer = None
+
+    sharded = shard_impl(
+        mesh=cp_mesh,
+        buffers=buffers,
+        seq_dims=seq_dims,
+        load_balancer=load_balancer,
+    )
+    return tuple(sharded)

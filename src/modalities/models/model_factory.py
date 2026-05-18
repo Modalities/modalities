@@ -650,6 +650,7 @@ class GPT2ModelFactory:
             attention_modules.append(attn_module)
 
         apply_cp_to_sdpa_attention_forward(attention_modules=attention_modules, cp_mesh=cp_mesh)
+        setattr(model, "_context_parallel_load_balancer", context_parallel_load_balancer)
 
     @staticmethod
     def get_gpt2_model(

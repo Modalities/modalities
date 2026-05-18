@@ -1,6 +1,6 @@
+import gc
 from datetime import datetime
 from enum import Enum
-import gc
 from typing import Callable, Optional
 
 import torch
@@ -16,8 +16,14 @@ from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, P
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
+from modalities.models.parallelism.context_parallel import shard_tensor_buffers_for_context_parallel
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    get_parallel_degree,
+    has_parallelism_method,
+)
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 from modalities.training.training_progress import TrainingProgress
@@ -92,6 +98,7 @@ class Trainer:
         """
         self.gc = GarbageCollection(gc_freq=10)
         self.global_rank = global_rank
+        self.device_mesh = device_mesh
         if device_mesh is not None:
             self.dp_degree = get_parallel_degree(
                 device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD]
@@ -126,6 +133,56 @@ class Trainer:
         """
         return (micro_batch_id + 1) // gradient_acc_steps
 
+    def _apply_context_parallel_sharding_to_batch_(
+        self,
+        batch: DatasetBatch,
+        sample_key: str | None,
+        target_key: str,
+        context_parallel_load_balancer: str | None = "headtail",
+    ) -> None:
+        if self.device_mesh is None or not has_parallelism_method(self.device_mesh, ParallelismDegrees.CP):
+            return
+
+        cp_mesh = get_mesh_for_parallelism_method(
+            device_mesh=self.device_mesh, parallelism_method=ParallelismDegrees.CP
+        )
+        if cp_mesh.size() <= 1:
+            return
+
+        buffer_keys: list[tuple[str, str]] = []
+        buffers: list[torch.Tensor] = []
+        seq_dims: list[int] = []
+
+        if sample_key is not None and sample_key in batch.samples:
+            if batch.samples[sample_key].device.type != "cuda":
+                batch.samples[sample_key] = batch.samples[sample_key].to(torch.cuda.current_device(), non_blocking=True)
+            buffer_keys.append(("sample", sample_key))
+            buffers.append(batch.samples[sample_key])
+            seq_dims.append(1)
+
+        if target_key in batch.targets:
+            if batch.targets[target_key].device.type != "cuda":
+                batch.targets[target_key] = batch.targets[target_key].to(torch.cuda.current_device(), non_blocking=True)
+            buffer_keys.append(("target", target_key))
+            buffers.append(batch.targets[target_key])
+            seq_dims.append(1)
+
+        if not buffers:
+            return
+
+        sharded_buffers = shard_tensor_buffers_for_context_parallel(
+            cp_mesh=cp_mesh,
+            buffers=tuple(buffers),
+            seq_dims=tuple(seq_dims),
+            load_balancer_type=context_parallel_load_balancer,
+        )
+
+        for (kind, key), tensor in zip(buffer_keys, sharded_buffers, strict=True):
+            if kind == "sample":
+                batch.samples[key] = tensor
+            else:
+                batch.targets[key] = tensor
+
     def _train_batch(
         self,
         batch: DatasetBatch,
@@ -159,6 +216,15 @@ class Trainer:
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
+        sample_key = getattr(model_parts[0], "sample_key", None)
+        context_parallel_load_balancer = getattr(model_parts[0], "_context_parallel_load_balancer", "headtail")
+        self._apply_context_parallel_sharding_to_batch_(
+            batch=batch,
+            sample_key=sample_key,
+            target_key=loss_fun.target_key,
+            context_parallel_load_balancer=context_parallel_load_balancer,
+        )
+
         if scheduled_pipeline is not None:
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
@@ -388,7 +454,7 @@ class Trainer:
                     self.gc.run(step_count=training_progress.num_seen_steps_total)
                     evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                     checkpointing_callback(training_progress=training_progress)
-                    
+
                 profiler_cm.step()
 
     @staticmethod
