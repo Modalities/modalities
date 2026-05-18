@@ -327,6 +327,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
 class GPT2ModelTPConfig(BaseModel):
     model: PydanticPytorchModuleOrListType  # TODO set proper type
     device_mesh: PydanticDeviceMeshIFType
+    context_parallel_load_balancer: Literal["headtail", "ptrr"] | None = "headtail"
 
     @model_validator(mode="after")
     def validate_tp_mesh_existence(self) -> "GPT2ModelTPConfig":
@@ -335,9 +336,29 @@ class GPT2ModelTPConfig(BaseModel):
             raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
         if ParallelismDegrees.TP.value not in mesh_dim_names:
             raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
+        if self.context_parallel_load_balancer is not None and ParallelismDegrees.CP.value not in mesh_dim_names:
+            raise ValueError(
+                "context_parallel_load_balancer can only be set when context parallelism is configured in the mesh. "
+                f"Expected key '{ParallelismDegrees.CP.value}' in {self.device_mesh=}."
+            )
         if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
             # TorchTitan uses replicate (i.e, plain DP) to combine DP with TP.
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
+        return self
+
+
+class GPT2ModelCPConfig(BaseModel):
+    model: PydanticPytorchModuleOrListType
+    device_mesh: PydanticDeviceMeshIFType
+    context_parallel_load_balancer: Literal["headtail", "ptrr"] | None = "headtail"
+
+    @model_validator(mode="after")
+    def validate_cp_mesh_existence(self) -> "GPT2ModelCPConfig":
+        mesh_dim_names = self.device_mesh.mesh_dim_names
+        if mesh_dim_names is None:
+            raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
+        if ParallelismDegrees.CP.value not in mesh_dim_names:
+            raise ValueError(f"Context parallelism key '{ParallelismDegrees.CP.value}' not in {self.device_mesh=}")
         return self
 
 
