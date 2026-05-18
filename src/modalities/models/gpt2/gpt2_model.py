@@ -25,6 +25,17 @@ except ModuleNotFoundError:
     flash_attn_func = None
 
 try:
+    from torch.distributed.tensor import DTensor, Shard
+except (ImportError, ModuleNotFoundError):
+    DTensor = None
+    Shard = None
+
+try:
+    from torch.distributed.tensor.experimental._attention import _enable_context_parallel_dispatcher
+except (ImportError, ModuleNotFoundError):
+    _enable_context_parallel_dispatcher = None
+
+try:
     from torch.distributed.tensor.experimental import context_parallel
     from torch.distributed.tensor.experimental._attention import context_parallel_unshard
 except (ImportError, ModuleNotFoundError):
@@ -646,45 +657,27 @@ class CausalSelfAttention(nn.Module):
                 cp_mesh = context_parallel_mesh
                 if cp_mesh is None:
                     raise RuntimeError("Context parallelism is active, but no CP mesh was provided.")
-                if context_parallel is None or context_parallel_unshard is None:
+                if DTensor is None or Shard is None or _enable_context_parallel_dispatcher is None:
                     raise RuntimeError(
                         "Context parallelism is enabled, but PyTorch context parallel APIs are unavailable. "
                         "Please install a CP-capable PyTorch build."
                     )
-                # context_parallel shards buffers via distribute_tensor, which currently
-                # requires leaf tensors. Use detached copies for CP execution and bridge
-                # gradients through a reference SDPA path.
-                cp_q = q.detach().clone()
-                cp_k = k.detach().clone()
-                cp_v = v.detach().clone()
-                with context_parallel(
-                    cp_mesh,
-                    buffers=[cp_q, cp_k, cp_v],
-                    buffer_seq_dims=[2, 2, 2],
-                    no_restore_buffers={cp_q, cp_k, cp_v},
-                ):
-                    y_cp = torch.nn.functional.scaled_dot_product_attention(
-                        query=cp_q,
-                        key=cp_k,
-                        value=cp_v,
-                        attn_mask=None,
-                        dropout_p=dropout,
-                        is_causal=True,
-                    )
-                (y_cp,) = context_parallel_unshard(cp_mesh, [y_cp], [2])
-                y_cp = y_cp.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-
-                # Keep gradient flow through standard SDPA on non-detached tensors.
-                y_ref = torch.nn.functional.scaled_dot_product_attention(
-                    query=q,
-                    key=k,
-                    value=v,
+                _enable_context_parallel_dispatcher()
+                cp_placement = [Shard(2)]
+                cp_q = q if isinstance(q, DTensor) else DTensor.from_local(q, cp_mesh, cp_placement, run_check=False)
+                cp_k = k if isinstance(k, DTensor) else DTensor.from_local(k, cp_mesh, cp_placement, run_check=False)
+                cp_v = v if isinstance(v, DTensor) else DTensor.from_local(v, cp_mesh, cp_placement, run_check=False)
+                y = torch.nn.functional.scaled_dot_product_attention(
+                    query=cp_q,
+                    key=cp_k,
+                    value=cp_v,
                     attn_mask=None,
                     dropout_p=dropout,
                     is_causal=True,
                 )
-                y_ref = y_ref.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
-                y = y_ref + (y_cp - y_ref.detach())
+                if isinstance(y, DTensor):
+                    y = y.to_local()
+                y = y.transpose(1, 2).contiguous()  # (B, T, nh_q, hd)
             else:
                 y = torch.nn.functional.scaled_dot_product_attention(
                     query=q,
