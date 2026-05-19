@@ -336,7 +336,11 @@ class GPT2ModelTPConfig(BaseModel):
             raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
         if ParallelismDegrees.TP.value not in mesh_dim_names:
             raise ValueError(f"Tensor parallelism key '{ParallelismDegrees.TP.value}' not in {self.device_mesh=}")
-        if self.context_parallel_load_balancer is not None and ParallelismDegrees.CP.value not in mesh_dim_names:
+        if (
+            "context_parallel_load_balancer" in self.model_fields_set
+            and self.context_parallel_load_balancer is not None
+            and ParallelismDegrees.CP.value not in mesh_dim_names
+        ):
             raise ValueError(
                 "context_parallel_load_balancer can only be set when context parallelism is configured in the mesh. "
                 f"Expected key '{ParallelismDegrees.CP.value}' in {self.device_mesh=}."
