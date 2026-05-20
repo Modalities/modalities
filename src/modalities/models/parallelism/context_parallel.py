@@ -11,13 +11,27 @@ from modalities.models.gpt2.gpt2_model import AttentionImplementation, CausalSel
 # from Meta's open-source project TorchTitan,
 # licensed under the BSD 3-Clause License.
 def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], cp_mesh: DeviceMesh) -> None:
-    """Wrap SDPA attention forward methods with context parallel DTensor dispatch.
+    """Patch CausalSelfAttention.execute_attention to route SDPA through DTensor CP dispatch.
 
-    This wrapper is intentionally minimal and only targets the QKV->SDPA path.
+    The patch is class-level (not per-instance). `attention_modules` is used only as a
+    guard: if the list is empty no patching happens, since the model has no SDPA layers to
+    wrap. The individual module objects are not modified.
+
     It must run before tensor-parallel wrappers so CP logic executes inside local
     tensor regions.
     """
     if len(attention_modules) == 0:
+        return
+
+    # Detect re-entry. A second call with the same mesh is a no-op; a different mesh
+    # would silently use the wrong mesh because cp_mesh is captured by closure.
+    existing_mesh = getattr(CausalSelfAttention, "_cp_mesh", None)
+    if getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", False):
+        if existing_mesh is not cp_mesh:
+            raise RuntimeError(
+                "apply_cp_to_sdpa_attention_forward has already patched CausalSelfAttention "
+                "with a different cp_mesh. Re-patching with a new mesh is not supported."
+            )
         return
 
     try:
@@ -31,9 +45,6 @@ def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], c
         ) from exc
 
     _enable_context_parallel_dispatcher()
-
-    if getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", False):
-        return
 
     original_execute_attention = CausalSelfAttention.execute_attention
 
@@ -53,7 +64,8 @@ def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], c
         return output.to_local() if isinstance(output, DTensor) else output
 
     CausalSelfAttention.execute_attention = classmethod(cp_execute_attention)
-    CausalSelfAttention._cp_execute_attention_wrapped = True
+    setattr(CausalSelfAttention, "_cp_execute_attention_wrapped", True)
+    setattr(CausalSelfAttention, "_cp_mesh", cp_mesh)
 
 
 def shard_tensor_buffers_for_context_parallel(

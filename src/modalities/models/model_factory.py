@@ -607,12 +607,22 @@ class GPT2ModelFactory:
         return cp_mesh if cp_mesh.size() > 1 else None
 
     @staticmethod
-    def _validate_context_parallel_seq_len(model: GPT2LLM, cp_degree: int, tp_degree: int = 1) -> None:
-        seq_len_divisor = tp_degree * cp_degree * 2
+    def _validate_context_parallel_seq_len(
+        model: GPT2LLM,
+        cp_degree: int,
+        tp_degree: int = 1,
+        load_balancer_type: str | None = "headtail",
+    ) -> None:
+        # The "headtail" balancer splits each rank's chunk into a head and tail piece,
+        # requiring an extra factor of 2. Other load balancers don't impose this constraint.
+        headtail_factor = 2 if load_balancer_type == "headtail" else 1
+        seq_len_divisor = tp_degree * cp_degree * headtail_factor
         if model.sequence_length % seq_len_divisor != 0:
+            headtail_note = " * 2 (headtail)" if load_balancer_type == "headtail" else ""
             raise ValueError(
-                "For GPT2 TP+CP runs, sequence_length must be divisible by tp_degree * 2 * cp_degree. "
-                f"Got sequence_length={model.sequence_length}, tp_degree={tp_degree}, cp_degree={cp_degree}."
+                f"For GPT2 CP runs, sequence_length must be divisible by tp_degree * cp_degree{headtail_note}. "
+                f"Got sequence_length={model.sequence_length}, tp_degree={tp_degree}, cp_degree={cp_degree}, "
+                f"load_balancer_type={load_balancer_type!r}."
             )
 
     @staticmethod
@@ -624,19 +634,23 @@ class GPT2ModelFactory:
         if cp_mesh is None:
             return
 
-        # Placeholder for future load-balancer-aware input sharding integration.
         if context_parallel_load_balancer not in ("headtail", "ptrr", None):
             raise ValueError(
                 "context_parallel_load_balancer must be one of: 'headtail', 'ptrr', or None. "
                 f"Got {context_parallel_load_balancer}."
             )
 
-        GPT2ModelFactory._validate_context_parallel_seq_len(model=model, cp_degree=cp_mesh.size())
+        GPT2ModelFactory._validate_context_parallel_seq_len(
+            model=model, cp_degree=cp_mesh.size(), load_balancer_type=context_parallel_load_balancer
+        )
 
         attention_modules: list[nn.Module] = []
         transformer_layers = getattr(model.transformer, "h", None)
         if not isinstance(transformer_layers, nn.ModuleDict):
-            return
+            raise TypeError(
+                "Context parallelism requires model.transformer.h to be an nn.ModuleDict of GPT2 blocks. "
+                f"Got type {type(transformer_layers).__name__}."
+            )
 
         for _, transformer_block in transformer_layers.named_children():
             attn_module = getattr(transformer_block, "attn", None)
@@ -739,6 +753,7 @@ class GPT2ModelFactory:
                 model=model,
                 cp_degree=cp_mesh.size(),
                 tp_degree=tp_mesh.size(),
+                load_balancer_type=context_parallel_load_balancer,
             )
             GPT2ModelFactory._apply_context_parallel_to_gpt2_attention(
                 model=model,

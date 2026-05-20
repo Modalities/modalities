@@ -9,7 +9,7 @@ from modalities.trainer import Trainer
 
 
 class _DummyPublisher:
-    def publish_message(self, payload):
+    def publish_message(self, **_kwargs):
         return None
 
 
