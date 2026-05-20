@@ -156,6 +156,19 @@ class Trainer:
         if sample_key is not None and sample_key in batch.samples:
             if batch.samples[sample_key].device.type != "cuda":
                 batch.samples[sample_key] = batch.samples[sample_key].to(torch.cuda.current_device(), non_blocking=True)
+            # Build global position_ids before sharding so they carry the full-sequence range.
+            # After HeadTail sharding they hold the correct global indices for each CP rank's
+            # local tokens, which RotaryTransform uses instead of a local 0-based arange.
+            full_seq_len = batch.samples[sample_key].shape[1]
+            position_ids = torch.arange(
+                full_seq_len, device=batch.samples[sample_key].device, dtype=torch.long
+            ).unsqueeze(
+                0
+            )  # (1, T)
+            buffer_keys.append(("sample", "position_ids"))
+            buffers.append(position_ids)
+            seq_dims.append(1)
+
             buffer_keys.append(("sample", sample_key))
             buffers.append(batch.samples[sample_key])
             seq_dims.append(1)

@@ -134,7 +134,18 @@ def _run_cp_parity_impl(
             dim=1,
         )
 
-        out_cp_local = cp.model({"input_ids": input_cp})["logits"].float()
+        # Global position indices for this rank's HeadTail-sharded tokens so RoPE uses
+        # the correct frequencies instead of a local 0-based arange.
+        position_ids = torch.cat(
+            [
+                torch.arange(head_start, head_start + chunk, device=device),
+                torch.arange(tail_start, tail_start + chunk, device=device),
+            ]
+        ).unsqueeze(
+            0
+        )  # (1, 2*chunk)
+
+        out_cp_local = cp.model({"input_ids": input_cp, "position_ids": position_ids})["logits"].float()
 
         assert out_cp_local.shape == ref.shape, f"Shape mismatch: CP={out_cp_local.shape}, ref={ref.shape}"
         assert torch.allclose(out_cp_local, ref, atol=1e-5, rtol=1e-4), (

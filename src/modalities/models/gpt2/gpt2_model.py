@@ -207,8 +207,26 @@ class RotaryTransform(QueryKeyValueTransform):
         # the rotation below work
         return (x * cos) + (self.rotate_half(x) * sin)
 
+    def _compute_cos_sin_from_positions(
+        self, position_ids: torch.Tensor, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # position_ids: (B, T) or (T,) — explicit global token positions
+        # Returns cos, sin of shape (B or 1, 1, T, dim_model) matching x: (B, nh, T, hd)
+        pos = position_ids.float()
+        if pos.dim() == 1:
+            pos = pos.unsqueeze(0)  # (1, T)
+        freqs = torch.einsum("bt,d->btd", pos, self.inv_freq.to(x.dtype))  # (B or 1, T, dim/2)
+        emb = torch.cat((freqs, freqs), dim=-1)  # (B or 1, T, dim)
+        cos = emb.cos().to(x.dtype).unsqueeze(1)  # (B or 1, 1, T, dim)
+        sin = emb.sin().to(x.dtype).unsqueeze(1)
+        return cos, sin
+
     def forward(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        position_ids: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass of the RotaryTransform module.
@@ -217,12 +235,20 @@ class RotaryTransform(QueryKeyValueTransform):
             q (torch.Tensor): Query tensor.
             k (torch.Tensor): Key tensor.
             v (torch.Tensor): Value tensor.
+            position_ids (torch.Tensor | None): Optional explicit global position indices of shape
+                (B, T) or (T,).  When provided (e.g. for context-parallel ranks that hold
+                non-contiguous token ranges), the correct global RoPE frequencies are computed
+                from these positions instead of assuming a local 0-based range.
 
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             Tuple containing the modified query tensor, key tensor, and value tensor.
         """
-        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
+        if position_ids is not None:
+            cos, sin = self._compute_cos_sin_from_positions(position_ids, k)
+            self._cos_cached, self._sin_cached = cos, sin
+        else:
+            self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
         q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
         k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
 
@@ -514,7 +540,12 @@ class CausalSelfAttention(nn.Module):
 
     @staticmethod
     def execute_qkv_transforms(
-        q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, qkv_transforms: nn.ModuleList, n_head_q: int
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        qkv_transforms: nn.ModuleList,
+        n_head_q: int,
+        position_ids: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Applies a series of transformations to the query, key, and value tensors.
@@ -525,6 +556,8 @@ class CausalSelfAttention(nn.Module):
             v (torch.Tensor): The value tensors.
             qkv_transforms (nn.ModuleList): A list of transformation modules to be applied to q, k, and v.
             n_head_q (int): The number of heads for the query tensors.
+            position_ids (torch.Tensor | None): Optional explicit global position indices forwarded
+                to RotaryTransform so CP ranks use correct global RoPE frequencies.
 
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -541,7 +574,10 @@ class CausalSelfAttention(nn.Module):
         v = v.view(batch_size, sequence_length, -1, n_head_dim).transpose(1, 2).contiguous()  # (B, nh_kv, T, hd)
 
         for transform in qkv_transforms:
-            q, k, v = transform(q, k, v)
+            if isinstance(transform, RotaryTransform) and position_ids is not None:
+                q, k, v = transform(q, k, v, position_ids=position_ids)
+            else:
+                q, k, v = transform(q, k, v)
 
         return q, k, v
 
@@ -655,12 +691,14 @@ class CausalSelfAttention(nn.Module):
             raise NotImplementedError(f"Attention implementation {attention_impl} not supported")
         return y  # (B, T, nh_q, hd)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, position_ids: torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass of the CausalSelfAttention module.
 
         Args:
             x (torch.Tensor): Input tensor of shape (B, T, n_embd)
+            position_ids (torch.Tensor | None): Optional global position indices forwarded to
+                RotaryTransform for correct CP-rank-aware RoPE.
 
         Returns:
             torch.Tensor: Output tensor of shape (B, T, n_embd), representing the output projection.
@@ -669,7 +707,9 @@ class CausalSelfAttention(nn.Module):
         q, k, v = self.projection(x)  # q: (B, T, n_embd), k: (B, T, n_embd // n_rep), v: (B, T, n_embd // n_rep)
 
         # q: (B, nh_q, T, hd), k: (B, nh_kv, T, hd), v: (B, nh_kv, T, hd)
-        q, k, v = CausalSelfAttention.execute_qkv_transforms(q, k, v, self.qkv_transforms, self.n_head_q)
+        q, k, v = CausalSelfAttention.execute_qkv_transforms(
+            q, k, v, self.qkv_transforms, self.n_head_q, position_ids=position_ids
+        )
         if self.q_norm is not None and self.k_norm is not None:
             q = self.q_norm(q)
             k = self.k_norm(k)
@@ -796,17 +836,19 @@ class GPT2Block(nn.Module):
                 f"but got `n_embd = {n_embd}` and `ffn_hidden = {ffn_hidden}`."
             )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, position_ids: torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass of the GPT2Block.
 
         Args:
             x (torch.Tensor): Input tensor.
+            position_ids (torch.Tensor | None): Optional global position indices forwarded to
+                the attention layer for CP-aware RoPE.
 
         Returns:
             torch.Tensor: Output tensor.
         """
-        x = x + self.attn(self.attention_norm(x))
+        x = x + self.attn(self.attention_norm(x), position_ids=position_ids)
         x = x + self.mlp(self.ffn_norm(x))
         return x
 
@@ -971,22 +1013,29 @@ class GPT2LLM(NNModel):
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.
+            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.  When a dict, an optional
+                ``"position_ids"`` key (shape ``(B, T)`` or ``(1, T)``) may be present to supply
+                explicit global token positions for CP-aware RoPE.
 
         Returns:
             dict[str, torch.Tensor] | torch.Tensor: Model output.
         """
         if isinstance(inputs, dict):
-            return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
+            position_ids = inputs.get("position_ids", None)
+            return {self.prediction_key: self.forward_impl(inputs[self.sample_key], position_ids=position_ids)}
         else:
             return self.forward_impl(inputs)
 
-    def forward_impl(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward_impl(self, inputs: torch.Tensor, position_ids: torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass implementation of the GPT2LLM module.
 
         Args:
             inputs (torch.Tensor): A tensor containing input token ids.
+            position_ids (torch.Tensor | None): Optional explicit global position indices
+                of shape ``(B, T)`` or ``(1, T)``.  When provided, RoPE uses these positions
+                instead of a local 0-based arange, enabling correct behaviour for CP ranks
+                that hold non-contiguous token ranges.
 
         Returns:
             torch.Tensor: A tensor containing output logits.
@@ -1010,7 +1059,7 @@ class GPT2LLM(NNModel):
         h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
 
         for layer_idx in self.transformer.h:
-            h = self.transformer.h[layer_idx](h)
+            h = self.transformer.h[layer_idx](h, position_ids=position_ids)
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
         h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
         return h

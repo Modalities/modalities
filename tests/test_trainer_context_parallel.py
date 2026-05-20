@@ -175,6 +175,32 @@ def test_cp_sharding_with_sample_key_none_only_shards_target(monkeypatch):
     assert captured.get("num_buffers") == 1
 
 
+def test_cp_sharding_with_sample_key_includes_position_ids(monkeypatch):
+    """When sample_key is provided, position_ids and the sample both enter the shard call,
+    and position_ids is written back to batch.samples."""
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required")
+
+    captured = {}
+
+    def _fake_shard(*, cp_mesh, buffers, seq_dims, load_balancer_type, shard_impl=None):
+        captured["num_buffers"] = len(buffers)
+        return buffers
+
+    monkeypatch.setattr("modalities.trainer.shard_tensor_buffers_for_context_parallel", _fake_shard)
+
+    trainer = _make_trainer(_DummyDeviceMesh())
+    batch = _cuda_batch(seq_len=8)
+    trainer._apply_context_parallel_sharding_to_batch_(
+        batch=batch, sample_key="input_ids", target_key="target_ids", context_parallel_load_balancer=None
+    )
+
+    # position_ids + input_ids + target_ids
+    assert captured.get("num_buffers") == 3
+    assert "position_ids" in batch.samples
+    assert batch.samples["position_ids"].shape == (1, 8)
+
+
 # ── CP sharding: early-exit conditions ───────────────────────────────────────
 
 
