@@ -57,6 +57,72 @@ class ThroughputAggregationKeys(Enum):
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
 
 
+def apply_context_parallel_sharding_to_batch(
+    device_mesh: DeviceMesh | None,
+    batch: DatasetBatch,
+    sample_key: str | None,
+    target_key: str,
+    context_parallel_load_balancer: str | None = "headtail",
+) -> None:
+    """Shard the sequence dimension of a batch in-place for context parallelism.
+
+    When a sample_key is provided, also derives and shards ``position_ids`` (global
+    token positions) so that RotaryTransform receives the correct frequencies for
+    each CP rank's non-contiguous token range.
+    """
+    if device_mesh is None or not has_parallelism_method(device_mesh, ParallelismDegrees.CP):
+        return
+
+    cp_mesh = get_mesh_for_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.CP)
+    if cp_mesh.size() <= 1:
+        return
+
+    buffer_keys: list[tuple[str, str]] = []
+    buffers: list[torch.Tensor] = []
+    seq_dims: list[int] = []
+
+    if sample_key is not None and sample_key in batch.samples:
+        if batch.samples[sample_key].device.type != "cuda":
+            batch.samples[sample_key] = batch.samples[sample_key].to(torch.cuda.current_device(), non_blocking=True)
+        # Build global position_ids before sharding so they carry the full-sequence range.
+        # After HeadTail sharding they hold the correct global indices for each CP rank's
+        # local tokens, which RotaryTransform uses instead of a local 0-based arange.
+        full_seq_len = batch.samples[sample_key].shape[1]
+        position_ids = torch.arange(full_seq_len, device=batch.samples[sample_key].device, dtype=torch.long).unsqueeze(
+            0
+        )  # (1, T)
+        buffer_keys.append(("sample", "position_ids"))
+        buffers.append(position_ids)
+        seq_dims.append(1)
+
+        buffer_keys.append(("sample", sample_key))
+        buffers.append(batch.samples[sample_key])
+        seq_dims.append(1)
+
+    if target_key in batch.targets:
+        if batch.targets[target_key].device.type != "cuda":
+            batch.targets[target_key] = batch.targets[target_key].to(torch.cuda.current_device(), non_blocking=True)
+        buffer_keys.append(("target", target_key))
+        buffers.append(batch.targets[target_key])
+        seq_dims.append(1)
+
+    if not buffers:
+        return
+
+    sharded_buffers = shard_tensor_buffers_for_context_parallel(
+        cp_mesh=cp_mesh,
+        buffers=tuple(buffers),
+        seq_dims=tuple(seq_dims),
+        load_balancer_type=context_parallel_load_balancer,
+    )
+
+    for (kind, key), tensor in zip(buffer_keys, sharded_buffers, strict=True):
+        if kind == "sample":
+            batch.samples[key] = tensor
+        else:
+            batch.targets[key] = tensor
+
+
 class Trainer:
     def __init__(
         self,
@@ -140,61 +206,13 @@ class Trainer:
         target_key: str,
         context_parallel_load_balancer: str | None = "headtail",
     ) -> None:
-        if self.device_mesh is None or not has_parallelism_method(self.device_mesh, ParallelismDegrees.CP):
-            return
-
-        cp_mesh = get_mesh_for_parallelism_method(
-            device_mesh=self.device_mesh, parallelism_method=ParallelismDegrees.CP
+        apply_context_parallel_sharding_to_batch(
+            device_mesh=self.device_mesh,
+            batch=batch,
+            sample_key=sample_key,
+            target_key=target_key,
+            context_parallel_load_balancer=context_parallel_load_balancer,
         )
-        if cp_mesh.size() <= 1:
-            return
-
-        buffer_keys: list[tuple[str, str]] = []
-        buffers: list[torch.Tensor] = []
-        seq_dims: list[int] = []
-
-        if sample_key is not None and sample_key in batch.samples:
-            if batch.samples[sample_key].device.type != "cuda":
-                batch.samples[sample_key] = batch.samples[sample_key].to(torch.cuda.current_device(), non_blocking=True)
-            # Build global position_ids before sharding so they carry the full-sequence range.
-            # After HeadTail sharding they hold the correct global indices for each CP rank's
-            # local tokens, which RotaryTransform uses instead of a local 0-based arange.
-            full_seq_len = batch.samples[sample_key].shape[1]
-            position_ids = torch.arange(
-                full_seq_len, device=batch.samples[sample_key].device, dtype=torch.long
-            ).unsqueeze(
-                0
-            )  # (1, T)
-            buffer_keys.append(("sample", "position_ids"))
-            buffers.append(position_ids)
-            seq_dims.append(1)
-
-            buffer_keys.append(("sample", sample_key))
-            buffers.append(batch.samples[sample_key])
-            seq_dims.append(1)
-
-        if target_key in batch.targets:
-            if batch.targets[target_key].device.type != "cuda":
-                batch.targets[target_key] = batch.targets[target_key].to(torch.cuda.current_device(), non_blocking=True)
-            buffer_keys.append(("target", target_key))
-            buffers.append(batch.targets[target_key])
-            seq_dims.append(1)
-
-        if not buffers:
-            return
-
-        sharded_buffers = shard_tensor_buffers_for_context_parallel(
-            cp_mesh=cp_mesh,
-            buffers=tuple(buffers),
-            seq_dims=tuple(seq_dims),
-            load_balancer_type=context_parallel_load_balancer,
-        )
-
-        for (kind, key), tensor in zip(buffer_keys, sharded_buffers, strict=True):
-            if kind == "sample":
-                batch.samples[key] = tensor
-            else:
-                batch.targets[key] = tensor
 
     def _train_batch(
         self,

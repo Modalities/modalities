@@ -13,6 +13,7 @@ from modalities.models.model import model_predict_batch
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.running_env.fsdp.reducer import Reducer
+from modalities.trainer import apply_context_parallel_sharding_to_batch
 from modalities.util import TimeRecorder
 
 
@@ -33,6 +34,7 @@ class Evaluator:
         """
         self.progress_publisher = progress_publisher
         self.evaluation_result_publisher = evaluation_result_publisher
+        self.device_mesh = device_mesh
         if device_mesh is not None:
             self.dp_degree = get_parallel_degree(
                 device_mesh, [ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD]
@@ -62,6 +64,16 @@ class Evaluator:
             torch.Tensor | None: The loss of the batch
                 None, if a non-last stage was processed in pipeline parallelism
         """
+        sample_key = getattr(model[0], "sample_key", None)
+        context_parallel_load_balancer = getattr(model[0], "_context_parallel_load_balancer", "headtail")
+        apply_context_parallel_sharding_to_batch(
+            device_mesh=self.device_mesh,
+            batch=batch,
+            sample_key=sample_key,
+            target_key=loss_fun.target_key,
+            context_parallel_load_balancer=context_parallel_load_balancer,
+        )
+
         with torch.no_grad():
             if scheduled_pipeline is not None:
                 pp_schedule = scheduled_pipeline.pp_schedule
