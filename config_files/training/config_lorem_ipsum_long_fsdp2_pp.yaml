@@ -10,6 +10,7 @@ settings:
     global_rank: ${cuda_env:RANK}
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
+    experiments_root_path: ${modalities_env:experiments_root_path}
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: ./data/lorem_ipsum_long.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
