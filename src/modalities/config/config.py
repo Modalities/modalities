@@ -11,6 +11,7 @@ from transformers import GPT2Tokenizer as GPT2TokenizerFast
 from transformers import LlamaTokenizer as LlamaTokenizerFast
 from typing_extensions import deprecated
 
+from modalities.checkpointing.stateful.app_state import StatefulComponents
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
@@ -382,6 +383,7 @@ class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
+    components_to_load: Optional[list[StatefulComponents]] = None
 
 
 class DCPAppStateConfig(BaseModel):
