@@ -47,6 +47,7 @@ class AppStateFactory:
     def get_dcp_checkpointed_app_state_(
         raw_app_state: AppState,
         checkpoint_dir_path: Path,
+        allow_partial_load: bool = True,
     ) -> AppState:
         """Loads the checkpointed state dict into the raw AppState object
         (i.e., non-checkpoint loaded AppState) in-place.
@@ -55,6 +56,7 @@ class AppStateFactory:
             raw_app_state (AppState): The raw AppState object. Its ``components_to_load`` policy
                 determines which components are restored.
             checkpoint_dir_path (Path): The path to the checkpoint directory.
+            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to True.
 
         Raises:
             RuntimeError: Raises an error if the state dict has already been loaded.
@@ -67,6 +69,6 @@ class AppStateFactory:
                 "Cannot call load_state_dict twice on the same AppState object. State dict has already been loaded."
             )
 
-        cp_loading = DCPCheckpointLoading(global_rank=dist.get_rank())
+        cp_loading = DCPCheckpointLoading(global_rank=dist.get_rank(), allow_partial_load=allow_partial_load)
         cp_loading.load_checkpoint_(app_state=raw_app_state, checkpoint_dir_path=checkpoint_dir_path)
         return raw_app_state

@@ -125,8 +125,9 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-class DCPCheckpointLoadingConfig(BaseModel):
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
+# class DCPCheckpointLoadingConfig(BaseModel):
+#     global_rank: Annotated[int, Field(strict=True, ge=0)]
+#     allow_partial_load: bool = True
 
 
 class FSDP1CheckpointSavingConfig(BaseModel):
@@ -389,6 +390,7 @@ class RawAppStateConfig(BaseModel):
 class DCPAppStateConfig(BaseModel):
     raw_app_state: PydanticAppStateType
     checkpoint_dir_path: Path
+    allow_partial_load: bool = False
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
