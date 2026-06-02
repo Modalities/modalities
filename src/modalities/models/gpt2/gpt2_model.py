@@ -211,6 +211,85 @@ class RotaryTransform(QueryKeyValueTransform):
 
         self.reset_parameters()
 
+    def reset_parameters(self):
+        # If previously initialized on or moved to a device, reuse that device.
+        # Otherwise, use the default device of the current environment.
+        device = self.inv_freq.device if hasattr(self, "inv_freq") and isinstance(self.inv_freq, torch.Tensor) else None
+
+        rope_type = self.rope_scaling.rope_type if self.rope_scaling is not None else "default"
+
+        if rope_type == "yarn":
+            inv_freq, self.attention_scaling = self._compute_yarn_parameters(device=device)
+        else:
+            inv_freq = 1.0 / (
+                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+            )
+            self.attention_scaling = 1.0
+
+        self.register_buffer("inv_freq", inv_freq)
+
+        self._seq_len_cached = None
+        self._cos_cached = None
+        self._sin_cached = None
+
+    def rotate_half(self, x: torch.Tensor):
+        """
+        Rearrange tensor elements.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+
+        """
+        x1, x2 = x.chunk(2, dim=-1)
+        return torch.cat((-x2, x1), dim=-1)
+
+    def apply_rotary_pos_emb(self, x, cos, sin):
+        """
+        Applies rotary positional embedding to the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            cos (torch.Tensor): Cosine values for rotary positional embedding.
+            sin (torch.Tensor): Sine values for rotary positional embedding.
+
+        Returns:
+            torch.Tensor: Tensor after applying rotary positional embedding.
+        """
+        # NOTE: This could probably be moved to Triton
+
+        # Handle a possible sequence length mismatch in between q and k
+        cos = cos[:, :, : x.shape[self.seq_length_dim], :]
+        sin = sin[:, :, : x.shape[self.seq_length_dim], :]
+
+        # the rotation is not really a rotation in higher dimensions,
+        # It merely swaps and negates certain dimensions to make
+        # the rotation below work
+        return (x * cos) + (self.rotate_half(x) * sin)
+
+    def forward(
+        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the RotaryTransform module.
+
+        Args:
+            q (torch.Tensor): Query tensor.
+            k (torch.Tensor): Key tensor.
+            v (torch.Tensor): Value tensor.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            Tuple containing the modified query tensor, key tensor, and value tensor.
+        """
+        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
+        q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
+        k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
+
+        return q, k, v
+
     def _compute_yarn_parameters(self, device: torch.device | None) -> tuple[torch.Tensor, float]:
         """Compute YaRN inverse frequencies and the attention scaling factor."""
         if not isinstance(self.rope_scaling, YarnRopeScalingConfig):
@@ -299,41 +378,6 @@ class RotaryTransform(QueryKeyValueTransform):
 
         return inv_freq, float(attention_factor)
 
-    def reset_parameters(self):
-        # If previously initialized on or moved to a device, reuse that device.
-        # Otherwise, use the default device of the current environment.
-        device = self.inv_freq.device if hasattr(self, "inv_freq") and isinstance(self.inv_freq, torch.Tensor) else None
-
-        rope_type = self.rope_scaling.rope_type if self.rope_scaling is not None else "default"
-
-        if rope_type == "yarn":
-            inv_freq, self.attention_scaling = self._compute_yarn_parameters(device=device)
-        else:
-            inv_freq = 1.0 / (
-                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
-            )
-            self.attention_scaling = 1.0
-
-        self.register_buffer("inv_freq", inv_freq)
-
-        self._seq_len_cached = None
-        self._cos_cached = None
-        self._sin_cached = None
-
-    def rotate_half(self, x: torch.Tensor):
-        """
-        Rearrange tensor elements.
-
-        Args:
-            x (torch.Tensor): The input tensor.
-
-        Returns:
-            torch.Tensor: The output tensor.
-
-        """
-        x1, x2 = x.chunk(2, dim=-1)
-        return torch.cat((-x2, x1), dim=-1)
-
     def _update_cos_sin_tables(self, x):
         # Update the cosine and sine tables.
         seq_len = x.shape[self.seq_length_dim]
@@ -357,50 +401,6 @@ class RotaryTransform(QueryKeyValueTransform):
             self._sin_cached = (emb.sin() * self.attention_scaling)[None, None, :, :].to(x.dtype)
 
         return self._cos_cached, self._sin_cached
-
-    def apply_rotary_pos_emb(self, x, cos, sin):
-        """
-        Applies rotary positional embedding to the input tensor.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-            cos (torch.Tensor): Cosine values for rotary positional embedding.
-            sin (torch.Tensor): Sine values for rotary positional embedding.
-
-        Returns:
-            torch.Tensor: Tensor after applying rotary positional embedding.
-        """
-        # NOTE: This could probably be moved to Triton
-
-        # Handle a possible sequence length mismatch in between q and k
-        cos = cos[:, :, : x.shape[self.seq_length_dim], :]
-        sin = sin[:, :, : x.shape[self.seq_length_dim], :]
-
-        # the rotation is not really a rotation in higher dimensions,
-        # It merely swaps and negates certain dimensions to make
-        # the rotation below work
-        return (x * cos) + (self.rotate_half(x) * sin)
-
-    def forward(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the RotaryTransform module.
-
-        Args:
-            q (torch.Tensor): Query tensor.
-            k (torch.Tensor): Key tensor.
-            v (torch.Tensor): Value tensor.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-            Tuple containing the modified query tensor, key tensor, and value tensor.
-        """
-        self._cos_cached, self._sin_cached = self._update_cos_sin_tables(k)
-        q = self.apply_rotary_pos_emb(q, self._cos_cached, self._sin_cached)
-        k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
-
-        return q, k, v
 
 
 class QueryKeyValueTransformType(Enum):
