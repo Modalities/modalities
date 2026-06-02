@@ -51,6 +51,10 @@ class ThroughputAggregationKeys(Enum):
     FORWARD_BACKWARD_TIME = "FORWARD_BACKWARD_TIME"
 
 
+
+from modalities.training.logging import MetricsAccumulator, format_metrics
+
+
 class Trainer:
     def __init__(
         self,
@@ -150,7 +154,7 @@ class Trainer:
                 operate the model. Defaults to None.
 
         Returns:
-            tuple[bool, int, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
+            tuple[bool, int, torch.Tensor, Optional[torch.Tensor]]:
                 A tuple containing the following:
                     - step_performed (bool): Indicates whether a training step was performed.
                     - num_train_steps_done (int): The number of training steps done.
@@ -234,6 +238,7 @@ class Trainer:
 
         local_num_seen_samples = 0
         cumulated_losses = torch.zeros(3).cuda()
+        metrics_accum = MetricsAccumulator()
 
         # throughput
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -291,6 +296,9 @@ class Trainer:
                     # it has less samples than the batch size
                     cumulated_losses[-1] += 1  # number of local batches
 
+                    if hasattr(loss_fun, "get_metrics"):
+                        metrics_accum.accumulate(loss_fun.get_metrics())
+
                 # gradient norm is already synced across all ranks
                 if gradient_norm_score is not None:
                     gradient_norm_scores.append(gradient_norm_score.item())
@@ -336,17 +344,52 @@ class Trainer:
                         reduced_losses[0],
                         reduced_losses[1],
                     )
+
+                    adaptive_losses = {}
+                    adaptive_metrics = {}
+                    if metrics_accum.count > 0:
+                        (
+                            sync_tensor, scalar_names, per_layer_names, per_layer_sizes,
+                            hist_names, hist_shapes,
+                        ) = metrics_accum.build_sync_tensor(device)
+
+                        reduce_scale = dist.get_world_size() / self.pp_degree
+                        synced_tensor = Reducer.reduce(
+                            tensor=sync_tensor,
+                            operation=dist.ReduceOp.SUM,
+                            post_processing_fun=lambda t: t / reduce_scale,
+                        )
+
+                        (
+                            synced_loss, synced_scalars, synced_per_layer, synced_hists,
+                        ) = MetricsAccumulator.unpack_synced_tensor(
+                            synced_tensor, scalar_names, per_layer_names, per_layer_sizes,
+                            hist_names, hist_shapes,
+                        )
+
+                        adaptive_losses, adaptive_metrics = format_metrics(
+                            loss=synced_loss,
+                            scalars=synced_scalars,
+                            per_layer_scalars=synced_per_layer,
+                            per_layer_vectors=metrics_accum.last_per_layer_vectors,
+                            per_layer_histograms=synced_hists,
+                        )
+
                     losses = {
                         "train loss avg": ResultItem(train_loss_avg, decimal_places=2),
                         "train loss last": ResultItem(train_loss_last_batch, decimal_places=2),
+                        **adaptive_losses,
                     }
 
                     metrics = {
                         "consumed tokens": ResultItem(torch.tensor(training_progress.num_seen_tokens_total), 0),
                         "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
                         "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
+                        **adaptive_metrics,
                     }
+
                     gradient_norm_scores = []
+
                     mfu_score = torch.tensor(-1.0)
                     if self.mfu_calculator is not None:
                         mfu_score = self.mfu_calculator.compute(num_samples_per_second=global_num_samples_per_second)
@@ -384,11 +427,12 @@ class Trainer:
                     )
 
                     cumulated_losses.zero_()
+                    metrics_accum.reset()
                 if step_performed:
                     self.gc.run(step_count=training_progress.num_seen_steps_total)
                     evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                     checkpointing_callback(training_progress=training_progress)
-                    
+
                 profiler_cm.step()
 
     @staticmethod

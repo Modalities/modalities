@@ -939,7 +939,7 @@ class GPT2LLM(NNModel):
             )  # https://paperswithcode.com/method/weight-tying
 
     @overload
-    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor | dict]:
         """
         Forward pass of the GPT2LLM module.
 
@@ -948,8 +948,8 @@ class GPT2LLM(NNModel):
                 - sample_key (str): Key for the input tensor containing token ids.
 
         Returns:
-            dict[str, torch.Tensor]: A dictionary containing output tensors.
-                - prediction_key (str): Key for the output tensor containing logits.
+            dict[str, torch.Tensor | dict]: A dictionary containing output tensors and metrics.
+                - prediction_key (str): Key for the output containing logits and metrics dict.
         """
         ...
 
@@ -966,7 +966,7 @@ class GPT2LLM(NNModel):
         """
         ...
 
-    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor | dict] | torch.Tensor:
         """
         Forward pass of the GPT2LLM module.
 
@@ -974,14 +974,19 @@ class GPT2LLM(NNModel):
             inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.
 
         Returns:
-            dict[str, torch.Tensor] | torch.Tensor: Model output.
+            dict[str, torch.Tensor | dict] | torch.Tensor: Model output.
         """
         if isinstance(inputs, dict):
-            return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
+            logits, metrics = self.forward_impl(inputs[self.sample_key])
+            return {
+                self.prediction_key: logits,
+                "metrics": metrics,
+            }
         else:
-            return self.forward_impl(inputs)
+            logits, _ = self.forward_impl(inputs)
+            return logits
 
-    def forward_impl(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward_impl(self, inputs: torch.Tensor) -> tuple[torch.Tensor, dict]:
         """
         Forward pass implementation of the GPT2LLM module.
 
@@ -989,7 +994,7 @@ class GPT2LLM(NNModel):
             inputs (torch.Tensor): A tensor containing input token ids.
 
         Returns:
-            torch.Tensor: A tensor containing output logits.
+            tuple[torch.Tensor, dict]: A tuple containing output logits and custom metrics.
         """
         device = inputs.device
         seq_len = inputs.size(1)
@@ -1009,11 +1014,31 @@ class GPT2LLM(NNModel):
         # TODO: use drop out also without absolute position embedding?
         h = self.transformer.drop(h) if hasattr(self.transformer, "drop") else h
 
+        layer_norms = []
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h)
+            layer_norms.append(h.detach().norm(dim=-1).mean())
+
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
-        h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
-        return h
+        logits = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
+
+        with torch.no_grad():
+            log_p = torch.log_softmax(logits, dim=-1)
+            p = torch.exp(log_p)
+            entropy = -torch.sum(p * log_p, dim=-1).mean()
+            layer_norms_tensor = torch.stack(layer_norms)
+
+        metrics = {
+            "scalars": {
+                "logits_entropy": entropy
+            },
+            "per_layer_scalars": {
+                "layer_activation_norm": layer_norms_tensor
+            }
+        }
+
+        return logits, metrics
+
 
 
 def manual_scaled_dot_product_attention(
