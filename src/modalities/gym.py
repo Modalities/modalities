@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import partial
-from typing import Callable
+from typing import Callable, Optional
 
 import torch.nn as nn
 
@@ -42,6 +42,8 @@ class Gym:
         evaluation_data_loaders: list[LLMDataLoader],
         checkpoint_saving: CheckpointSaving,
         scheduled_pipeline: Pipeline | None = None,
+        conversion_callback: Optional[Callable[[int], None]] = None,
+        downstream_evaluation_callback: Optional[Callable[[int], None]] = None,
     ):
         """Runs the model training, including evaluation and checkpointing.
 
@@ -55,6 +57,8 @@ class Gym:
             checkpoint_saving (CheckpointSaving): Routine for saving checkpoints.
             scheduled_pipeline (Pipeline | None, optional): In case of pipeline parallelism, this is used to
                 operate the model. Defaults to None.
+            conversion_callback (Optional[Callable[[int], None]]): A callback function for checkpoint-to-HF conversion.
+            downstream_evaluation_callback (Optional[Callable[[int], None]]): A callback function for downstream evaluation.
         """
         evaluation_callback: Callable[[int], None] = partial(
             self._run_evaluation,
@@ -80,6 +84,8 @@ class Gym:
             checkpointing_callback=checkpointing_callback,
             training_log_interval_in_steps=training_log_interval_in_steps,
             scheduled_pipeline=scheduled_pipeline,
+            conversion_callback=conversion_callback,
+            downstream_evaluation_callback=downstream_evaluation_callback,
         )
         print_rank_0(f"Training done at {datetime.now()}.")
 

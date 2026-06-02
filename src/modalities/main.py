@@ -220,6 +220,14 @@ class Main:
 
         print_rank_0(report)
 
+        conversion_callback = None
+        if components.model_converter is not None:
+            conversion_callback = components.model_converter.convert
+
+        downstream_evaluation_callback = None
+        if components.downstream_evaluator is not None:
+            downstream_evaluation_callback = components.downstream_evaluator.evaluate
+
         gym.run(
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
@@ -229,6 +237,8 @@ class Main:
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
             scheduled_pipeline=components.scheduled_pipeline,
+            conversion_callback=conversion_callback,
+            downstream_evaluation_callback=downstream_evaluation_callback,
         )
 
     def get_logging_publishers(

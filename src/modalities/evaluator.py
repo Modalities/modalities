@@ -1,8 +1,14 @@
+import json
+import logging
+import subprocess
+from pathlib import Path
 from typing import Callable
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+
+from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from torch.distributed.device_mesh import DeviceMesh
 
 from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResultBatch, ResultItem
@@ -14,6 +20,8 @@ from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.running_env.fsdp.reducer import Reducer
 from modalities.util import TimeRecorder
+
+logger = logging.getLogger(__name__)
 
 
 class Evaluator:
@@ -197,3 +205,76 @@ class Evaluator:
         evaluation_result_publisher.publish_message(
             payload=evaluation_result, message_type=MessageTypes.EVALUATION_RESULT
         )
+
+
+class DownstreamEvaluator:
+    """Evaluator that runs OLMES on HF checkpoints produced by the conversion callback.
+
+    Checks if an ``hf_checkpoint`` folder exists inside the latest checkpoint directory
+    (as written by ``ModelConverter``).  If it does, the configured OLMES command template
+    is executed via subprocess.
+    """
+
+    def __init__(
+        self,
+        tokenizer: TokenizerWrapper,
+        tasks: list[str],
+        eval_interval: int,
+        checkpoint_dir: Path,
+        global_rank: int,
+        olmes_command_template: str,
+    ) -> None:
+        self.tokenizer = tokenizer
+        self.tasks = tasks
+        self.eval_interval = eval_interval
+        self.checkpoint_dir = Path(checkpoint_dir)
+        self.global_rank = global_rank
+        self.olmes_command_template = olmes_command_template
+
+    def evaluate(self, num_train_steps_done: int) -> None:
+        if num_train_steps_done == 0 or num_train_steps_done % self.eval_interval != 0:
+            return
+        if self.global_rank != 0:
+            return
+
+        hf_model_dir = self._find_hf_checkpoint()
+        if hf_model_dir is None:
+            logger.warning(
+                f"No hf_checkpoint found in {self.checkpoint_dir} at step {num_train_steps_done}, "
+                "skipping downstream evaluation."
+            )
+            return
+
+        tasks_str = ",".join(self.tasks)
+        cmd = self.olmes_command_template.format(
+            hf_model_dir=str(hf_model_dir),
+            tasks=tasks_str,
+            step=num_train_steps_done,
+        )
+
+        logger.info(f"Running downstream evaluation: {cmd}")
+        try:
+            subprocess.Popen(cmd, shell=True)
+            logger.info(f"Downstream evaluation launched for step {num_train_steps_done}.")
+        except Exception as e:
+            logger.error(f"Failed to launch downstream evaluation: {e}")
+
+    def _find_hf_checkpoint(self) -> Path | None:
+        """Read last_checkpoint_info.json and check for hf_checkpoint subfolder."""
+        info_file = self.checkpoint_dir / "last_checkpoint_info.json"
+        if not info_file.exists():
+            return None
+
+        with open(info_file, "r", encoding="utf-8") as f:
+            info = json.load(f)
+
+        checkpoint_path_str = info.get("checkpoint_folder_path") or info.get("model_checkpoint_path")
+        if checkpoint_path_str is None:
+            return None
+
+        checkpoint_path = Path(checkpoint_path_str)
+        if checkpoint_path.is_file():
+            checkpoint_path = checkpoint_path.parent
+
+        hf_dir = checkpoint_path / "hf_checkpoint"
+        return hf_dir if hf_dir.exists() else None
