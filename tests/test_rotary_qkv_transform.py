@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from modalities.models.gpt2.gpt2_model import AttentionConfig, RotaryTransform
+from modalities.models.gpt2.gpt2_model import AttentionConfig, RotaryTransform, YarnRopeScalingConfig
 
 
 def test_rotary_transform():
@@ -76,22 +76,20 @@ def _assert_yarn_outputs_match_reference(
 @pytest.mark.parametrize(
     "rope_scaling",
     [
-        {
-            "rope_type": "yarn",
-            "factor": 2.0,
-            "beta_fast": 32,
-            "beta_slow": 1,
-            "original_max_position_embeddings": 4,
-        },
-        {
-            "rope_type": "yarn",
-            "beta_fast": 32,
-            "beta_slow": 1,
-            "original_max_position_embeddings": 4,
-        },
+        YarnRopeScalingConfig(
+            factor=2.0,
+            beta_fast=32,
+            beta_slow=1,
+            original_max_position_embeddings=4,
+        ),
+        YarnRopeScalingConfig(
+            beta_fast=32,
+            beta_slow=1,
+            original_max_position_embeddings=4,
+        ),
     ],
 )
-def test_rotary_transform_yarn_matches_reference(rope_scaling: dict):
+def test_rotary_transform_yarn_matches_reference(rope_scaling: YarnRopeScalingConfig):
     bs = 1
     n_heads = 2
     embedding_dim = 8
@@ -123,23 +121,14 @@ def test_rotary_transform_yarn_matches_reference(rope_scaling: dict):
     )
 
 
-@pytest.mark.parametrize(
-    ("key", "value"),
-    [
-        ("beta_fast", "32"),
-        ("beta_slow", torch.tensor(1.0)),
-        ("beta_fast", True),
-    ],
-)
-def test_rotary_transform_yarn_rejects_invalid_beta_values(key: str, value: object):
+def test_rotary_transform_rejects_dict_rope_scaling():
     rope_scaling = {
         "rope_type": "yarn",
         "factor": 2.0,
         "original_max_position_embeddings": 4,
-        key: value,
     }
 
-    with pytest.raises(ValueError, match=rf"rope_scaling\.{key} must be a float"):
+    with pytest.raises(TypeError, match="rope_scaling must be an instance"):
         RotaryTransform(
             n_embd=8,
             n_head=2,
@@ -170,70 +159,6 @@ def test_rotary_transform_config_yarn_rejects_invalid_beta_values(key: str, valu
             n_embd=8,
             n_head=2,
             seq_length_dim=-2,
-            base_freq=10000,
-            max_position_embeddings=8,
-            rope_scaling=rope_scaling,
-        )
-
-
-@pytest.mark.parametrize(
-    ("rope_scaling", "match"),
-    [
-        (
-            {
-                "rope_type": "yarn",
-                "factor": 2.0,
-                "original_max_position_embeddings": 4,
-                "mscale": "1.0",
-                "mscale_all_dim": 1.0,
-            },
-            r"rope_scaling\.mscale must be a float",
-        ),
-        (
-            {
-                "rope_type": "yarn",
-                "factor": 2.0,
-                "original_max_position_embeddings": 4,
-                "mscale": 1.0,
-                "mscale_all_dim": torch.tensor(1.0),
-            },
-            r"rope_scaling\.mscale_all_dim must be a float",
-        ),
-        (
-            {
-                "rope_type": "yarn",
-                "factor": 2.0,
-                "original_max_position_embeddings": 4,
-                "mscale": True,
-                "mscale_all_dim": 1.0,
-            },
-            r"rope_scaling\.mscale must be a float",
-        ),
-        (
-            {
-                "rope_type": "yarn",
-                "factor": 2.0,
-                "original_max_position_embeddings": 4,
-                "mscale": 1.0,
-            },
-            r"rope_scaling\.mscale and rope_scaling\.mscale_all_dim must be provided together",
-        ),
-        (
-            {
-                "rope_type": "yarn",
-                "factor": 2.0,
-                "original_max_position_embeddings": 4,
-                "mscale_all_dim": 1.0,
-            },
-            r"rope_scaling\.mscale and rope_scaling\.mscale_all_dim must be provided together",
-        ),
-    ],
-)
-def test_rotary_transform_yarn_rejects_invalid_mscale_values(rope_scaling: dict, match: str):
-    with pytest.raises(ValueError, match=match):
-        RotaryTransform(
-            n_embd=8,
-            n_head=2,
             base_freq=10000,
             max_position_embeddings=8,
             rope_scaling=rope_scaling,

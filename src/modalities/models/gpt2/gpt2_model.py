@@ -3,11 +3,11 @@ import math
 from abc import abstractmethod
 from enum import Enum
 from numbers import Real
-from typing import Annotated, Optional, overload
+from typing import Annotated, Literal, Optional, overload
 
 import torch
 import torch.nn as nn
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
@@ -32,48 +32,58 @@ logger.setLevel(logging.WARNING)
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
 
 
-def _get_optional_rope_scaling_float(
-    rope_scaling: dict[str, object],
-    key: str,
-    default: float,
-    *,
-    min_value: float | None = None,
-) -> float:
-    """Return a validated float from rope_scaling or a default when the key is absent."""
-    if key not in rope_scaling:
-        return default
-
-    value = rope_scaling[key]
+def _validate_numeric_field(field_name: str, value: object) -> float:
+    """Validate that a value is a real number (excluding bool) and cast to float."""
     if isinstance(value, bool) or not isinstance(value, Real):
-        raise ValueError(f"rope_scaling.{key} must be a float")
-
-    value_float = float(value)
-    if min_value is not None and value_float < min_value:
-        raise ValueError(f"rope_scaling.{key} must be a float >= {min_value}")
-
-    return value_float
+        raise ValueError(f"rope_scaling.{field_name} must be a float")
+    return float(value)
 
 
-def _get_optional_rope_scaling_float_pair(
-    rope_scaling: dict[str, object],
-    first_key: str,
-    second_key: str,
-    *,
-    min_value: float | None = None,
-) -> tuple[float, float] | None:
-    """Return a validated float pair when both keys are present, otherwise None if both are absent."""
-    first_present = first_key in rope_scaling
-    second_present = second_key in rope_scaling
+class DefaultRopeScalingConfig(BaseModel):
+    """Configuration for default RoPE behavior."""
 
-    if not first_present and not second_present:
-        return None
-    if first_present != second_present:
-        raise ValueError(f"rope_scaling.{first_key} and rope_scaling.{second_key} must be provided together")
+    rope_type: Literal["default"] = "default"
 
-    return (
-        _get_optional_rope_scaling_float(rope_scaling, first_key, 0.0, min_value=min_value),
-        _get_optional_rope_scaling_float(rope_scaling, second_key, 0.0, min_value=min_value),
+
+class YarnRopeScalingConfig(BaseModel):
+    """Configuration for YaRN RoPE scaling."""
+
+    rope_type: Literal["yarn"] = "yarn"
+    original_max_position_embeddings: Annotated[int, Field(strict=True, ge=1)]
+    factor: Optional[Annotated[float, Field(ge=1.0)]] = None
+    attention_factor: Optional[Annotated[float, Field(gt=0.0)]] = None
+    mscale: Optional[Annotated[float, Field(ge=0.0)]] = None
+    mscale_all_dim: Optional[Annotated[float, Field(ge=0.0)]] = None
+    beta_fast: Annotated[float, Field(ge=0.0)] = 32.0
+    beta_slow: Annotated[float, Field(ge=0.0)] = 1.0
+    truncate: bool = True
+
+    @field_validator(
+        "factor",
+        "attention_factor",
+        "mscale",
+        "mscale_all_dim",
+        "beta_fast",
+        "beta_slow",
+        mode="before",
     )
+    @classmethod
+    def validate_numeric_fields(cls, value: object, info):
+        if value is None:
+            return value
+        return _validate_numeric_field(info.field_name, value)
+
+    @model_validator(mode="after")
+    def validate_mscale_pair(self) -> "YarnRopeScalingConfig":
+        if (self.mscale is None) != (self.mscale_all_dim is None):
+            raise ValueError("rope_scaling.mscale and rope_scaling.mscale_all_dim must be provided together")
+        return self
+
+
+RopeScalingConfig = Annotated[
+    DefaultRopeScalingConfig | YarnRopeScalingConfig,
+    Field(discriminator="rope_type"),
+]
 
 
 class LayerNorms(LookupEnum):
@@ -172,7 +182,7 @@ class RotaryTransform(QueryKeyValueTransform):
         seq_length_dim: int = -2,
         base_freq: int = 10000,
         max_position_embeddings: int | None = None,
-        rope_scaling: dict[str, object] | None = None,
+        rope_scaling: RopeScalingConfig | None = None,
     ):
         """
         Initializes the RotaryTransform object.
@@ -191,6 +201,11 @@ class RotaryTransform(QueryKeyValueTransform):
         self.base_freq = base_freq
         self.max_position_embeddings = max_position_embeddings
 
+        if rope_scaling is not None and not isinstance(rope_scaling, (DefaultRopeScalingConfig, YarnRopeScalingConfig)):
+            raise TypeError(
+                "rope_scaling must be an instance of DefaultRopeScalingConfig, YarnRopeScalingConfig, or None"
+            )
+
         self.rope_scaling = rope_scaling
         self.attention_scaling = 1.0
 
@@ -198,33 +213,25 @@ class RotaryTransform(QueryKeyValueTransform):
 
     def _compute_yarn_parameters(self, device: torch.device | None) -> tuple[torch.Tensor, float]:
         """Compute YaRN inverse frequencies and the attention scaling factor."""
-        if self.rope_scaling is None:
+        if not isinstance(self.rope_scaling, YarnRopeScalingConfig):
             raise ValueError("YaRN requires a rope_scaling config.")
         if self.max_position_embeddings is None:
             raise ValueError("YaRN requires max_position_embeddings to be set.")
 
-        original_max_position_embeddings = self.rope_scaling.get("original_max_position_embeddings")
-        if (
-            original_max_position_embeddings is None
-            or not isinstance(original_max_position_embeddings, int)
-            or original_max_position_embeddings <= 0
-        ):
-            raise ValueError("YaRN requires original_max_position_embeddings to be a positive integer")
-
-        factor = self.rope_scaling.get("factor")
+        original_max_position_embeddings = self.rope_scaling.original_max_position_embeddings
+        factor = self.rope_scaling.factor
         if factor is None:
             factor = self.max_position_embeddings / original_max_position_embeddings
-        if not isinstance(factor, (int, float)) or factor < 1.0:
-            raise ValueError("YaRN requires rope_scaling.factor to be a float >= 1.0")
         factor_float = float(factor)
 
-        attention_factor = self.rope_scaling.get("attention_factor")
-        mscale_pair = _get_optional_rope_scaling_float_pair(
-            self.rope_scaling, "mscale", "mscale_all_dim", min_value=0.0
-        )
-        beta_fast = _get_optional_rope_scaling_float(self.rope_scaling, "beta_fast", 32.0, min_value=0.0)
-        beta_slow = _get_optional_rope_scaling_float(self.rope_scaling, "beta_slow", 1.0, min_value=0.0)
-        truncate = self.rope_scaling.get("truncate", True)
+        attention_factor = self.rope_scaling.attention_factor
+        mscale_pair = None
+        if self.rope_scaling.mscale is not None and self.rope_scaling.mscale_all_dim is not None:
+            mscale_pair = (self.rope_scaling.mscale, self.rope_scaling.mscale_all_dim)
+
+        beta_fast = self.rope_scaling.beta_fast
+        beta_slow = self.rope_scaling.beta_slow
+        truncate = self.rope_scaling.truncate
 
         def get_mscale(scale: float, mscale: float = 1.0) -> float:
             """Return the YaRN mscale coefficient for a given scaling factor."""
@@ -240,8 +247,6 @@ class RotaryTransform(QueryKeyValueTransform):
                 )
             else:
                 attention_factor = get_mscale(factor_float)
-        elif not isinstance(attention_factor, (int, float)) or attention_factor <= 0:
-            raise ValueError("YaRN requires rope_scaling.attention_factor to be a float > 0")
 
         def find_correction_dim(num_rotations: float, dim: int, base: int, max_position_embeddings: int) -> float:
             """Map a target number of rotations to a rotary dimension index."""
@@ -299,9 +304,7 @@ class RotaryTransform(QueryKeyValueTransform):
         # Otherwise, use the default device of the current environment.
         device = self.inv_freq.device if hasattr(self, "inv_freq") and isinstance(self.inv_freq, torch.Tensor) else None
 
-        rope_type = "default"
-        if self.rope_scaling is not None:
-            rope_type = str(self.rope_scaling.get("rope_type", "default"))
+        rope_type = self.rope_scaling.rope_type if self.rope_scaling is not None else "default"
 
         if rope_type == "yarn":
             inv_freq, self.attention_scaling = self._compute_yarn_parameters(device=device)
@@ -467,48 +470,13 @@ class AttentionConfig(BaseModel):
             seq_length_dim: Annotated[int, Field(strict=True)]
             base_freq: Annotated[int, Field(strict=True, ge=10000)]
             max_position_embeddings: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
-            rope_scaling: Optional[dict[str, object]] = None
+            rope_scaling: Optional[RopeScalingConfig] = None
 
             @model_validator(mode="after")
             def validate_rope_scaling(self) -> "AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig":
-                """Validate and normalize rope_scaling, including YaRN-specific constraints."""
-                if self.rope_scaling is None:
-                    return self
-
-                if not isinstance(self.rope_scaling, dict):
-                    raise ValueError("rope_scaling must be a dictionary")
-
-                rope_scaling = dict(self.rope_scaling)
-                if "type" in rope_scaling and "rope_type" not in rope_scaling:
-                    rope_scaling["rope_type"] = rope_scaling["type"]
-
-                rope_type = rope_scaling.get("rope_type", "default")
-                if rope_type not in {"default", "yarn"}:
-                    raise ValueError(
-                        f"Unsupported rope_scaling.rope_type '{rope_type}'. Supported values are 'default' and 'yarn'."
-                    )
-
-                if rope_type == "yarn":
-                    if self.max_position_embeddings is None:
-                        raise ValueError("YaRN requires max_position_embeddings to be set")
-
-                    original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings")
-                    if (
-                        original_max_position_embeddings is None
-                        or not isinstance(original_max_position_embeddings, int)
-                        or original_max_position_embeddings <= 0
-                    ):
-                        raise ValueError("YaRN requires original_max_position_embeddings to be a positive integer")
-
-                    factor = rope_scaling.get("factor")
-                    if factor is not None and (not isinstance(factor, (int, float)) or factor < 1.0):
-                        raise ValueError("YaRN requires rope_scaling.factor to be a float >= 1.0")
-
-                    _get_optional_rope_scaling_float(rope_scaling, "beta_fast", 32.0, min_value=0.0)
-                    _get_optional_rope_scaling_float(rope_scaling, "beta_slow", 1.0, min_value=0.0)
-                    _get_optional_rope_scaling_float_pair(rope_scaling, "mscale", "mscale_all_dim", min_value=0.0)
-
-                self.rope_scaling = rope_scaling
+                """Validate rope_scaling cross-field constraints."""
+                if isinstance(self.rope_scaling, YarnRopeScalingConfig) and self.max_position_embeddings is None:
+                    raise ValueError("YaRN requires max_position_embeddings to be set")
                 return self
 
         @validator("type_hint", pre=True, always=True)
