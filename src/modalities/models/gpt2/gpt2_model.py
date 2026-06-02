@@ -2,6 +2,7 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
+from numbers import Real
 from typing import Annotated, Optional, overload
 
 import torch
@@ -29,6 +30,50 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+def _get_optional_rope_scaling_float(
+    rope_scaling: dict[str, object],
+    key: str,
+    default: float,
+    *,
+    min_value: float | None = None,
+) -> float:
+    """Return a validated float from rope_scaling or a default when the key is absent."""
+    if key not in rope_scaling:
+        return default
+
+    value = rope_scaling[key]
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ValueError(f"rope_scaling.{key} must be a float")
+
+    value_float = float(value)
+    if min_value is not None and value_float < min_value:
+        raise ValueError(f"rope_scaling.{key} must be a float >= {min_value}")
+
+    return value_float
+
+
+def _get_optional_rope_scaling_float_pair(
+    rope_scaling: dict[str, object],
+    first_key: str,
+    second_key: str,
+    *,
+    min_value: float | None = None,
+) -> tuple[float, float] | None:
+    """Return a validated float pair when both keys are present, otherwise None if both are absent."""
+    first_present = first_key in rope_scaling
+    second_present = second_key in rope_scaling
+
+    if not first_present and not second_present:
+        return None
+    if first_present != second_present:
+        raise ValueError(f"rope_scaling.{first_key} and rope_scaling.{second_key} must be provided together")
+
+    return (
+        _get_optional_rope_scaling_float(rope_scaling, first_key, 0.0, min_value=min_value),
+        _get_optional_rope_scaling_float(rope_scaling, second_key, 0.0, min_value=min_value),
+    )
 
 
 class LayerNorms(LookupEnum):
@@ -174,12 +219,11 @@ class RotaryTransform(QueryKeyValueTransform):
         factor_float = float(factor)
 
         attention_factor = self.rope_scaling.get("attention_factor")
-        mscale = self.rope_scaling.get("mscale")
-        mscale_all_dim = self.rope_scaling.get("mscale_all_dim")
-        beta_fast_raw = self.rope_scaling.get("beta_fast")
-        beta_slow_raw = self.rope_scaling.get("beta_slow")
-        beta_fast = float(beta_fast_raw) if isinstance(beta_fast_raw, (int, float)) else 32.0
-        beta_slow = float(beta_slow_raw) if isinstance(beta_slow_raw, (int, float)) else 1.0
+        mscale_pair = _get_optional_rope_scaling_float_pair(
+            self.rope_scaling, "mscale", "mscale_all_dim", min_value=0.0
+        )
+        beta_fast = _get_optional_rope_scaling_float(self.rope_scaling, "beta_fast", 32.0, min_value=0.0)
+        beta_slow = _get_optional_rope_scaling_float(self.rope_scaling, "beta_slow", 1.0, min_value=0.0)
         truncate = self.rope_scaling.get("truncate", True)
 
         def get_mscale(scale: float, mscale: float = 1.0) -> float:
@@ -189,7 +233,8 @@ class RotaryTransform(QueryKeyValueTransform):
             return 0.1 * mscale * math.log(scale) + 1.0
 
         if attention_factor is None:
-            if isinstance(mscale, (int, float)) and isinstance(mscale_all_dim, (int, float)):
+            if mscale_pair is not None:
+                mscale, mscale_all_dim = mscale_pair
                 attention_factor = float(
                     get_mscale(factor_float, float(mscale)) / get_mscale(factor_float, float(mscale_all_dim))
                 )
@@ -458,6 +503,10 @@ class AttentionConfig(BaseModel):
                     factor = rope_scaling.get("factor")
                     if factor is not None and (not isinstance(factor, (int, float)) or factor < 1.0):
                         raise ValueError("YaRN requires rope_scaling.factor to be a float >= 1.0")
+
+                    _get_optional_rope_scaling_float(rope_scaling, "beta_fast", 32.0, min_value=0.0)
+                    _get_optional_rope_scaling_float(rope_scaling, "beta_slow", 1.0, min_value=0.0)
+                    _get_optional_rope_scaling_float_pair(rope_scaling, "mscale", "mscale_all_dim", min_value=0.0)
 
                 self.rope_scaling = rope_scaling
                 return self
