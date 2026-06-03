@@ -118,3 +118,32 @@ For context on how these components are wired into the system, the following fil
 
 8. **`tests/test_downstream_evaluator.py`**
    - Contains comprehensive tests mocking the `subprocess` calls and verifying interval gating, rank gating, and directory existence logic.
+
+---
+
+## 3. Precaching Datasets (Offline Environments)
+
+If your compute cluster nodes do not have internet access, you must precache the Hugging Face datasets that OLMES requires. We provide a generalized script `scripts/precache_tasks.py` that you can run on a login node (or any environment with internet access).
+
+### Usage
+
+Activate your evaluation environment (virtualenv, conda, or your Singularity container shell) and set the `HF_DATASETS_CACHE` and `HF_HOME` variables to a location accessible by your compute nodes.
+
+```bash
+# 1. Activate your python environment (e.g. venv where olmes is installed)
+source /path/to/olmes/venv/bin/activate
+export PYTHONPATH=/path/to/olmes/venv/lib/python3.12/site-packages:$PYTHONPATH
+
+# 2. Point Hugging Face to a shared scratch space or cache directory
+export HF_DATASETS_CACHE="/path/to/shared/hf_cache"
+export HF_HOME="/path/to/shared/hf_cache"
+export HF_TOKEN="your_hf_access_token"  # If needed for gated models/datasets
+
+# 3. Define the tasks you need
+export OLMES_TASKS="arc_challenge:rc::olmes:full hellaswag:rc::olmes:full gsm8k::olmes"
+
+# 4. Run the precache script
+python scripts/precache_tasks.py --tasks $OLMES_TASKS
+```
+
+This script will resolve the tasks via OLMES and download all required datasets to your cache directory. When you run your training job via `sbatch`, ensure the compute nodes also set `HF_DATASETS_CACHE` and `HF_HOME` to the exact same shared directory.
