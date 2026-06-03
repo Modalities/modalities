@@ -38,6 +38,7 @@ def convert_gpt2(
     num_testruns: int = 0,
     device_modalities: str = "cpu",
     device_hf: str = "cpu",
+    checkpoint_path: str | None = None,
 ) -> None:
     """Takes a modalities gpt2 model and converts it to a Huggingface transformers model.
        The provided config yaml file should contain the model_raw or model section with the model configuration.
@@ -56,6 +57,11 @@ def convert_gpt2(
         modalities_config = load_app_config_dict(
             Path(modalities_config_path), experiment_id="-1", experiments_root_path=Path(tmpdir)
         )
+        if checkpoint_path is not None:
+            if "checkpointed_model" not in modalities_config:
+                modalities_config["checkpointed_model"] = {"config": {}}
+            modalities_config["checkpointed_model"]["config"]["checkpoint_path"] = checkpoint_path
+
         hf_model, modalities_model = convert_model_checkpoint(modalities_config)
 
     if num_testruns > 0:
@@ -69,12 +75,20 @@ def convert_gpt2(
     sentence_piece_tokenizer_configs = {
         key: subconfig
         for key, subconfig in modalities_config.items()
-        if "component_key" in subconfig
+        if isinstance(subconfig, dict) and "component_key" in subconfig
         and subconfig["component_key"] == "tokenizer"
         and subconfig["variant_key"] == "pretrained_sp_tokenizer"
     }
 
-    if len(sentence_piece_tokenizer_configs) > 1:
+    hf_tokenizer_configs = {
+        key: subconfig
+        for key, subconfig in modalities_config.items()
+        if isinstance(subconfig, dict) and "component_key" in subconfig
+        and subconfig["component_key"] == "tokenizer"
+        and subconfig["variant_key"] == "pretrained_hf_tokenizer"
+    }
+
+    if len(sentence_piece_tokenizer_configs) + len(hf_tokenizer_configs) > 1:
         raise ValueError(
             "Multiple tokenizer configs found. Please specify only one tokenizer config in the modalities config file."
         )
@@ -88,6 +102,14 @@ def convert_gpt2(
         hf_model.config.bos_token_id = bos_token_id
         hf_model.config.eos_token_id = eos_token_id
         hf_model.config.pad_token_id = pad_token_id
+    elif len(hf_tokenizer_configs) == 1:
+        from transformers import AutoTokenizer
+        tokenizer_name = modalities_config["tokenizer"]["config"]["pretrained_model_name_or_path"]
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        tokenizer.save_pretrained(output_dir)
+        hf_model.config.bos_token_id = tokenizer.bos_token_id
+        hf_model.config.eos_token_id = tokenizer.eos_token_id
+        hf_model.config.pad_token_id = tokenizer.pad_token_id
     else:
         logger.warning("No tokenizer specified in the config. Skipping tokenizer conversion.")
     hf_model.config.auto_map = {
@@ -110,6 +132,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_testruns", type=int, default=0, help="Number of test runs to perform.")
     parser.add_argument("--device_modalities", type=str, default="cpu", help="Device for the modalities model.")
     parser.add_argument("--device_hf", type=str, default="cpu", help="Device for the Hugging Face model.")
+    parser.add_argument("--checkpoint_path", type=str, default=None, help="Path to the model checkpoint. Overrides config.")
 
     args = parser.parse_args()
 
@@ -119,4 +142,5 @@ if __name__ == "__main__":
         args.num_testruns,
         args.device_modalities,
         args.device_hf,
+        args.checkpoint_path,
     )
