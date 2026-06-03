@@ -6,7 +6,7 @@ from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.tensor import DTensor
-from torch.optim import Adam, AdamW, Optimizer
+from torch.optim import Adam, AdamW, Muon, Optimizer
 
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.exceptions import OptimizerError
@@ -47,6 +47,33 @@ class OptimizerFactory:
     ) -> Optimizer:
         optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
         optimizer = AdamW(params=optimizer_groups, lr=lr, betas=betas, eps=eps, foreach=foreach, fused=fused)
+        return optimizer
+
+    @staticmethod
+    def get_muon(
+        lr: float,
+        weight_decay: float,
+        momentum: float,
+        nesterov: bool,
+        ns_coefficients: tuple[float, float, float],
+        eps: float,
+        ns_steps: int,
+        adjust_lr_fn: str | None,
+        weight_decay_groups_excluded: list[str],
+        wrapped_model: nn.Module,
+    ) -> Optimizer:
+        optimizer_groups = get_optimizer_groups(wrapped_model, weight_decay, weight_decay_groups_excluded)
+        optimizer = Muon(
+            params=optimizer_groups,
+            lr=lr,
+            weight_decay=weight_decay,
+            momentum=momentum,
+            nesterov=nesterov,
+            ns_coefficients=ns_coefficients,
+            eps=eps,
+            ns_steps=ns_steps,
+            adjust_lr_fn=adjust_lr_fn,
+        )
         return optimizer
 
     @staticmethod
@@ -149,7 +176,7 @@ def _create_optimizer_groups(
 
     else:
         raise OptimizerError(
-            f"model {type(model)} is not an instance of FSDP1 or FSDP2. " "Please use the correct model type."
+            f"model {type(model)} is not an instance of FSDP1 or FSDP2. Please use the correct model type."
         )
 
     if (
