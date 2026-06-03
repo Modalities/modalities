@@ -21,7 +21,7 @@ The `ModelConverter` is a thin wrapper that executes a shell command template vi
 
 ### Behavior
 - Triggered if `num_train_steps_done % eval_interval == 0`.
-- Only executes on `global_rank == 0`.
+- Only executes on `global_rank == 0`. You can prefix the command with `CUDA_VISIBLE_DEVICES=X` to manually specify which GPU the evaluation script should run on.
 - Reads `last_checkpoint_info.json` from the checkpoint directory to determine the latest checkpoint path.
 - Checks if the `{checkpoint_path}/hf_checkpoint` directory already exists. If it does, conversion is skipped.
 - If it does not exist, it formats the `command_template` and runs it using `subprocess.run(cmd, shell=True, check=True)`.
@@ -38,7 +38,7 @@ model_converter:
   component_key: model_converter
   variant_key: default
   config:
-    command_template: "python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path}"
+    command_template: "CUDA_VISIBLE_DEVICES=7 python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path}"
     checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     global_rank: ${settings.cuda_env.global_rank}
     eval_interval: 1000
@@ -83,7 +83,7 @@ downstream_evaluator:
     eval_interval: 100
     checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     global_rank: ${settings.cuda_env.global_rank}
-    olmes_command_template: "CUDA_VISIBLE_DEVICES=$LOCAL_RANK . /home/markus_frey/Github/olmes/.venv/bin/activate && olmes --model {hf_model_dir} --model-args '{{\"trust_remote_code\": true}}' --task {tasks} --limit 128 --output-dir {hf_model_dir}/olmes_eval_{step} > {hf_model_dir}/olmes_eval_{step}.log 2>&1"
+    olmes_command_template: "CUDA_VISIBLE_DEVICES=7 . /home/markus_frey/Github/olmes/.venv/bin/activate && olmes --model {hf_model_dir} --model-args '{{\"trust_remote_code\": true}}' --task {tasks} --limit 128 --output-dir {hf_model_dir}/olmes_eval_{step} > {hf_model_dir}/olmes_eval_{step}.log 2>&1"
 ```
 
 ---
