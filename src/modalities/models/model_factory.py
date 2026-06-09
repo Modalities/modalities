@@ -212,6 +212,12 @@ class ModelFactory:
 
         modules = list(model.modules())
 
+        # Collect EP parameters to exclude from FSDP2 sharding
+        ep_params = {
+            p for m in model.modules() if getattr(m, "_ep_enabled", False) for p in m.parameters(recurse=False)
+        }
+        ignored_params = ep_params if ep_params else None
+
         # we first shard all the blocks
         grouped_modules: list[nn.Module] = []
         module_id = 0
@@ -226,6 +232,7 @@ class ModelFactory:
                         grouped_modules,
                         **fsdp_config,
                         reshard_after_forward=reshard_block_after_forward,
+                        ignored_params=ignored_params,
                     )
                     grouped_modules = list()
 
@@ -235,10 +242,11 @@ class ModelFactory:
                 grouped_modules,
                 **fsdp_config,
                 reshard_after_forward=reshard_block_after_forward,
+                ignored_params=ignored_params,
             )
 
         # finally, we shard the entire model
-        fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
+        fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward, ignored_params=ignored_params)
         logger.info(
             f"Rank {dist.get_rank()} sharded number of parameters: "
             f"{get_local_number_of_trainable_parameters(model)}"
