@@ -1,6 +1,6 @@
+import gc
 from datetime import datetime
 from enum import Enum
-import gc
 from typing import Callable, Optional
 
 import torch
