@@ -222,8 +222,12 @@ class LlamaAttention(nn.Module):
         )
         if getattr(config, "use_qk_norm", False):
             qk_norm_dim = getattr(config, "qk_norm_dim", None) or self.head_dim
-            self.q_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
-            self.k_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+            if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+                self.q_norm = nn.RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+                self.k_norm = nn.RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+            else:
+                self.q_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+                self.k_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
         else:
             self.q_norm = None
             self.k_norm = None
@@ -284,7 +288,10 @@ class GPT2DecoderLayer(GradientCheckpointingLayer):
         self.self_attn = LlamaAttention(config=config, layer_idx=layer_idx)
 
         self.mlp = LlamaMLP(config)
-        if getattr(config, "norm_type", "layer_norm") in ["rms_norm", "pytorch_rms_norm"]:
+        if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+            self.input_layernorm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.post_attention_layernorm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        elif getattr(config, "norm_type", "layer_norm") == "rms_norm":
             self.input_layernorm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
             self.post_attention_layernorm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
         else:
@@ -365,7 +372,9 @@ class GPT2Model(GPT2PreTrainedModel):
         self.layers = nn.ModuleList(
             [GPT2DecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
-        if getattr(config, "norm_type", "layer_norm") in ["rms_norm", "pytorch_rms_norm"]:
+        if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+            self.norm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        elif getattr(config, "norm_type", "layer_norm") == "rms_norm":
             self.norm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
         else:
             self.norm = nn.LayerNorm(

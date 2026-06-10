@@ -80,8 +80,6 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
 
     ffn_norm_key = "ffn_norm_config"
     norm_type = config[ffn_norm_key].get("norm_type", "layer_norm")
-    if norm_type == "pytorch_rms_norm":
-        norm_type = "rms_norm"
 
     qk_norm_cfg = config.get("attention_config", {}).get("qk_norm_config")
     use_qk_norm = qk_norm_cfg is not None
@@ -131,13 +129,11 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
 
         modalities_model.to(dtype=hf_model.dtype, device=hf_model.device)
         with torch.no_grad():
-            llama_logits = hf_model(input_ids=input_ids).logits.to("cpu", dtype=torch.float32)
-            modalities_logits = modalities_model(inputs)[modalities_model.prediction_key].to("cpu", dtype=torch.float32)
+            llama_logits = hf_model(input_ids=input_ids).logits.to("cpu")
+            modalities_logits = modalities_model(inputs)[modalities_model.prediction_key].to("cpu")
 
         assert llama_logits.shape == modalities_logits.shape
-        max_diff = torch.max(torch.abs(llama_logits - modalities_logits))
-        print("Max diff:", max_diff.item())
-        assert torch.allclose(llama_logits, modalities_logits, atol=1.0, rtol=1e-3)
+        assert torch.equal(llama_logits, modalities_logits)
 
 
 def _check_conversion_criteria(model_config: dict) -> None:

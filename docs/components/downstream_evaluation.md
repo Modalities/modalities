@@ -38,7 +38,7 @@ model_converter:
   component_key: model_converter
   variant_key: default
   config:
-    command_template: "CUDA_VISIBLE_DEVICES=7 python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path}"
+    command_template: "python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path}"
     checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     global_rank: ${settings.cuda_env.global_rank}
     eval_interval: 1000
@@ -68,6 +68,15 @@ The `olmes_command_template` string can use the following placeholders:
 - `{tasks}`: A space-separated string of the tasks provided in the config (Line 248).
 - `{step}`: The current `num_train_steps_done`.
 
+### HPC / SLURM Integration
+For HPC environments (like Leonardo Booster), running OLMES directly from the trainer process can cause GPU Out-of-Memory (OOM) errors. You can decouple evaluation by creating a wrapper script (`scripts/evaluation/run_olmes_sbatch.sh`) that submits an independent SLURM job using `sbatch --wait`. Because `DownstreamEvaluator` uses `subprocess.Popen` asynchronously, the wrapper script will wait in the background on the training node without blocking the training loop!
+
+> [!IMPORTANT]
+> **Nested SLURM Job Environment Isolation (`--export=NONE`)**
+> When submitting the nested evaluation job using `sbatch` from within a running SLURM training job, the nested job inherits the parent job's environment variables (such as CUDA variables, `RANK`, `WORLD_SIZE`, `MASTER_ADDR`, etc.) by default. This will cause the evaluation job to fail or behave incorrectly.
+>
+> To prevent environment leakage, you **must** include `#SBATCH --export=NONE` in the nested `sbatch` script header. This ensures the evaluation job starts with a clean, isolated environment.
+
 ### YAML Configuration
 ```yaml
 downstream_evaluator:
@@ -83,7 +92,7 @@ downstream_evaluator:
     eval_interval: 100
     checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
     global_rank: ${settings.cuda_env.global_rank}
-    olmes_command_template: "CUDA_VISIBLE_DEVICES=7 . /home/markus_frey/Github/olmes/.venv/bin/activate && olmes --model {hf_model_dir} --model-args '{{\"trust_remote_code\": true}}' --task {tasks} --limit 128 --output-dir {hf_model_dir}/olmes_eval_{step} > {hf_model_dir}/olmes_eval_{step}.log 2>&1"
+    olmes_command_template: "bash scripts/evaluation/run_olmes_sbatch.sh {hf_model_dir} '{tasks}' {step} 1024 1"
 ```
 
 ---
@@ -123,7 +132,7 @@ For context on how these components are wired into the system, the following fil
 
 ## 3. Precaching Datasets (Offline Environments)
 
-If your compute cluster nodes do not have internet access, you must precache the Hugging Face datasets that OLMES requires. We provide a generalized script `scripts/precache_tasks.py` that you can run on a login node (or any environment with internet access).
+If your compute cluster nodes do not have internet access, you must precache the Hugging Face datasets that OLMES requires. We provide a generalized script `scripts/evaluation/precache_tasks.py` that you can run on a login node (or any environment with internet access).
 
 ### Usage
 
@@ -143,7 +152,7 @@ export HF_TOKEN="your_hf_access_token"  # If needed for gated models/datasets
 export OLMES_TASKS="arc_challenge:rc::olmes:full hellaswag:rc::olmes:full gsm8k::olmes"
 
 # 4. Run the precache script
-python scripts/precache_tasks.py --tasks $OLMES_TASKS
+python scripts/evaluation/precache_tasks.py --tasks $OLMES_TASKS
 ```
 
 This script will resolve the tasks via OLMES and download all required datasets to your cache directory. When you run your training job via `sbatch`, ensure the compute nodes also set `HF_DATASETS_CACHE` and `HF_HOME` to the exact same shared directory.
