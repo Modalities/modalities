@@ -166,6 +166,12 @@ class GroupedExperts(nn.Module):
         w1 = self.w1.to_local() if DTensor is not None and isinstance(self.w1, DTensor) else self.w1
         w2 = self.w2.to_local() if DTensor is not None and isinstance(self.w2, DTensor) else self.w2
         w3 = self.w3.to_local() if DTensor is not None and isinstance(self.w3, DTensor) else self.w3
+        # F.linear requires matching dtypes between inputs and weights. Under mixed precision,
+        # routed_input can be BF16 while local expert weights remain FP32.
+        if routed_input.dtype != w1.dtype:
+            w1 = w1.to(dtype=routed_input.dtype)
+            w2 = w2.to(dtype=routed_input.dtype)
+            w3 = w3.to(dtype=routed_input.dtype)
         local_num_tokens = (
             num_tokens_per_expert.to_local()
             if DTensor is not None and isinstance(num_tokens_per_expert, DTensor)
