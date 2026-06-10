@@ -1,27 +1,17 @@
 # ruff: noqa: E402
 
 import os
-import sys
 from pathlib import Path
-
-MOE_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(MOE_ROOT))
+from typing import cast
 
 import torch
 import torch.distributed as dist
-from modalities_moe.config.config import EPWrappedModelConfig, MoECrossEntropyLossConfig
-from modalities_moe.loss_functions import MoECrossEntropyLoss
-from modalities_moe.models.model_factory import get_ep_wrapped_model
-from modalities_moe.models.moe.qwen_model import QwenModel, QwenModelConfig
-from modalities_moe.optimizers.ep_adamw import EPAdamWConfig, get_ep_adam_w
-from modalities_moe.training.gradient_clipping.ep_gradient_clipper import EPGradientClipper
 from torch.distributed.tensor import DTensor
 
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.running_env.cuda_env import CudaEnv
-from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import FSDP2GradientClipperConfig
 
 cwd = Path(__file__).resolve().parent.parent
 os.chdir(cwd)
@@ -102,8 +92,8 @@ def _enable_torchtitan_moe_permute_fallback() -> (
 
     kernels.generate_permute_indices = _generate_permute_indices_no_triton
     moe_utils.generate_permute_indices = _generate_permute_indices_no_triton
-    kernels._modalities_fallback_enabled = True
-    kernels._modalities_generate_permute_indices_original = _orig_generate_permute_indices
+    setattr(kernels, "_modalities_fallback_enabled", True)
+    setattr(kernels, "_modalities_generate_permute_indices_original", _orig_generate_permute_indices)
 
 
 def debug_ep(model):
@@ -132,40 +122,10 @@ def main():
             config_path=CONFIG_FILE_PATH,
             experiments_root_path=EXPERIMENTS_ROOT_PATH,
         )
-        modalities_main.add_custom_component(
-            component_key="model",
-            variant_key="ep_wrapped",
-            custom_component=get_ep_wrapped_model,
-            custom_config=EPWrappedModelConfig,
-        )
 
-        modalities_main.add_custom_component(
-            component_key="model", variant_key="moe", custom_component=QwenModel, custom_config=QwenModelConfig
-        )
-
-        modalities_main.add_custom_component(
-            component_key="gradient_clipper",
-            variant_key="ep",
-            custom_component=EPGradientClipper,
-            custom_config=FSDP2GradientClipperConfig,
-        )
-
-        modalities_main.add_custom_component(
-            component_key="loss",
-            variant_key="moe_cross_entropy",
-            custom_component=MoECrossEntropyLoss,
-            custom_config=MoECrossEntropyLossConfig,
-        )
-
-        modalities_main.add_custom_component(
-            component_key="optimizer",
-            variant_key="ep_adam_w",
-            custom_component=get_ep_adam_w,
-            custom_config=EPAdamWConfig,
-        )
-
-        components: TrainingComponentsInstantiationModel = modalities_main.build_components(
-            components_model_type=TrainingComponentsInstantiationModel
+        components = cast(
+            TrainingComponentsInstantiationModel,
+            modalities_main.build_components(components_model_type=TrainingComponentsInstantiationModel),
         )
 
         # WORKAROUNDS (wip)

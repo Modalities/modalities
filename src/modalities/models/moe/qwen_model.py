@@ -1,10 +1,12 @@
 import math
-from typing import Literal, Optional
+from typing import Literal, Optional, overload
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pydantic import BaseModel
+
+from modalities.models.model import NNModel
 
 try:
     from torch.distributed.tensor import DTensor
@@ -13,7 +15,6 @@ except Exception:
 
 
 class QwenModelConfig(BaseModel):
-    # Model
     vocab_size: int
     max_seq_len: int
     d_model: int
@@ -311,18 +312,6 @@ class MoEBlock(nn.Module):
         return out.view(B, T, D)
 
 
-class DenseMLP(nn.Module):
-    def __init__(self, d_model, d_ff, ffn_dropout):
-        super().__init__()
-        self.w1 = nn.Linear(d_model, d_ff, bias=False)
-        self.w2 = nn.Linear(d_model, d_ff, bias=False)
-        self.w3 = nn.Linear(d_ff, d_model, bias=False)
-        self.dropout = nn.Dropout(ffn_dropout) if ffn_dropout > 0 else nn.Identity()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.dropout(self.w3(F.silu(self.w1(x)) * self.w2(x)))
-
-
 class TransformerBlock(nn.Module):
     def __init__(
         self,
@@ -385,7 +374,7 @@ class TransformerBlock(nn.Module):
         return getattr(self.ffn, "last_aux_loss", None)
 
 
-class QwenModel(nn.Module):
+class QwenModel(NNModel):
     def __init__(
         self,
         vocab_size: int,
@@ -414,7 +403,12 @@ class QwenModel(nn.Module):
         moe_aux_loss_coef: float = 0.001,
         moe_z_loss_coef: float = 0.0,
     ):
-        super().__init__()
+        weight_decay_groups = {
+            "linear": ["q_proj", "k_proj", "v_proj", "o_proj", "lm_head", "router", "w1", "w2", "w3"],
+            "embedding": ["token_emb"],
+            "layernorm": ["pre_attn_norm", "pre_ffn_norm", "final_norm", "q_norm", "k_norm"],
+        }
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
 
@@ -454,15 +448,15 @@ class QwenModel(nn.Module):
         if tie_embeddings:
             self.lm_head.weight = self.token_emb.weight
 
-    @property
-    def weight_decay_groups(self):
-        return {
-            "linear": ["q_proj", "k_proj", "v_proj", "o_proj", "lm_head", "router", "w1", "w2", "w3"],
-            "embedding": ["token_emb"],
-            "layernorm": ["pre_attn_norm", "pre_ffn_norm", "final_norm", "q_norm", "k_norm"],
-        }
+    @overload
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        ...
 
-    def forward(self, inputs):
+    @overload
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        ...
+
+    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
         if isinstance(inputs, dict):
             return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
         return self.forward_impl(inputs)
@@ -472,30 +466,3 @@ class QwenModel(nn.Module):
         for layer in self.layers.values():
             x = layer(x)
         return self.lm_head(self.final_norm(x))
-
-
-if __name__ == "__main__":
-    torch.manual_seed(0)
-
-    model = QwenModel(
-        vocab_size=151936,
-        max_seq_len=4096,
-        d_model=2048,
-        n_heads=32,
-        n_kv_heads=8,
-        d_ff=6144,
-        moe_d_ff=768,
-        num_layers=48,
-        moe_num_experts=128,
-        moe_top_k=8,
-    )
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Parametri: {num_params/1e9:.2f}B")
-
-    x = torch.randint(0, 151936, (2, 64))
-    logits = model(x)
-    print(f"Output: {logits.shape}")
-
-    loss = logits.mean()
-    loss.backward()
-    print("Backward OK")

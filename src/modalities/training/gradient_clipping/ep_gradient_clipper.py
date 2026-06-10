@@ -16,7 +16,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper import FSDP2Gra
 
 
 class EPGradientClipper(FSDP2GradientClipper):
-    """FSDP2 clipper wrapper for EP adaptation"""
+    """FSDP2 clipper wrapper that handles EP DTensor gradients safely."""
 
     def __init__(
         self,
@@ -54,7 +54,6 @@ class EPGradientClipper(FSDP2GradientClipper):
             for grad in grads:
                 grad_norm = torch.linalg.vector_norm(grad, ord=norm_type_val)
                 if isinstance(grad_norm, DTensor):
-                    # Reduce each partial norm inside its own mesh before aggregation.
                     grad_norm = grad_norm.full_tensor()
                 norm_scalars.append(grad_norm.to(first_device))
 
@@ -79,8 +78,6 @@ class EPGradientClipper(FSDP2GradientClipper):
                 dist.all_reduce(total_norm, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
                 total_norm **= 1.0 / self.norm_type.value
 
-        # do not use torch.nn.utils.clip_grads_with_norm_ here: it batches grads with
-        # torch._foreach_mul_, which fails when the list mixes DTensors from different meshes.
         clip_coef = self.max_norm / (total_norm + 1e-6)
         clip_coef_clamped = torch.clamp(clip_coef, max=1.0)
 
