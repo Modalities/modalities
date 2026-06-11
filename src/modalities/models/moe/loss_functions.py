@@ -31,6 +31,7 @@ class MoECrossEntropyLoss(Loss):
             labels.contiguous().long().view(-1),
         )
 
+        # Aux loss
         for layer in self.model.layers.values():
             if hasattr(layer, "aux_loss") and layer.aux_loss is not None:
                 loss = loss + layer.aux_loss.to(loss.dtype)

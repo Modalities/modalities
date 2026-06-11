@@ -10,6 +10,7 @@ from torchtitan.distributed.expert_parallel import ExpertParallel
 from modalities.util import get_module_class_from_name
 
 
+# TODO refactor these funtions into a utils
 def _resolve_ep_mesh(device_mesh: DeviceMesh, ep_mesh_dim_name: str | None) -> DeviceMesh:
     mesh_dim_names = tuple(device_mesh.mesh_dim_names or ())
 

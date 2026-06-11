@@ -78,6 +78,8 @@ class EPGradientClipper(FSDP2GradientClipper):
                 dist.all_reduce(total_norm, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
                 total_norm **= 1.0 / self.norm_type.value
 
+        # do not use torch.nn.utils.clip_grads_with_norm_ here: it batches grads with
+        # torch._foreach_mul_, which fails when the list mixes DTensors from different meshes.
         clip_coef = self.max_norm / (total_norm + 1e-6)
         clip_coef_clamped = torch.clamp(clip_coef, max=1.0)
 
