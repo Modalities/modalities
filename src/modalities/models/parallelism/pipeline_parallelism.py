@@ -14,10 +14,14 @@ from torch.distributed.pipelining import PipelineStage
 from torch.distributed.pipelining.schedules import (
     PipelineScheduleMulti,
     PipelineScheduleSingle,
-    ScheduleDualPipeV,
     ScheduleZBVZeroBubble,
     get_schedule_class,
 )
+
+try:
+    from torch.distributed.pipelining.schedules import ScheduleDualPipeV
+except ImportError:
+    ScheduleDualPipeV = None
 
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
@@ -152,7 +156,10 @@ class PipelineFactory:
         num_stages: int,
         schedule_class: Type[PipelineScheduleSingle | PipelineScheduleMulti],
     ) -> list[int]:
-        style = "v" if schedule_class in (ScheduleZBVZeroBubble, ScheduleDualPipeV) else "loop"
+        v_schedules = [ScheduleZBVZeroBubble]
+        if ScheduleDualPipeV is not None:
+            v_schedules.append(ScheduleDualPipeV)
+        style = "v" if schedule_class in tuple(v_schedules) else "loop"
         pp_size = pp_mesh.size()
         pp_rank = pp_mesh.get_local_rank()
         stages_per_rank = num_stages // pp_size
