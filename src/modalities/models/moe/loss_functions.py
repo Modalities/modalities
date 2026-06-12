@@ -6,7 +6,7 @@ from modalities.loss_functions import Loss
 
 
 class MoECrossEntropyLoss(Loss):
-    """Cross Entropy Loss with auxiliary loss support for router balancing"""
+    """Cross entropy loss with optional MoE auxiliary losses from model layers."""
 
     def __init__(
         self,

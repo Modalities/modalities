@@ -1,25 +1,10 @@
 import torch
 import torch.distributed as dist
-from pydantic import BaseModel
 from torch.distributed.tensor import DTensor
 from torch.nn import Module
 from torch.optim import AdamW, Optimizer
 
-from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticPytorchModuleOrListType
 from modalities.optimizers.optimizer_factory import _build_optimizer_groups_via_weight_decay_split
-
-
-class EPAdamWConfig(BaseModel):
-    wrapped_model: PydanticPytorchModuleOrListType
-    device_mesh: PydanticDeviceMeshIFType
-    lr: float
-    betas: tuple[float, float]
-    eps: float
-    weight_decay: float
-    weight_decay_groups_excluded: list[str]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 def _get_ep_param_ids(model: Module) -> set:
@@ -104,8 +89,8 @@ class EPAdamW(Optimizer):
         # Sync lr
         if self._ep_adamw is not None:
             self._ep_adamw.param_groups[0]["lr"] = self.param_groups[0]["lr"]
-        for i, g in enumerate(self._dense_adamw.param_groups):
-            g["lr"] = self.param_groups[i + 1]["lr"]
+        for i, group in enumerate(self._dense_adamw.param_groups):
+            group["lr"] = self.param_groups[i + 1]["lr"]
 
         # Update ep params
         if self._ep_adamw is not None:

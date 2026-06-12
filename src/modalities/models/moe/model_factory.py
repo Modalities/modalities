@@ -11,9 +11,7 @@ from modalities.util import get_module_class_from_name
 
 
 # TODO refactor these funtions into a utils
-def _resolve_ep_mesh(
-    device_mesh: DeviceMesh, ep_mesh_dim_name: str | None
-) -> DeviceMesh:  # devicemesh not supporting EP
+def _resolve_ep_mesh(device_mesh: DeviceMesh, ep_mesh_dim_name: str | None) -> DeviceMesh:
     mesh_dim_names = tuple(device_mesh.mesh_dim_names or ())
 
     if ep_mesh_dim_name is not None:
@@ -72,15 +70,6 @@ def _apply_torchtitan_ep(module, ep_mesh) -> None:
     setattr(module.experts, "_ep_enabled", True)
 
 
-def debug_forward_hook(module, input):
-    for name, param in module.named_parameters(recurse=False):
-        if hasattr(param, "_local_tensor"):
-            # still dTensor
-            print(f"[EP forward] {name}: still DTensor, local={param._local_tensor.shape}")
-        else:
-            print(f"[EP forward] {name}: plain tensor shape={param.shape}")
-
-
 def get_ep_wrapped_model(
     model,
     block_names: list[str],
@@ -89,7 +78,6 @@ def get_ep_wrapped_model(
     mp_param_dtype=torch.bfloat16,
     mp_reduce_dtype=torch.bfloat16,
 ) -> nn.Module:
-    # Warn for unresolved names, but still wrap any block types that can be resolved.
     block_types = []
     missing_block_names = []
     for name in block_names:
@@ -111,7 +99,6 @@ def get_ep_wrapped_model(
         raise ValueError(f"None of the requested MoE block names were found: {block_names}")
 
     ep_mesh = _resolve_ep_mesh(device_mesh, ep_mesh_dim_name)
-    device_mesh["dp_shard"]
     MixedPrecisionPolicy(param_dtype=mp_param_dtype, reduce_dtype=mp_reduce_dtype)
 
     wrapped_blocks = 0

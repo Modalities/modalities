@@ -1,10 +1,17 @@
 import math
-from typing import Literal, Optional
+from typing import Literal, Optional, overload
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pydantic import BaseModel
+
+from modalities.models.components.rotary_embedding import (
+    apply_rotary_pos_emb,
+    compute_default_inv_freq,
+    update_cos_sin_tables,
+)
+from modalities.models.model import NNModel
 
 try:
     from torch.distributed.tensor import DTensor
@@ -13,7 +20,6 @@ except Exception:
 
 
 class QwenModelConfig(BaseModel):
-    # Model
     vocab_size: int
     max_seq_len: int
     d_model: int
@@ -61,33 +67,40 @@ class RotaryEmbedding(nn.Module):
         self.head_dim = head_dim
         self.max_seq_len = max_seq_len
         self.base = base
+        self.register_buffer("inv_freq", None, persistent=False)
         self.register_buffer("cos_cached", None, persistent=False)
         self.register_buffer("sin_cached", None, persistent=False)
+        self._seq_len_cached: Optional[int] = None
 
     def _compute_cache(self, device):
-        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.head_dim, 2, device=device).float() / self.head_dim))
-        t = torch.arange(self.max_seq_len, device=device).float()
-        freqs = torch.outer(t, inv_freq)
-        emb = torch.cat([freqs, freqs], dim=-1)
-        self.cos_cached = emb.cos()[None, None, :, :]
-        self.sin_cached = emb.sin()[None, None, :, :]
+        self.inv_freq = compute_default_inv_freq(dim_model=self.head_dim, base_freq=self.base, device=device)
+        self._seq_len_cached = None
+        self.cos_cached = None
+        self.sin_cached = None
 
     def forward(self, x: torch.Tensor, seq_len: int):
-        if self.cos_cached is None:
+        if self.inv_freq is None:
             self._compute_cache(x.device)
+        self._seq_len_cached, self.cos_cached, self.sin_cached = update_cos_sin_tables(
+            x=x,
+            inv_freq=self.inv_freq,
+            attention_scaling=1.0,
+            seq_length_dim=-2,
+            seq_len_cached=self._seq_len_cached,
+            cos_cached=self.cos_cached,
+            sin_cached=self.sin_cached,
+        )
         return (
             self.cos_cached[:, :, :seq_len, :].to(x.dtype),
             self.sin_cached[:, :, :seq_len, :].to(x.dtype),
         )
 
 
-def rotate_half(x):
-    x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
-    return torch.cat([-x2, x1], dim=-1)
-
-
 def apply_rotary_emb(q, k, cos, sin):
-    return (q * cos) + (rotate_half(q) * sin), (k * cos) + (rotate_half(k) * sin)
+    return (
+        apply_rotary_pos_emb(x=q, cos=cos, sin=sin, seq_length_dim=-2),
+        apply_rotary_pos_emb(x=k, cos=cos, sin=sin, seq_length_dim=-2),
+    )
 
 
 class GroupedQueryAttention(nn.Module):
@@ -165,6 +178,12 @@ class GroupedExperts(nn.Module):
         w1 = self.w1.to_local() if DTensor is not None and isinstance(self.w1, DTensor) else self.w1
         w2 = self.w2.to_local() if DTensor is not None and isinstance(self.w2, DTensor) else self.w2
         w3 = self.w3.to_local() if DTensor is not None and isinstance(self.w3, DTensor) else self.w3
+        # F.linear requires matching dtypes between inputs and weights. Under mixed precision,
+        # routed_input can be BF16 while local expert weights remain FP32.
+        if routed_input.dtype != w1.dtype:
+            w1 = w1.to(dtype=routed_input.dtype)
+            w2 = w2.to(dtype=routed_input.dtype)
+            w3 = w3.to(dtype=routed_input.dtype)
         local_num_tokens = (
             num_tokens_per_expert.to_local()
             if DTensor is not None and isinstance(num_tokens_per_expert, DTensor)
@@ -311,18 +330,6 @@ class MoEBlock(nn.Module):
         return out.view(B, T, D)
 
 
-class DenseMLP(nn.Module):
-    def __init__(self, d_model, d_ff, ffn_dropout):
-        super().__init__()
-        self.w1 = nn.Linear(d_model, d_ff, bias=False)
-        self.w2 = nn.Linear(d_model, d_ff, bias=False)
-        self.w3 = nn.Linear(d_ff, d_model, bias=False)
-        self.dropout = nn.Dropout(ffn_dropout) if ffn_dropout > 0 else nn.Identity()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.dropout(self.w3(F.silu(self.w1(x)) * self.w2(x)))
-
-
 class TransformerBlock(nn.Module):
     def __init__(
         self,
@@ -385,7 +392,7 @@ class TransformerBlock(nn.Module):
         return getattr(self.ffn, "last_aux_loss", None)
 
 
-class QwenModel(nn.Module):
+class QwenModel(NNModel):
     def __init__(
         self,
         vocab_size: int,
@@ -414,7 +421,12 @@ class QwenModel(nn.Module):
         moe_aux_loss_coef: float = 0.001,
         moe_z_loss_coef: float = 0.0,
     ):
-        super().__init__()
+        weight_decay_groups = {
+            "linear": ["q_proj", "k_proj", "v_proj", "o_proj", "lm_head", "router", "w1", "w2", "w3"],
+            "embedding": ["token_emb"],
+            "layernorm": ["pre_attn_norm", "pre_ffn_norm", "final_norm", "q_norm", "k_norm"],
+        }
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
 
@@ -454,15 +466,15 @@ class QwenModel(nn.Module):
         if tie_embeddings:
             self.lm_head.weight = self.token_emb.weight
 
-    @property
-    def weight_decay_groups(self):
-        return {
-            "linear": ["q_proj", "k_proj", "v_proj", "o_proj", "lm_head", "router", "w1", "w2", "w3"],
-            "embedding": ["token_emb"],
-            "layernorm": ["pre_attn_norm", "pre_ffn_norm", "final_norm", "q_norm", "k_norm"],
-        }
+    @overload
+    def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        ...
 
-    def forward(self, inputs):
+    @overload
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        ...
+
+    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
         if isinstance(inputs, dict):
             return {self.prediction_key: self.forward_impl(inputs[self.sample_key])}
         return self.forward_impl(inputs)
@@ -472,30 +484,3 @@ class QwenModel(nn.Module):
         for layer in self.layers.values():
             x = layer(x)
         return self.lm_head(self.final_norm(x))
-
-
-if __name__ == "__main__":
-    torch.manual_seed(0)
-
-    model = QwenModel(
-        vocab_size=151936,
-        max_seq_len=4096,
-        d_model=2048,
-        n_heads=32,
-        n_kv_heads=8,
-        d_ff=6144,
-        moe_d_ff=768,
-        num_layers=48,
-        moe_num_experts=128,
-        moe_top_k=8,
-    )
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Parametri: {num_params/1e9:.2f}B")
-
-    x = torch.randint(0, 151936, (2, 64))
-    logits = model(x)
-    print(f"Output: {logits.shape}")
-
-    loss = logits.mean()
-    loss.backward()
-    print("Backward OK")
