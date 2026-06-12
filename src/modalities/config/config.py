@@ -138,6 +138,7 @@ class DCPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
+    use_gloo_process_group_for_planning: bool = False
 
 
 class CheckpointSavingConfig(BaseModel):
