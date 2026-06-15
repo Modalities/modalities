@@ -938,6 +938,12 @@ class GPT2LLM(NNModel):
                 self.transformer.lm_head.weight
             )  # https://paperswithcode.com/method/weight-tying
 
+    @property
+    def has_tied_word_embeddings(self) -> bool:
+        token_embedding_weight = getattr(self.transformer.wte, "weight", None)
+        lm_head_weight = getattr(self.transformer.lm_head, "weight", None)
+        return token_embedding_weight is not None and token_embedding_weight is lm_head_weight
+
     @overload
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """

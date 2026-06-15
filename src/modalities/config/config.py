@@ -34,6 +34,7 @@ from modalities.config.pydantic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
+from modalities.models.weight_tying import has_tied_word_embeddings
 from modalities.running_env.env_utils import (
     FSDP2MixedPrecisionSettings,
     MixedPrecisionSettings,
@@ -340,6 +341,13 @@ class GPT2ModelTPConfig(BaseModel):
         if ParallelismDegrees.DP_REPLICATE.value in mesh_dim_names:
             # TorchTitan uses replicate (i.e, plain DP) to combine DP with TP.
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_untied_word_embeddings(self) -> "GPT2ModelTPConfig":
+        models = self.model if isinstance(self.model, list) else [self.model]
+        if any(has_tied_word_embeddings(model) for model in models):
+            raise ValueError("Tied word embeddings are not supported with Tensor Parallelism.")
         return self
 
 
