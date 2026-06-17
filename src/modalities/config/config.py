@@ -338,6 +338,7 @@ class EPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     block_names: list[str]
     device_mesh: PydanticDeviceMeshIFType
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
 
 
 class DebuggingEnrichedModelConfig(BaseModel):

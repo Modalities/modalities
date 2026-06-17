@@ -238,6 +238,9 @@ ep_model:
     device_mesh:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
     block_names: [TransformerBlock]
 
 ac_model:
