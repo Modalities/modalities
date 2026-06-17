@@ -29,7 +29,7 @@ def _permute_tokens(
     counts = num_tokens_per_expert_group.view(ep_degree, num_local_experts)  # (ep_degree, num_local_experts)
 
     flat_counts = counts.flatten()  # length = ep_degree * num_local_experts
-    
+
     offsets = flat_counts.cumsum(0) - flat_counts
 
     # build permuted_indices
@@ -39,9 +39,7 @@ def _permute_tokens(
             count = int(counts[r, e].item())
             if count > 0:
                 start = int(offsets[r * num_local_experts + e].item())
-                indices_per_expert.append(
-                    torch.arange(start, start + count, device=x.device, dtype=torch.long)
-                )
+                indices_per_expert.append(torch.arange(start, start + count, device=x.device, dtype=torch.long))
 
     if indices_per_expert:
         permuted_indices = torch.cat(indices_per_expert)
@@ -88,9 +86,7 @@ class ExpertParallel:
                 nn.Parameter(distribute_tensor(param, device_mesh, [Shard(0)])),
             )
 
-    def _token_dispatch(
-        self, mod: nn.Module, inputs: tuple, device_mesh: DeviceMesh
-    ) -> tuple[Tensor, Tensor]:
+    def _token_dispatch(self, mod: nn.Module, inputs: tuple, device_mesh: DeviceMesh) -> tuple[Tensor, Tensor]:
         routed_input, num_tokens_per_expert = inputs
         ep_degree = device_mesh.shape[0]
         num_local_experts = num_tokens_per_expert.shape[0] // ep_degree
@@ -99,20 +95,14 @@ class ExpertParallel:
             num_tokens_per_expert_group = all_to_all_single(
                 num_tokens_per_expert, None, None, group=device_mesh.get_group()
             )
-            
-            num_tokens_per_expert_group = torch.ops._c10d_functional.wait_tensor(
-                num_tokens_per_expert_group
-            )
+
+            num_tokens_per_expert_group = torch.ops._c10d_functional.wait_tensor(num_tokens_per_expert_group)
             input_splits = (
-                num_tokens_per_expert.view(ep_degree, -1)
-                .sum(dim=1)
-                .to(torch.device("cpu"), non_blocking=True)
+                num_tokens_per_expert.view(ep_degree, -1).sum(dim=1).to(torch.device("cpu"), non_blocking=True)
             )
-            
+
             output_splits = (
-                num_tokens_per_expert_group.view(ep_degree, -1)
-                .sum(dim=1)
-                .to(torch.device("cpu"), non_blocking=False)
+                num_tokens_per_expert_group.view(ep_degree, -1).sum(dim=1).to(torch.device("cpu"), non_blocking=False)
             )
             self.input_splits = input_splits.tolist()
             self.output_splits = output_splits.tolist()
@@ -124,14 +114,12 @@ class ExpertParallel:
             device_mesh.get_group(),
         )
 
-        self.original_shape, routed_input, self.permuted_indices, num_tokens_per_expert_group = (
-            _permute_tokens(routed_input, num_tokens_per_expert_group, ep_degree, num_local_experts)
+        self.original_shape, routed_input, self.permuted_indices, num_tokens_per_expert_group = _permute_tokens(
+            routed_input, num_tokens_per_expert_group, ep_degree, num_local_experts
         )
         return routed_input, num_tokens_per_expert_group
 
-    def _token_combine(
-        self, mod: nn.Module, routed_output: Tensor, device_mesh: DeviceMesh
-    ) -> Tensor:
+    def _token_combine(self, mod: nn.Module, routed_output: Tensor, device_mesh: DeviceMesh) -> Tensor:
         routed_output = _unpermute_tokens(routed_output, self.original_shape, self.permuted_indices)
         routed_output = all_to_all_single_autograd(
             routed_output,
