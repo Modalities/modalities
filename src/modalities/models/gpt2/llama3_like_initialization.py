@@ -23,7 +23,7 @@ class Llama3Initializer(ModelInitializationIF):
     Follows weight initialization distributions and parameterization for Llama3 as described in TorchTitan.
     """
 
-    def __init__(self, num_layers: int, n_embd: int, depth_init: bool) -> None:
+    def __init__(self, num_layers: int, n_embd: int, depth_init: bool, use_weight_tying: bool) -> None:
         """
         Initializes the Llama3Initializer.
         Args:
@@ -39,16 +39,6 @@ class Llama3Initializer(ModelInitializationIF):
         self.regex_to_init = {
             # embedding weights
             r"transformer\.wte\.weight": (nn.init.normal_, {"mean": 0.0, "std": 1}),
-            # lm head weights
-            r"transformer\.lm_head\.weight": (
-                trunc_normal_,
-                {
-                    "mean": 0.0,
-                    "std": 1 / math.sqrt(n_embd),
-                    "a": -3 / math.sqrt(n_embd),
-                    "b": 3 / math.sqrt(n_embd),
-                },
-            ),
             # qkv projections
             r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn)\.weight": (
                 trunc_normal_,
@@ -97,6 +87,17 @@ class Llama3Initializer(ModelInitializationIF):
                 },
             ),
         }
+        if not use_weight_tying:
+            # lm head weights
+            self.regex_to_init[r"transformer\.lm_head\.weight"] = (
+                trunc_normal_,
+                {
+                    "mean": 0.0,
+                    "std": 1 / math.sqrt(n_embd),
+                    "a": -3 / math.sqrt(n_embd),
+                    "b": 3 / math.sqrt(n_embd),
+                },
+            )
 
     def initialize_in_place(self, model: nn.Module):
         self._init_by_fqn_regex(model, self.regex_to_init)
