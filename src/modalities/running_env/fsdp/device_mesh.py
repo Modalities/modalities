@@ -21,6 +21,7 @@ class DeviceMeshConfig(BaseModel):
     tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     context_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
+    expert_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     enable_loss_parallel: Optional[bool] = False
     world_size: Annotated[int, Field(strict=True, gt=0)]
 
@@ -28,6 +29,7 @@ class DeviceMeshConfig(BaseModel):
     def _validate(self):
         for d in (
             self.context_parallel_degree,
+            self.expert_parallel_degree,
             self.tensor_parallel_degree,
             self.pipeline_parallel_degree,
         ):
@@ -50,6 +52,7 @@ class DeviceMeshConfig(BaseModel):
             self.data_parallel_shard_degree = self.world_size // (
                 self.data_parallel_replicate_degree
                 * self.context_parallel_degree
+                * self.expert_parallel_degree
                 * self.tensor_parallel_degree
                 * self.pipeline_parallel_degree
             )
@@ -58,12 +61,14 @@ class DeviceMeshConfig(BaseModel):
             self.data_parallel_replicate_degree = self.world_size // (
                 self.data_parallel_shard_degree
                 * self.context_parallel_degree
+                * self.expert_parallel_degree
                 * self.tensor_parallel_degree
                 * self.pipeline_parallel_degree
             )
         if (
             self.data_parallel_shard_degree
             * self.data_parallel_replicate_degree
+            * self.expert_parallel_degree
             * self.tensor_parallel_degree
             * self.pipeline_parallel_degree
             * self.context_parallel_degree
@@ -72,6 +77,7 @@ class DeviceMeshConfig(BaseModel):
             raise ConfigError(
                 f"Invalid parallel dims: data_parallel_shard_degree({self.data_parallel_shard_degree}) * "
                 f"data_parallel_replicate_degree({self.data_parallel_replicate_degree}) * "
+                f"expert_parallel_degree({self.expert_parallel_degree}) * "
                 f"tensor_parallel_degree({self.tensor_parallel_degree}) *"
                 f"* pipeline_parallel_degree({self.pipeline_parallel_degree}) *"
                 f"context_parallel_degree({self.context_parallel_degree})!= WORLD_SIZE({self.world_size})"
@@ -85,6 +91,7 @@ class ParallelismDegrees(Enum):
     DP_REPLICATE = "dp_replicate"
     DP_SHARD = "dp_shard"
     CP = "cp"
+    EP = "ep"
     TP = "tp"
     PP = "pp"
 
@@ -96,6 +103,7 @@ def get_device_mesh(
     tensor_parallel_degree: int,
     pipeline_parallel_degree: int,
     context_parallel_degree: int,
+    expert_parallel_degree: int,
     enable_loss_parallel: bool,
     world_size: int,
 ) -> DeviceMesh:
@@ -109,6 +117,7 @@ def get_device_mesh(
         tensor_parallel_degree (int): The tensor parallel degree.
         pipeline_parallel_degree (int): The pipeline parallel degree.
         context_parallel_degree (int): The context parallel degree.
+        expert_parallel_degree (int): The expert parallel degree.
         enable_loss_parallel (bool): Whether to enable loss parallelism.
         world_size (int): The world size.
 
@@ -123,6 +132,7 @@ def get_device_mesh(
             data_parallel_replicate_degree,
             data_parallel_shard_degree,
             context_parallel_degree,
+            expert_parallel_degree,
             tensor_parallel_degree,
         ],
         [
@@ -130,6 +140,7 @@ def get_device_mesh(
             ParallelismDegrees.DP_REPLICATE.value,
             ParallelismDegrees.DP_SHARD.value,
             ParallelismDegrees.CP.value,
+            ParallelismDegrees.EP.value,
             ParallelismDegrees.TP.value,
         ],
         strict=True,

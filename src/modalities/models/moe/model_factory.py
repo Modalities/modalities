@@ -5,26 +5,10 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy
 from torch.distributed.device_mesh import DeviceMesh
+
 from modalities.models.parallelism.expert_parallelism import ExpertParallel
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_mesh_for_parallelism_method
 from modalities.util import get_module_class_from_name
-
-
-# TODO refactor these funtions into a utils
-def _resolve_ep_mesh(device_mesh: DeviceMesh, ep_mesh_dim_name: str | None) -> DeviceMesh:
-    mesh_dim_names = tuple(device_mesh.mesh_dim_names or ())
-
-    if ep_mesh_dim_name is not None:
-        if ep_mesh_dim_name not in mesh_dim_names:
-            raise ValueError(f"ep_mesh_dim_name='{ep_mesh_dim_name}' not in mesh_dim_names={mesh_dim_names}")
-        return device_mesh[ep_mesh_dim_name]
-
-    if len(mesh_dim_names) <= 1:
-        return device_mesh
-
-    raise ValueError(
-        "DeviceMesh has multiple dimensions. Pass ep_mesh_dim_name explicitly. "
-        f"Available dimensions: {mesh_dim_names}"
-    )
 
 
 def _validate_moe_block_for_ep(module) -> None:
@@ -64,16 +48,10 @@ def _attach_ep_metadata(module, ep_mesh) -> None:
     setattr(module, "_ep_rank", ep_mesh.get_local_rank())
 
 
-def _apply_ep(module, ep_mesh) -> None:
-    module.experts = ExpertParallel()._apply(module.experts, ep_mesh)
-    setattr(module.experts, "_ep_enabled", True)
-
-
 def get_ep_wrapped_model(
     model,
     block_names: list[str],
     device_mesh: DeviceMesh,
-    ep_mesh_dim_name: str | None = None,
     mp_param_dtype=torch.bfloat16,
     mp_reduce_dtype=torch.bfloat16,
 ) -> nn.Module:
@@ -97,7 +75,7 @@ def get_ep_wrapped_model(
     if len(block_types) == 0:
         raise ValueError(f"None of the requested MoE block names were found: {block_names}")
 
-    ep_mesh = _resolve_ep_mesh(device_mesh, ep_mesh_dim_name)
+    ep_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.EP)
     MixedPrecisionPolicy(param_dtype=mp_param_dtype, reduce_dtype=mp_reduce_dtype)
 
     wrapped_blocks = 0
@@ -115,7 +93,9 @@ def get_ep_wrapped_model(
 
             _validate_moe_block_for_ep(ep_target_module)
             _attach_ep_metadata(ep_target_module, ep_mesh)
-            _apply_ep(ep_target_module, ep_mesh)
+
+            ep_target_module.experts = ExpertParallel()._apply(ep_target_module.experts, ep_mesh)
+            setattr(ep_target_module.experts, "_ep_enabled", True)
 
             wrapped_blocks += 1
 
