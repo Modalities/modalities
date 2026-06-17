@@ -5,8 +5,7 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy
 from torch.distributed.device_mesh import DeviceMesh
-from torchtitan.distributed.expert_parallel import ExpertParallel
-
+from modalities.models.parallelism.expert_parallelism import ExpertParallel
 from modalities.util import get_module_class_from_name
 
 
@@ -65,7 +64,7 @@ def _attach_ep_metadata(module, ep_mesh) -> None:
     setattr(module, "_ep_rank", ep_mesh.get_local_rank())
 
 
-def _apply_torchtitan_ep(module, ep_mesh) -> None:
+def _apply_ep(module, ep_mesh) -> None:
     module.experts = ExpertParallel()._apply(module.experts, ep_mesh)
     setattr(module.experts, "_ep_enabled", True)
 
@@ -116,7 +115,7 @@ def get_ep_wrapped_model(
 
             _validate_moe_block_for_ep(ep_target_module)
             _attach_ep_metadata(ep_target_module, ep_mesh)
-            _apply_torchtitan_ep(ep_target_module, ep_mesh)
+            _apply_ep(ep_target_module, ep_mesh)
 
             wrapped_blocks += 1
 
