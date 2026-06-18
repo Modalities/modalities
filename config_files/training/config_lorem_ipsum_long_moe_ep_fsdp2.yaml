@@ -184,7 +184,7 @@ device_mesh:
     device_type: cuda
     data_parallel_replicate_degree: 1
     data_parallel_shard_degree: -1
-    tensor_parallel_degree: 4
+    expert_parallel_degree: 4
     world_size: ${settings.cuda_env.world_size}
 
 dp_degree:
@@ -238,7 +238,9 @@ ep_model:
     device_mesh:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
-    ep_mesh_dim_name: tp
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
     block_names: [TransformerBlock]
 
 ac_model:
