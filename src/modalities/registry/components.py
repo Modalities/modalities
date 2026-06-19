@@ -13,7 +13,7 @@ from modalities.checkpointing.checkpoint_saving_strategies import (
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointLoading, FSDP1CheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDP1CheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
 from modalities.checkpointing.stateful.app_state_factory import AppStateFactory
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
@@ -29,7 +29,6 @@ from modalities.config.config import (
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DCPAppStateConfig,
-    DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
     DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
@@ -358,7 +357,7 @@ COMPONENTS = [
     ComponentEntity("checkpoint_saving_execution", "dcp", DCPCheckpointSaving, DCPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp1", FSDP1CheckpointLoading, FSDP1CheckpointLoadingConfig),
-    ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
+    # ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(

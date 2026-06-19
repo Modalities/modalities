@@ -37,7 +37,11 @@ class AppState(Stateful):
     """
 
     def __init__(
-        self, model: nn.Module | list[nn.Module], optimizer: Optimizer, lr_scheduler: Optional[LRScheduler] = None
+        self,
+        model: nn.Module | list[nn.Module],
+        optimizer: Optimizer,
+        lr_scheduler: Optional[LRScheduler] = None,
+        components_to_load: list[StatefulComponents] | None = None,
     ):
         """Initializes the AppState object.
 
@@ -46,11 +50,28 @@ class AppState(Stateful):
                 a non-sharded model, FSDP1 or FSDP2 model.
             optimizer (Optimizer): The optimizer can be either a non-sharded optimizer, FSDP1 or FSDP2 optimizer.
             lr_scheduler (Optional[LRScheduler], optional): The lr scheduler used during training. Defaults to None.
+            components_to_load (list[StatefulComponents] | None, optional): The list of components to load from the
+                checkpoint. If None, all components are loaded. Defaults to None.
         """
         self._model_parts = list(model) if isinstance(model, list) else [model]
         self._optimizer = optimizer
         self._lr_scheduler = lr_scheduler
         self._is_loaded = False
+
+        # policy for which components to load from the checkpoint. If None, defaults to loading all components.
+        if components_to_load is None:
+            self._components_to_load = [StatefulComponents.MODEL, StatefulComponents.OPTIMIZER]
+            if lr_scheduler is not None:
+                self._components_to_load.append(StatefulComponents.LR_SCHEDULER)
+        else:
+            self._components_to_load = components_to_load
+
+        invalid_components = [c for c in self._components_to_load if not isinstance(c, StatefulComponents)]
+        if invalid_components:
+            raise ValueError(
+                f"components_to_load must only contain StatefulComponents, but got invalid entries: "
+                f"{invalid_components}"
+            )
 
     @property
     def is_loaded(self) -> bool:
@@ -106,12 +127,14 @@ class AppState(Stateful):
                 "Cannot call load_state_dict twice on the same AppState object. " "State dict has already been loaded."
             )
 
-        ModelStateRetriever.load_state_dict_(app_state=self, state_dict=state_dict[StatefulComponents.MODEL.value])
-        OptimizerStateRetriever.load_state_dict_(
-            app_state=self,
-            state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
-        )
-        if self._lr_scheduler is not None:
+        if StatefulComponents.MODEL in self._components_to_load:
+            ModelStateRetriever.load_state_dict_(app_state=self, state_dict=state_dict[StatefulComponents.MODEL.value])
+        if StatefulComponents.OPTIMIZER in self._components_to_load:
+            OptimizerStateRetriever.load_state_dict_(
+                app_state=self,
+                state_dict=state_dict[StatefulComponents.OPTIMIZER.value],
+            )
+        if self._lr_scheduler is not None and StatefulComponents.LR_SCHEDULER in self._components_to_load:
             LRSchedulerStateRetriever.load_state_dict_(
                 app_state=self, state_dict=state_dict[StatefulComponents.LR_SCHEDULER.value]
             )
