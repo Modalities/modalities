@@ -220,6 +220,10 @@ class Main:
 
         print_rank_0(report)
 
+        downstream_evaluation_callback = None
+        if getattr(components, "downstream_evaluator", None) is not None:
+            downstream_evaluation_callback = components.downstream_evaluator.evaluate
+
         gym.run(
             train_data_loader=components.train_dataloader,
             evaluation_data_loaders=components.eval_dataloaders,
@@ -229,7 +233,15 @@ class Main:
             evaluation_interval_in_steps=components.settings.intervals.evaluation_interval_in_steps,
             training_log_interval_in_steps=components.settings.intervals.training_log_interval_in_steps,
             scheduled_pipeline=components.scheduled_pipeline,
+            downstream_evaluation_callback=downstream_evaluation_callback,
         )
+
+        if getattr(components, "downstream_evaluator", None) is not None:
+            print_rank_0("\n" + "="*80)
+            print_rank_0("Training loop complete! Waiting for background evaluations to finish...")
+            print_rank_0("="*80 + "\n")
+            components.downstream_evaluator.wait_for_evaluations()
+            print_rank_0("All background evaluations completed successfully!")
 
     def get_logging_publishers(
         self,
