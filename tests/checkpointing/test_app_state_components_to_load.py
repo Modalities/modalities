@@ -135,3 +135,28 @@ class TestComponentsToLoad:
 
         with pytest.raises(RuntimeError):
             app_state.load_state_dict(_make_state_dict())
+
+
+class TestComponentsToLoadValidation:
+    @pytest.mark.parametrize(
+        "invalid_components",
+        [
+            ["model"],
+            [StatefulComponents.MODEL, "optimizer"],
+            [StatefulComponents.MODEL.value],
+            [None],
+            [0],
+        ],
+    )
+    def test_non_stateful_components_raise_value_error(
+        self, model: nn.Module, optimizer: SGD, invalid_components: list
+    ) -> None:
+        with pytest.raises(ValueError, match="StatefulComponents"):
+            AppState(model=model, optimizer=optimizer, components_to_load=invalid_components)
+
+    def test_valid_components_do_not_raise(self, model: nn.Module, optimizer: SGD) -> None:
+        AppState(
+            model=model,
+            optimizer=optimizer,
+            components_to_load=[StatefulComponents.MODEL, StatefulComponents.OPTIMIZER],
+        )

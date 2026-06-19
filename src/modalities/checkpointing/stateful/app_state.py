@@ -66,6 +66,13 @@ class AppState(Stateful):
         else:
             self._components_to_load = components_to_load
 
+        invalid_components = [c for c in self._components_to_load if not isinstance(c, StatefulComponents)]
+        if invalid_components:
+            raise ValueError(
+                f"components_to_load must only contain StatefulComponents, but got invalid entries: "
+                f"{invalid_components}"
+            )
+
     @property
     def is_loaded(self) -> bool:
         """Returns whether the state dict has been loaded.
