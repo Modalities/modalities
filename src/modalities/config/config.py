@@ -126,11 +126,6 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
 
 
-# class DCPCheckpointLoadingConfig(BaseModel):
-#     global_rank: Annotated[int, Field(strict=True, ge=0)]
-#     allow_partial_load: bool = True
-
-
 class FSDP1CheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]

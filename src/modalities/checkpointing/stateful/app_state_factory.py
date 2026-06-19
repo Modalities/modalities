@@ -47,7 +47,7 @@ class AppStateFactory:
     def get_dcp_checkpointed_app_state_(
         raw_app_state: AppState,
         checkpoint_dir_path: Path,
-        allow_partial_load: bool = True,
+        allow_partial_load: bool = False,
     ) -> AppState:
         """Loads the checkpointed state dict into the raw AppState object
         (i.e., non-checkpoint loaded AppState) in-place.
@@ -56,7 +56,7 @@ class AppStateFactory:
             raw_app_state (AppState): The raw AppState object. Its ``components_to_load`` policy
                 determines which components are restored.
             checkpoint_dir_path (Path): The path to the checkpoint directory.
-            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to True.
+            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to False.
 
         Raises:
             RuntimeError: Raises an error if the state dict has already been loaded.

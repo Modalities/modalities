@@ -109,7 +109,7 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
 
         Args:
             global_rank (int): The global rank of the process.
-            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to True.
+            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to False.
         Returns:
             None
         """
