@@ -165,7 +165,7 @@ class ComponentFactory:
             config_dict=config_dict,
             component_config_type=component_config_type,
         )
-        comp_config = component_config_type.model_validate(config_dict, extra="forbid")
+        comp_config = component_config_type.model_validate(config_dict)
         return comp_config
 
     def _assert_valid_config_keys(
