@@ -15,6 +15,7 @@ logger = get_logger(name="llama3 initialization")
 class Llama3InitializerConfig(BaseModel):
     num_layers: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
+    use_weight_tying: bool
     depth_init: bool = True
 
 
