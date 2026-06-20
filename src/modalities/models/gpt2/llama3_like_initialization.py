@@ -15,7 +15,7 @@ logger = get_logger(name="llama3 initialization")
 class Llama3InitializerConfig(BaseModel):
     num_layers: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
-    use_weight_tying: bool
+    use_weight_tying: bool = False
     depth_init: bool = True
 
 
@@ -89,8 +89,23 @@ class Llama3Initializer(ModelInitializationIF):
             ),
         }
         if not use_weight_tying:
-            # lm head weights
+            # lm head weights (separate output projection matrix)
             self.regex_to_init[r"transformer\.lm_head\.weight"] = (
+                trunc_normal_,
+                {
+                    "mean": 0.0,
+                    "std": 1 / math.sqrt(n_embd),
+                    "a": -3 / math.sqrt(n_embd),
+                    "b": 3 / math.sqrt(n_embd),
+                },
+            )
+        else:
+            # With weight tying, transformer.wte.weight IS the output projection
+            # (lm_head shares the same tensor), so it must be initialized with the
+            # small output std (1/sqrt(n_embd)) instead of the embedding std of 1.
+            # Otherwise the tied matrix produces logits that are ~sqrt(n_embd)x too
+            # large at init, causing the initial loss/grad norm to explode.
+            self.regex_to_init[r"transformer\.wte\.weight"] = (
                 trunc_normal_,
                 {
                     "mean": 0.0,
