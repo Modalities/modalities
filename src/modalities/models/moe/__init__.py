@@ -1,4 +1,4 @@
-from modalities.models.moe.loss_functions import MoECrossEntropyLoss
+from modalities.loss_functions import MoECrossEntropyLoss
 from modalities.models.moe.qwen_model import QwenModel, QwenModelConfig
 
 __all__ = [
