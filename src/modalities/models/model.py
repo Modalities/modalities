@@ -26,16 +26,13 @@ class ActivationType(str, Enum):
 class NNModel(nn.Module):
     """NNModel class to define a base model."""
 
-    def __init__(self, seed: int = None, weight_decay_groups: Optional[WeightDecayGroups] = None):
+    def __init__(self, weight_decay_groups: Optional[WeightDecayGroups] = None):
         """
         Initializes an NNModel object.
 
         Args:
-            seed (int, optional): The seed value for random number generation. Defaults to None.
             weight_decay_groups (Optional[WeightDecayGroups], optional): The weight decay groups. Defaults to None.
         """
-        if seed is not None:
-            torch.manual_seed(seed)
         self._weight_decay_groups = weight_decay_groups if weight_decay_groups is not None else {}
         super(NNModel, self).__init__()
 
@@ -48,6 +45,11 @@ class NNModel(nn.Module):
             WeightDecayGroups: The weight decay groups.
         """
         return self._weight_decay_groups
+
+    @property
+    def has_tied_word_embeddings(self) -> bool:
+        """Whether the model currently uses tied token embedding and output weights."""
+        return False
 
     @abstractmethod
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:

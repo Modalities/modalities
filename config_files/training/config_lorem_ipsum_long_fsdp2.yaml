@@ -13,6 +13,7 @@ settings:
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: ./data/lorem_ipsum_long.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
+    experiments_root_path: ${modalities_env:experiments_root_path}
   intervals:
     training_log_interval_in_steps: 1
     checkpointing_interval_in_steps: 32
@@ -221,6 +222,7 @@ initialized_model:
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
+        multi_device_generator_policy: error
 
 fsdp_model:
   component_key: model

@@ -40,7 +40,14 @@ from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_u
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging
-from transformers.utils.generic import check_model_inputs
+
+try:
+    from transformers.utils.generic import check_model_inputs
+except ImportError:
+
+    def check_model_inputs(func: Callable) -> Callable:
+        return func
+
 
 from modalities.conversion.gpt2.configuration_gpt2 import GPT2Config
 

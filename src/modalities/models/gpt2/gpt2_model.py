@@ -2,11 +2,12 @@ import logging
 import math
 from abc import abstractmethod
 from enum import Enum
-from typing import Annotated, Optional, overload
+from numbers import Real
+from typing import Annotated, Literal, Optional, overload
 
 import torch
 import torch.nn as nn
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator, validator
 
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.utils import convert_base_model_config_to_dict
@@ -29,6 +30,60 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 # GPT2 implementation taken from nanogpt https://github.com/karpathy/nanoGPT
+
+
+def _validate_numeric_field(field_name: str, value: object) -> float:
+    """Validate that a value is a real number (excluding bool) and cast to float."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ValueError(f"rope_scaling.{field_name} must be a float")
+    return float(value)
+
+
+class DefaultRopeScalingConfig(BaseModel):
+    """Configuration for default RoPE behavior."""
+
+    rope_type: Literal["default"] = "default"
+
+
+class YarnRopeScalingConfig(BaseModel):
+    """Configuration for YaRN RoPE scaling."""
+
+    rope_type: Literal["yarn"] = "yarn"
+    original_max_position_embeddings: Annotated[int, Field(strict=True, ge=1)]
+    factor: Optional[Annotated[float, Field(ge=1.0)]] = None
+    attention_factor: Optional[Annotated[float, Field(gt=0.0)]] = None
+    mscale: Optional[Annotated[float, Field(ge=0.0)]] = None
+    mscale_all_dim: Optional[Annotated[float, Field(ge=0.0)]] = None
+    beta_fast: Annotated[float, Field(ge=0.0)] = 32.0
+    beta_slow: Annotated[float, Field(ge=0.0)] = 1.0
+    truncate: bool = True
+
+    @field_validator(
+        "factor",
+        "attention_factor",
+        "mscale",
+        "mscale_all_dim",
+        "beta_fast",
+        "beta_slow",
+        mode="before",
+    )
+    @classmethod
+    def validate_numeric_fields(cls, value: object, info):
+        if value is None:
+            return value
+        return _validate_numeric_field(info.field_name, value)
+
+    @model_validator(mode="after")
+    def validate_mscale_pair(self) -> "YarnRopeScalingConfig":
+        if (self.mscale is None) != (self.mscale_all_dim is None):
+            raise ValueError("rope_scaling.mscale and rope_scaling.mscale_all_dim must be provided together")
+        return self
+
+
+RopeScalingConfig = Annotated[
+    DefaultRopeScalingConfig | YarnRopeScalingConfig,
+    Field(discriminator="rope_type"),
+]
 
 
 class LayerNorms(LookupEnum):
@@ -120,7 +175,15 @@ class RotaryTransform(QueryKeyValueTransform):
             XFormers implementation and removed in this implementation.#
     """
 
-    def __init__(self, n_embd: int, n_head: int, seq_length_dim: int = -2, base_freq: int = 10000):
+    def __init__(
+        self,
+        n_embd: int,
+        n_head: int,
+        seq_length_dim: int = -2,
+        base_freq: int = 10000,
+        max_position_embeddings: int | None = None,
+        rope_scaling: RopeScalingConfig | None = None,
+    ):
         """
         Initializes the RotaryTransform object.
 
@@ -136,16 +199,33 @@ class RotaryTransform(QueryKeyValueTransform):
         self.dim_model = n_embd // n_head
         self.seq_length_dim = seq_length_dim
         self.base_freq = base_freq
+        self.max_position_embeddings = max_position_embeddings
+
+        if rope_scaling is not None and not isinstance(rope_scaling, (DefaultRopeScalingConfig, YarnRopeScalingConfig)):
+            raise TypeError(
+                "rope_scaling must be an instance of DefaultRopeScalingConfig, YarnRopeScalingConfig, or None"
+            )
+
+        self.rope_scaling = rope_scaling
+        self.attention_scaling = 1.0
 
         self.reset_parameters()
 
     def reset_parameters(self):
         # If previously initialized on or moved to a device, reuse that device.
         # Otherwise, use the default device of the current environment.
-        device = self.inv_freq.device if hasattr(self, "inv_freq") else None
-        inv_freq = 1.0 / (
-            self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
-        )
+        device = self.inv_freq.device if hasattr(self, "inv_freq") and isinstance(self.inv_freq, torch.Tensor) else None
+
+        rope_type = self.rope_scaling.rope_type if self.rope_scaling is not None else "default"
+
+        if rope_type == "yarn":
+            inv_freq, self.attention_scaling = self._compute_yarn_parameters(device=device)
+        else:
+            inv_freq = 1.0 / (
+                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
+            )
+            self.attention_scaling = 1.0
+
         self.register_buffer("inv_freq", inv_freq)
 
         self._seq_len_cached = None
@@ -165,24 +245,6 @@ class RotaryTransform(QueryKeyValueTransform):
         """
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
-
-    def _update_cos_sin_tables(self, x):
-        # Update the cosine and sine tables.
-        seq_len = x.shape[self.seq_length_dim]
-
-        # Reset the tables if the sequence length has changed,
-        # or if we're on a new device (possibly due to tracing for instance)
-        if seq_len != self._seq_len_cached or self._cos_cached.device != x.device or self._cos_cached.dtype != x.dtype:
-            self._seq_len_cached = seq_len
-            t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
-            emb = torch.cat((freqs, freqs), dim=-1).to(
-                x.device
-            )  # here, we combine the two matrices (not zipping them).
-            self._cos_cached = emb.cos()[None, None, :, :].to(x.dtype)
-            self._sin_cached = emb.sin()[None, None, :, :].to(x.dtype)
-
-        return self._cos_cached, self._sin_cached
 
     def apply_rotary_pos_emb(self, x, cos, sin):
         """
@@ -227,6 +289,118 @@ class RotaryTransform(QueryKeyValueTransform):
         k = self.apply_rotary_pos_emb(k, self._cos_cached, self._sin_cached)
 
         return q, k, v
+
+    def _compute_yarn_parameters(self, device: torch.device | None) -> tuple[torch.Tensor, float]:
+        """Compute YaRN inverse frequencies and the attention scaling factor."""
+        if not isinstance(self.rope_scaling, YarnRopeScalingConfig):
+            raise ValueError("YaRN requires a rope_scaling config.")
+        if self.max_position_embeddings is None:
+            raise ValueError("YaRN requires max_position_embeddings to be set.")
+
+        original_max_position_embeddings = self.rope_scaling.original_max_position_embeddings
+        factor = self.rope_scaling.factor
+        if factor is None:
+            factor = self.max_position_embeddings / original_max_position_embeddings
+        factor_float = float(factor)
+
+        attention_factor = self.rope_scaling.attention_factor
+        mscale_pair = None
+        if self.rope_scaling.mscale is not None and self.rope_scaling.mscale_all_dim is not None:
+            mscale_pair = (self.rope_scaling.mscale, self.rope_scaling.mscale_all_dim)
+
+        beta_fast = self.rope_scaling.beta_fast
+        beta_slow = self.rope_scaling.beta_slow
+        truncate = self.rope_scaling.truncate
+
+        def get_mscale(scale: float, mscale: float = 1.0) -> float:
+            """Return the YaRN mscale coefficient for a given scaling factor."""
+            if scale <= 1:
+                return 1.0
+            return 0.1 * mscale * math.log(scale) + 1.0
+
+        if attention_factor is None:
+            if mscale_pair is not None:
+                mscale, mscale_all_dim = mscale_pair
+                attention_factor = float(
+                    get_mscale(factor_float, float(mscale)) / get_mscale(factor_float, float(mscale_all_dim))
+                )
+            else:
+                attention_factor = get_mscale(factor_float)
+
+        def find_correction_dim(num_rotations: float, dim: int, base: int, max_position_embeddings: int) -> float:
+            """Map a target number of rotations to a rotary dimension index."""
+            return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (2 * math.log(base))
+
+        def find_correction_range(
+            low_rot: float,
+            high_rot: float,
+            dim: int,
+            base: int,
+            max_position_embeddings: int,
+            truncate: bool,
+        ) -> tuple[float, float]:
+            """Compute the lower and upper rotary-dimension correction bounds for YaRN."""
+            low = find_correction_dim(low_rot, dim, base, max_position_embeddings)
+            high = find_correction_dim(high_rot, dim, base, max_position_embeddings)
+            if truncate:
+                low = math.floor(low)
+                high = math.ceil(high)
+            return max(low, 0), min(high, dim - 1)
+
+        def linear_ramp_factor(min_value: float, max_value: float, dim: int) -> torch.Tensor:
+            """Create a clamped linear ramp used to blend interpolation and extrapolation."""
+            if min_value == max_value:
+                max_value += 0.001
+            linear_func = (torch.arange(dim, dtype=torch.float32, device=device) - min_value) / (max_value - min_value)
+            ramp_func = torch.clamp(linear_func, 0, 1)
+            return ramp_func
+
+        dim = self.dim_model
+        base = self.base_freq
+
+        pos_freqs = base ** (torch.arange(0, dim, 2, device=device, dtype=torch.float) / dim)
+        inv_freq_extrapolation = 1.0 / pos_freqs
+        inv_freq_interpolation = 1.0 / (factor_float * pos_freqs)
+
+        low, high = find_correction_range(
+            beta_fast,
+            beta_slow,
+            dim,
+            base,
+            original_max_position_embeddings,
+            bool(truncate),
+        )
+        inv_freq_extrapolation_factor = 1 - linear_ramp_factor(low, high, dim // 2).to(device=device, dtype=torch.float)
+        inv_freq = (
+            inv_freq_interpolation * (1 - inv_freq_extrapolation_factor)
+            + inv_freq_extrapolation * inv_freq_extrapolation_factor
+        )
+
+        return inv_freq, float(attention_factor)
+
+    def _update_cos_sin_tables(self, x):
+        # Update the cosine and sine tables.
+        seq_len = x.shape[self.seq_length_dim]
+
+        # Reset the tables if the sequence length has changed,
+        # or if we're on a new device (possibly due to tracing for instance)
+        if (
+            seq_len != self._seq_len_cached
+            or self._cos_cached is None
+            or self._sin_cached is None
+            or self._cos_cached.device != x.device
+            or self._cos_cached.dtype != x.dtype
+        ):
+            self._seq_len_cached = seq_len
+            t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
+            emb = torch.cat((freqs, freqs), dim=-1).to(
+                x.device
+            )  # here, we combine the two matrices (not zipping them).
+            self._cos_cached = (emb.cos() * self.attention_scaling)[None, None, :, :].to(x.dtype)
+            self._sin_cached = (emb.sin() * self.attention_scaling)[None, None, :, :].to(x.dtype)
+
+        return self._cos_cached, self._sin_cached
 
 
 class QueryKeyValueTransformType(Enum):
@@ -295,6 +469,15 @@ class AttentionConfig(BaseModel):
             n_head: Annotated[int, Field(strict=True, ge=0)]
             seq_length_dim: Annotated[int, Field(strict=True)]
             base_freq: Annotated[int, Field(strict=True, ge=10000)]
+            max_position_embeddings: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
+            rope_scaling: Optional[RopeScalingConfig] = None
+
+            @model_validator(mode="after")
+            def validate_rope_scaling(self) -> "AttentionConfig.QueryKeyValueTransformConfig.RotaryTransformConfig":
+                """Validate rope_scaling cross-field constraints."""
+                if isinstance(self.rope_scaling, YarnRopeScalingConfig) and self.max_position_embeddings is None:
+                    raise ValueError("YaRN requires max_position_embeddings to be set")
+                return self
 
         @validator("type_hint", pre=True, always=True)
         def parse_sharding_strategy_by_name(cls, name):
@@ -342,7 +525,6 @@ class GPT2LLMConfig(BaseModel):
         ffn_norm_config (LayerNormWrapperConfig): Config for normalization of the feed-forward network.
         lm_head_norm_config (LayerNormWrapperConfig): Config for normalization of the language model head.
         use_weight_tying (bool): Whether to use weight tying.
-        seed: Optional[int] = None: The random seed for reproducibility.
         enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
             in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
             activation_type is SwiGLU. Defaults to 256.
@@ -370,7 +552,6 @@ class GPT2LLMConfig(BaseModel):
     ffn_norm_config: LayerNormWrapperConfig
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
-    seed: Optional[int] = None
     enforce_swiglu_hidden_dim_multiple_of: int = 256
 
     @model_validator(mode="after")
@@ -837,7 +1018,6 @@ class GPT2LLM(NNModel):
         ffn_norm_config: LayerNormWrapperConfig,
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
-        seed: Optional[int] = None,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
     ):
         """
@@ -862,7 +1042,6 @@ class GPT2LLM(NNModel):
             attention_norm_config (LayerNormWrapperConfig): Config for the attention normalization module.
             ffn_norm_config (LayerNormWrapperConfig): Config for the feed-forward network normalization module.
             lm_head_norm_config (LayerNormWrapperConfig): Config for the language model head normalization module.
-            seed (int, optional): The random seed. Defaults to None.
             use_weight_tying (bool): Whether to use weight tying.
             enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
@@ -873,7 +1052,7 @@ class GPT2LLM(NNModel):
             "embedding": [".wte", ".wpe"],
             "layernorm": [".attention_norm", ".ffn_norm", ".lm_head_norm"],
         }
-        super().__init__(weight_decay_groups=weight_decay_groups, seed=seed)
+        super().__init__(weight_decay_groups=weight_decay_groups)
         self.sample_key = sample_key
         self.prediction_key = prediction_key
         self.sequence_length = sequence_length
@@ -941,6 +1120,12 @@ class GPT2LLM(NNModel):
             self.transformer.wte.weight = (
                 self.transformer.lm_head.weight
             )  # https://paperswithcode.com/method/weight-tying
+
+    @property
+    def has_tied_word_embeddings(self) -> bool:
+        token_embedding_weight = getattr(self.transformer.wte, "weight", None)
+        lm_head_weight = getattr(self.transformer.lm_head, "weight", None)
+        return token_embedding_weight is not None and token_embedding_weight is lm_head_weight
 
     @overload
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:

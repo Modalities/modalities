@@ -9,10 +9,11 @@ import torch
 from omegaconf import OmegaConf, Resolver
 from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveInt, field_validator, model_validator
 from torch.distributed.fsdp import ShardingStrategy
-from transformers import GPT2TokenizerFast
-from transformers.models.llama.tokenization_llama_fast import LlamaTokenizerFast
+from transformers import GPT2Tokenizer as GPT2TokenizerFast
+from transformers import LlamaTokenizer as LlamaTokenizerFast
 from typing_extensions import deprecated
 
+from modalities.checkpointing.stateful.app_state import StatefulComponents
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
@@ -35,6 +36,7 @@ from modalities.config.pydantic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
+from modalities.models.weight_tying import has_tied_word_embeddings
 from modalities.running_env.env_utils import (
     FSDP2MixedPrecisionSettings,
     MixedPrecisionSettings,
@@ -124,10 +126,6 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name: str) -> ShardingStrategy:
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
-
-
-class DCPCheckpointLoadingConfig(BaseModel):
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class FSDP1CheckpointSavingConfig(BaseModel):
@@ -342,6 +340,13 @@ class GPT2ModelTPConfig(BaseModel):
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
+    @model_validator(mode="after")
+    def validate_untied_word_embeddings(self) -> "GPT2ModelTPConfig":
+        models = self.model if isinstance(self.model, list) else [self.model]
+        if any(has_tied_word_embeddings(model) for model in models):
+            raise ValueError("Tied word embeddings are not supported with Tensor Parallelism.")
+        return self
+
 
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
@@ -384,11 +389,13 @@ class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
+    components_to_load: Optional[list[StatefulComponents]] = None
 
 
 class DCPAppStateConfig(BaseModel):
     raw_app_state: PydanticAppStateType
     checkpoint_dir_path: Path
+    allow_partial_load: bool = False
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):

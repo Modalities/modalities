@@ -1,6 +1,9 @@
 import pytest
 import torch.nn as nn
+from pydantic import ValidationError
+from torch.distributed.device_mesh import DeviceMesh
 
+from modalities.config.config import GPT2ModelTPConfig
 from modalities.models.components.layer_norms import LayerNormConfig
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
@@ -11,6 +14,10 @@ from modalities.models.gpt2.gpt2_model import (
     PositionTypes,
 )
 from modalities.models.model import ActivationType
+from modalities.models.parallelism.pipeline_parallelism_configs import StagedPipelineConfig
+from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator
+from modalities.models.weight_tying import has_tied_word_embeddings
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 
 VOCAB_SIZE = 1000
 EMBEDDING_DIM = 64
@@ -79,9 +86,17 @@ def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
     )
 
 
+def create_device_mesh_stub(*mesh_dim_names: str) -> DeviceMesh:
+    device_mesh = DeviceMesh.__new__(DeviceMesh)
+    device_mesh.mesh_dim_names = mesh_dim_names
+    return device_mesh
+
+
 @pytest.mark.parametrize("use_weight_tying", [True, False])
 def test_weight_tying_behavior(use_weight_tying):
     model = create_gpt2_model(use_weight_tying)
+    assert model.has_tied_word_embeddings is use_weight_tying
+
     if use_weight_tying:
         assert (
             model.transformer.wte.weight is model.transformer.lm_head.weight
@@ -118,3 +133,52 @@ def test_weight_tying_named_parameters(use_weight_tying):
         assert (
             "transformer.lm_head.weight" in named_params
         ), "transformer.lm_head.weight should appear in named_parameters when weight tying is not used."
+
+
+def test_has_tied_word_embeddings_requires_model_capability():
+    with pytest.raises(TypeError, match="must define 'has_tied_word_embeddings'"):
+        has_tied_word_embeddings(nn.Linear(1, 1))
+
+
+def test_tp_config_rejects_tied_word_embeddings():
+    model = create_gpt2_model(use_weight_tying=True)
+    device_mesh = create_device_mesh_stub(ParallelismDegrees.TP.value)
+
+    with pytest.raises(ValidationError, match="Tied word embeddings are not supported with Tensor Parallelism"):
+        GPT2ModelTPConfig(model=model, device_mesh=device_mesh)
+
+
+def test_tp_config_allows_untied_word_embeddings():
+    model = create_gpt2_model(use_weight_tying=False)
+    device_mesh = create_device_mesh_stub(ParallelismDegrees.TP.value)
+
+    GPT2ModelTPConfig(model=model, device_mesh=device_mesh)
+
+
+def test_pp_config_rejects_tied_word_embeddings():
+    model = create_gpt2_model(use_weight_tying=True)
+    device_mesh = create_device_mesh_stub(ParallelismDegrees.PP.value)
+
+    with pytest.raises(ValidationError, match="Tied word embeddings are not supported with Pipeline Parallelism"):
+        StagedPipelineConfig(
+            whole_model=model,
+            stages_generator=GPT2LLMStagesGenerator(num_model_layers=model.n_layer),
+            device_mesh=device_mesh,
+            local_rank=0,
+            pp_schedule_name="gpipe",
+            num_layers_per_stage=1,
+        )
+
+
+def test_pp_config_allows_untied_word_embeddings():
+    model = create_gpt2_model(use_weight_tying=False)
+    device_mesh = create_device_mesh_stub(ParallelismDegrees.PP.value)
+
+    StagedPipelineConfig(
+        whole_model=model,
+        stages_generator=GPT2LLMStagesGenerator(num_model_layers=model.n_layer),
+        device_mesh=device_mesh,
+        local_rank=0,
+        pp_schedule_name="gpipe",
+        num_layers_per_stage=1,
+    )

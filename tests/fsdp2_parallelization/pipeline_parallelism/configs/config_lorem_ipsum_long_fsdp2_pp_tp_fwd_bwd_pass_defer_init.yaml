@@ -31,6 +31,32 @@ device_mesh:
     data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
 
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      component_key: pipeline
+      variant_key: selector
+      config:
+        pipeline:
+          instance_key: scheduled_pipeline
+          pass_type: BY_REFERENCE
+        selection_type: MODEL_PART
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        seed: 42
+        num_layers: ${model_raw.config.n_layer}
+        device_mesh:
+          instance_key: device_mesh
+          pass_type: BY_REFERENCE
+
 scheduled_pipeline:
   component_key: pipeline
   variant_key: scheduled
@@ -98,7 +124,7 @@ staged_pipeline:
   variant_key: staged
   config:
     whole_model:
-      instance_key: initialized_model
+      instance_key: model_raw
       pass_type: BY_REFERENCE
     stages_generator:
       component_key: stages_generator
@@ -113,27 +139,6 @@ staged_pipeline:
     local_rank: ${settings.cuda_env.local_rank}
     pp_schedule_name: ${scheduled_pipeline.config.pp_schedule_name}
     num_layers_per_stage: 4
-
-initialized_model:
-  component_key: model
-  variant_key: model_initialized
-  config:
-    model:
-      instance_key: model_raw
-      pass_type: BY_REFERENCE
-    model_initializer:
-      component_key: model_initialization
-      variant_key: composed
-      config:
-        model_type: gpt2
-        weight_init_type: scaled
-        mean: 0.0
-        std: 0.02
-        seed: 42
-        num_layers: ${model_raw.config.n_layer}
-        device_mesh:
-          instance_key: device_mesh
-          pass_type: BY_REFERENCE
 
 model_raw:
   component_key: model
