@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Tuple
 
@@ -27,7 +28,7 @@ def patch_config_file(original_config_path: Path, activation_type: str, tmp_dir:
 
     config_dict["model_raw"]["config"]["activation_type"] = activation_type
 
-    tmp_file_path = tmp_dir / original_config_path.name
+    tmp_file_path = tmp_dir / f"{activation_type}_{os.getpid()}_{original_config_path.name}"
     with tmp_file_path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(config_dict, f)
 
