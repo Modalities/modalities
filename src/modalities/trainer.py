@@ -1,6 +1,6 @@
+import gc
 from datetime import datetime
 from enum import Enum
-import gc
 from typing import Callable, Optional
 
 import torch
@@ -388,7 +388,7 @@ class Trainer:
                     self.gc.run(step_count=training_progress.num_seen_steps_total)
                     evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                     checkpointing_callback(training_progress=training_progress)
-                    
+
                 profiler_cm.step()
 
     @staticmethod
