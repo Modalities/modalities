@@ -149,13 +149,13 @@ def test_has_tied_word_embeddings_requires_model_capability():
         has_tied_word_embeddings(nn.Linear(1, 1))
 
 
-@pytest.mark.parametrize("module_name", ["transformer", "wte", "lm_head"])
+@pytest.mark.parametrize("module_name", ["wte", "lm_head"])
 def test_has_tied_word_embeddings_handles_pipeline_stage(module_name: str):
+    # In pipeline parallelism a stage's transformer ModuleDict only contains the submodules assigned
+    # to that stage (the transformer container itself is always present), so a stage may lack wte
+    # and/or lm_head. Such a stage has no tying to report and must not raise.
     model = create_gpt2_model(use_weight_tying=True)
-    if module_name == "transformer":
-        del model.transformer
-    else:
-        del model.transformer[module_name]
+    del model.transformer[module_name]
 
     assert has_tied_word_embeddings(model) is False
 

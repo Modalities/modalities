@@ -940,9 +940,13 @@ class GPT2LLM(NNModel):
 
     @property
     def has_tied_word_embeddings(self) -> bool:
-        token_embedding_weight = getattr(self.transformer.wte, "weight", None)
-        lm_head_weight = getattr(self.transformer.lm_head, "weight", None)
-        return token_embedding_weight is not None and token_embedding_weight is lm_head_weight
+        # In pipeline parallelism a stage's transformer may not contain the wte/lm_head submodules
+        # (e.g. a middle stage has neither). Such a stage has no tying to report, so return False when
+        # either submodule is absent. Whether tied embeddings are allowed at all (they are not, for PP)
+        # is enforced separately by the pipeline/TP config validators on the whole, unsplit model.
+        if "wte" not in self.transformer or "lm_head" not in self.transformer:
+            return False
+        return self.transformer.wte.weight is self.transformer.lm_head.weight
 
     @overload
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
