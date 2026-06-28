@@ -189,7 +189,8 @@ def test_llama3_init_keeps_output_projection_small(use_weight_tying: bool):
         bias=False,
         norm_type=LayerNorms.pytorch_rms_norm,
     )
-    initializer = Llama3Initializer(num_layers=2, n_embd=n_embd, depth_init=True, use_weight_tying=use_weight_tying)
+    # The initializer infers weight tying from the model itself, so no tying flag is passed.
+    initializer = Llama3Initializer(num_layers=2, n_embd=n_embd, depth_init=True)
     # Mirror the production flow (model_factory applies the initializer under no_grad).
     with torch.no_grad():
         initializer.initialize_in_place(model)
@@ -205,6 +206,14 @@ def test_llama3_init_keeps_output_projection_small(use_weight_tying: bool):
         # Untied: the embedding keeps the Llama3/TorchTitan std of 1.
         embedding_std = model.transformer.wte.weight.detach().float().std().item()
         assert embedding_std == pytest.approx(1.0, rel=0.15)
+
+
+def test_llama3_init_rejects_non_gpt2_model():
+    # The FQN regexes are GPT2LLM-specific, so the initializer must reject other model types
+    # rather than silently leaving everything uninitialized.
+    initializer = Llama3Initializer(num_layers=2, n_embd=EMBEDDING_DIM, depth_init=True)
+    with pytest.raises(TypeError, match="only supports GPT2LLM"):
+        initializer.initialize_in_place(nn.Linear(1, 1))
 
 
 def test_tp_config_allows_untied_word_embeddings():

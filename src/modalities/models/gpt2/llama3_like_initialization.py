@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel, Field
 
+from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.utils.logger_utils import get_logger
 
@@ -15,7 +16,6 @@ logger = get_logger(name="llama3 initialization")
 class Llama3InitializerConfig(BaseModel):
     num_layers: Annotated[int, Field(strict=True, gt=0)]
     n_embd: Annotated[int, Field(strict=True, gt=0)]
-    use_weight_tying: bool = False
     depth_init: bool = True
 
 
@@ -24,7 +24,7 @@ class Llama3Initializer(ModelInitializationIF):
     Follows weight initialization distributions and parameterization for Llama3 as described in TorchTitan.
     """
 
-    def __init__(self, num_layers: int, n_embd: int, depth_init: bool, use_weight_tying: bool) -> None:
+    def __init__(self, num_layers: int, n_embd: int, depth_init: bool) -> None:
         """
         Initializes the Llama3Initializer.
         Args:
@@ -35,11 +35,12 @@ class Llama3Initializer(ModelInitializationIF):
                         used for all layers baed on num_layers.
         """
         super().__init__()
+        self.num_layers = num_layers
+        self.n_embd = n_embd
         self.depth_init = depth_init
 
-        self.regex_to_init = {
-            # embedding weights
-            r"transformer\.wte\.weight": (nn.init.normal_, {"mean": 0.0, "std": 1}),
+    def _build_regex_to_init(self, use_weight_tying: bool) -> dict[str, tuple[Callable, dict]]:
+        regex_to_init: dict[str, tuple[Callable, dict]] = {
             # qkv projections
             r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn)\.weight": (
                 trunc_normal_,
@@ -57,8 +58,8 @@ class Llama3Initializer(ModelInitializationIF):
                     "mean": 0.0,
                     "std": (
                         (lambda layer_id: 0.02 / math.sqrt(2 * (layer_id + 1)))
-                        if depth_init
-                        else 0.02 / math.sqrt(2 * num_layers)
+                        if self.depth_init
+                        else 0.02 / math.sqrt(2 * self.num_layers)
                     ),
                     "a": -2,
                     "b": 2,
@@ -80,43 +81,50 @@ class Llama3Initializer(ModelInitializationIF):
                     "mean": 0.0,
                     "std": (
                         (lambda layer_id: 0.02 / math.sqrt(2 * (layer_id + 1)))
-                        if depth_init
-                        else 0.02 / math.sqrt(2 * num_layers)
+                        if self.depth_init
+                        else 0.02 / math.sqrt(2 * self.num_layers)
                     ),
                     "a": -2,
                     "b": 2,
                 },
             ),
         }
-        if not use_weight_tying:
-            # lm head weights (separate output projection matrix)
-            self.regex_to_init[r"transformer\.lm_head\.weight"] = (
-                trunc_normal_,
-                {
-                    "mean": 0.0,
-                    "std": 1 / math.sqrt(n_embd),
-                    "a": -3 / math.sqrt(n_embd),
-                    "b": 3 / math.sqrt(n_embd),
-                },
-            )
+
+        # Initialization of the output projection (the matrix that produces the logits): small std
+        # 1/sqrt(n_embd) so the logits are well-scaled at init.
+        output_projection_init = (
+            trunc_normal_,
+            {
+                "mean": 0.0,
+                "std": 1 / math.sqrt(self.n_embd),
+                "a": -3 / math.sqrt(self.n_embd),
+                "b": 3 / math.sqrt(self.n_embd),
+            },
+        )
+        if use_weight_tying:
+            # With weight tying, transformer.wte.weight IS the output projection (lm_head shares the
+            # same tensor), so it must use the small output std instead of the embedding std of 1.
+            # Otherwise the tied matrix produces logits ~sqrt(n_embd)x too large at init, causing the
+            # initial loss/grad norm to explode.
+            regex_to_init[r"transformer\.wte\.weight"] = output_projection_init
         else:
-            # With weight tying, transformer.wte.weight IS the output projection
-            # (lm_head shares the same tensor), so it must be initialized with the
-            # small output std (1/sqrt(n_embd)) instead of the embedding std of 1.
-            # Otherwise the tied matrix produces logits that are ~sqrt(n_embd)x too
-            # large at init, causing the initial loss/grad norm to explode.
-            self.regex_to_init[r"transformer\.wte\.weight"] = (
-                trunc_normal_,
-                {
-                    "mean": 0.0,
-                    "std": 1 / math.sqrt(n_embd),
-                    "a": -3 / math.sqrt(n_embd),
-                    "b": 3 / math.sqrt(n_embd),
-                },
-            )
+            # Untied: wte is the embedding (std=1) and lm_head is the separate output projection.
+            regex_to_init[r"transformer\.wte\.weight"] = (nn.init.normal_, {"mean": 0.0, "std": 1})
+            regex_to_init[r"transformer\.lm_head\.weight"] = output_projection_init
+        return regex_to_init
 
     def initialize_in_place(self, model: nn.Module):
-        self._init_by_fqn_regex(model, self.regex_to_init)
+        # The FQN regexes are specific to GPT2LLM, which is also the single source of truth for whether
+        # the word embeddings are tied -- so we infer tying from the model rather than tracking a
+        # separate flag that could disagree with it (wrong-std tied output projection / uninitialized
+        # lm_head). Reject model types we cannot initialize.
+        if not isinstance(model, GPT2LLM):
+            raise TypeError(
+                f"Llama3Initializer only supports GPT2LLM (its FQN regexes are specific to it), "
+                f"but received {type(model).__name__}."
+            )
+        regex_to_init = self._build_regex_to_init(use_weight_tying=model.has_tied_word_embeddings)
+        self._init_by_fqn_regex(model, regex_to_init)
 
     @staticmethod
     def _init_by_fqn_regex(model: nn.Module, regex_to_init: dict[str, tuple[Callable, dict]]):
