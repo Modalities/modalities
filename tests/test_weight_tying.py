@@ -1,10 +1,13 @@
+import math
+
 import pytest
+import torch
 import torch.nn as nn
 from pydantic import ValidationError
 from torch.distributed.device_mesh import DeviceMesh
 
 from modalities.config.config import GPT2ModelTPConfig
-from modalities.models.components.layer_norms import LayerNormConfig
+from modalities.models.components.layer_norms import LayerNormConfig, PytorchRMSLayerNormConfig
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
     AttentionConfig,
@@ -13,6 +16,7 @@ from modalities.models.gpt2.gpt2_model import (
     LayerNormWrapperConfig,
     PositionTypes,
 )
+from modalities.models.gpt2.llama3_like_initialization import Llama3Initializer
 from modalities.models.model import ActivationType
 from modalities.models.parallelism.pipeline_parallelism_configs import StagedPipelineConfig
 from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator
@@ -27,7 +31,12 @@ def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
+def create_gpt2_model(
+    use_weight_tying: bool,
+    activation_type: ActivationType = ActivationType.GELU,
+    bias: bool = True,
+    norm_type: LayerNorms = LayerNorms.layer_norm,
+) -> GPT2LLM:
     vocab_size = VOCAB_SIZE
     n_embd = EMBEDDING_DIM
     sequence_length = 128
@@ -36,9 +45,7 @@ def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
     n_head_kv = 2
     ffn_hidden = 256
     dropout = 0.1
-    bias = True
     poe_type = PositionTypes.NOPE
-    activation_type = ActivationType.GELU
     attention_implementation = AttentionImplementation.PYTORCH_FLASH
     attention_config = AttentionConfig(
         qkv_transforms=[
@@ -53,15 +60,17 @@ def create_gpt2_model(use_weight_tying: bool) -> GPT2LLM:
             )
         ]
     )
-    attention_norm_config = LayerNormWrapperConfig(
-        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
-    )
-    ffn_norm_config = LayerNormWrapperConfig(
-        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
-    )
-    lm_head_norm_config = LayerNormWrapperConfig(
-        norm_type=LayerNorms.layer_norm, config=LayerNormConfig(normalized_shape=n_embd)
-    )
+
+    def _make_norm_config() -> LayerNormWrapperConfig:
+        if norm_type == LayerNorms.pytorch_rms_norm:
+            return LayerNormWrapperConfig(
+                norm_type=norm_type, config=PytorchRMSLayerNormConfig(normalized_shape=n_embd)
+            )
+        return LayerNormWrapperConfig(norm_type=norm_type, config=LayerNormConfig(normalized_shape=n_embd))
+
+    attention_norm_config = _make_norm_config()
+    ffn_norm_config = _make_norm_config()
+    lm_head_norm_config = _make_norm_config()
 
     return GPT2LLM(
         sample_key="input_ids",
@@ -140,12 +149,71 @@ def test_has_tied_word_embeddings_requires_model_capability():
         has_tied_word_embeddings(nn.Linear(1, 1))
 
 
+@pytest.mark.parametrize("module_name", ["wte", "lm_head"])
+def test_has_tied_word_embeddings_handles_pipeline_stage(module_name: str):
+    # In pipeline parallelism a stage's transformer ModuleDict only contains the submodules assigned
+    # to that stage (the transformer container itself is always present), so a stage may lack wte
+    # and/or lm_head. Such a stage has no tying to report and must not raise.
+    model = create_gpt2_model(use_weight_tying=True)
+    del model.transformer[module_name]
+
+    assert has_tied_word_embeddings(model) is False
+
+
 def test_tp_config_rejects_tied_word_embeddings():
     model = create_gpt2_model(use_weight_tying=True)
     device_mesh = create_device_mesh_stub(ParallelismDegrees.TP.value)
 
     with pytest.raises(ValidationError, match="Tied word embeddings are not supported with Tensor Parallelism"):
         GPT2ModelTPConfig(model=model, device_mesh=device_mesh)
+
+
+@pytest.mark.parametrize("use_weight_tying", [True, False])
+def test_llama3_init_keeps_output_projection_small(use_weight_tying: bool):
+    """Regression test for the weight-tying init bug.
+
+    With weight tying, ``transformer.wte.weight`` *is* the output projection
+    (``lm_head`` shares the same tensor), so it must be initialized with the small
+    output std ``1 / sqrt(n_embd)`` -- not the embedding std of 1. Otherwise the tied
+    matrix produces logits ~sqrt(n_embd)x too large at init and the loss/grad norm
+    explode (observed: initial loss ~1685 instead of ~ln(vocab_size)).
+    """
+    n_embd = EMBEDDING_DIM
+    expected_output_std = 1 / math.sqrt(n_embd)
+
+    # SwiGLU + RMSNorm + no bias so the Llama3Initializer's FQN regexes fully match
+    # the model and it rejects no parameters.
+    model = create_gpt2_model(
+        use_weight_tying=use_weight_tying,
+        activation_type=ActivationType.SWIGLU,
+        bias=False,
+        norm_type=LayerNorms.pytorch_rms_norm,
+    )
+    # The initializer infers weight tying from the model itself, so no tying flag is passed.
+    initializer = Llama3Initializer(num_layers=2, n_embd=n_embd, depth_init=True)
+    # Mirror the production flow (model_factory applies the initializer under no_grad).
+    with torch.no_grad():
+        initializer.initialize_in_place(model)
+
+    # The logit-producing matrix must be small regardless of weight tying.
+    output_proj_std = model.transformer.lm_head.weight.detach().float().std().item()
+    assert output_proj_std == pytest.approx(expected_output_std, rel=0.15)
+
+    if use_weight_tying:
+        # Tied: embedding and output projection are the same (small) tensor.
+        assert model.transformer.wte.weight is model.transformer.lm_head.weight
+    else:
+        # Untied: the embedding keeps the Llama3/TorchTitan std of 1.
+        embedding_std = model.transformer.wte.weight.detach().float().std().item()
+        assert embedding_std == pytest.approx(1.0, rel=0.15)
+
+
+def test_llama3_init_rejects_non_gpt2_model():
+    # The FQN regexes are GPT2LLM-specific, so the initializer must reject other model types
+    # rather than silently leaving everything uninitialized.
+    initializer = Llama3Initializer(num_layers=2, n_embd=EMBEDDING_DIM, depth_init=True)
+    with pytest.raises(TypeError, match="only supports GPT2LLM"):
+        initializer.initialize_in_place(nn.Linear(1, 1))
 
 
 def test_tp_config_allows_untied_word_embeddings():
