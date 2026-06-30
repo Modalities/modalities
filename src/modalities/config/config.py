@@ -94,6 +94,11 @@ class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
     k: Annotated[int, Field(strict=True, ge=-1)]
 
 
+class KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig(BaseModel):
+    k: Annotated[int, Field(strict=True, gt=0)]
+    num_recent_checkpoints_to_keep: Annotated[int, Field(strict=True, ge=1)] = 2
+
+
 class TorchCheckpointLoadingConfig(BaseModel):
     device: PydanticPytorchDeviceType
     precision: Optional[PrecisionEnum] = None
