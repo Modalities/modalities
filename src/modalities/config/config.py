@@ -85,6 +85,13 @@ class CLMCrossEntropyLossConfig(BaseModel):
     prediction_key: str
 
 
+class ChunkedCLMCrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+    num_chunks: int = 1
+    use_compile: bool = True
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
