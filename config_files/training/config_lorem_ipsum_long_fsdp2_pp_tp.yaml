@@ -13,6 +13,7 @@ settings:
     checkpoint_saving_path: data/checkpoints
     train_dataset_path: ./data/lorem_ipsum_long.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
+    experiments_root_path: ${modalities_env:experiments_root_path}
   intervals:
     training_log_interval_in_steps: 2
     checkpointing_interval_in_steps: 100000
@@ -163,10 +164,15 @@ checkpoint_saving:
 
 loss_fn:
   component_key: loss
-  variant_key: clm_cross_entropy_loss
+  variant_key: compiled
   config:
-    target_key: ${settings.referencing_keys.target_key}
-    prediction_key: ${settings.referencing_keys.prediction_key}
+    loss:
+      component_key: loss
+      variant_key: clm_cross_entropy_loss
+      config:
+        target_key: ${settings.referencing_keys.target_key}
+        prediction_key: ${settings.referencing_keys.prediction_key}
+    fullgraph: true
 
 device_mesh:
   component_key: device_mesh
@@ -324,7 +330,7 @@ model_raw:
     sample_key: ${settings.referencing_keys.sample_key}
     poe_type: NOPE
     sequence_length: ${settings.step_profile.sequence_length}
-    prediction_key: ${loss_fn.config.prediction_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: 2
     n_head_q: 8
