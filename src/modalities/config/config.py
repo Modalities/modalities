@@ -24,6 +24,7 @@ from modalities.config.pydantic_if_types import (
     PydanticFSDP1ModuleType,
     PydanticFSDP2ModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLossIFType,
     PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -83,6 +84,12 @@ class ReferenceConfig(BaseModel):
 class CLMCrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
+
+
+class CompiledLossConfig(BaseModel):
+    loss: PydanticLossIFType
+    fullgraph: Optional[bool] = True
+    debug: Optional[bool] = False
 
 
 # Checkpointing
