@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import overload
+from typing import Any, Optional, overload
 
 import torch
-from torch.nn import CrossEntropyLoss
+import torch.nn.functional as F
 
 from modalities.batch import InferenceResultBatch
 
@@ -23,14 +23,49 @@ class Loss(ABC):
         """
         raise NotImplementedError
 
+    def compile(self, fullgraph: bool, options: dict[str, Any]) -> None:
+        """Compiles the loss's tensor computation in place via torch.compile.
+
+        Only losses that separate their pure-tensor computation from the Python-side argument
+        parsing support compilation and override this method. The default implementation raises.
+
+        Args:
+            fullgraph (bool): Flag enforcing compilation without graph breaks.
+            options (dict[str, Any]): Additional options forwarded to torch.compile.
+
+        Raises:
+            NotImplementedError: If the concrete loss does not support compilation.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support torch.compile.")
+
+
+def clm_cross_entropy_loss(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    """Computes the mean cross-entropy loss for causal language modeling over all tokens.
+
+    This is the pure-tensor computation of CLMCrossEntropyLoss, kept as a standalone function so that
+    it can be compiled via torch.compile (see CLMCrossEntropyLoss.compile). Tokens with the label
+    -100 are ignored, as cross_entropy uses ignore_index=-100 by default (used for loss masking).
+
+    Args:
+        logits (torch.Tensor): Predicted logits of shape (..., vocab_size).
+        labels (torch.Tensor): Target token ids, matching logits without the vocab dimension.
+
+    Returns:
+        torch.Tensor: Scalar loss tensor, averaged over the non-ignored tokens.
+    """
+    logits = logits.contiguous()
+    labels = labels.contiguous().long()
+    # Flatten the tokens. We compute here, the loss per token.
+    return F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1), reduction="mean")
+
 
 class CLMCrossEntropyLoss(Loss):
     def __init__(self, target_key: str, prediction_key: str, tag: str = "CLMCrossEntropyLoss"):
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
-        # Mean over the tokens in the local-batch (batch per rank)
-        self.loss_fun = CrossEntropyLoss(reduction="mean")
+        # Pure-tensor loss computation; replaced by a compiled version in self.compile(...).
+        self.loss_fn = clm_cross_entropy_loss
 
     @overload
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
@@ -42,14 +77,18 @@ class CLMCrossEntropyLoss(Loss):
 
     def __call__(self, *args, **kwargs) -> torch.Tensor:
         labels, lm_logits = self._parse_arguments(args, kwargs)
-
         # move labels to correct device to enable model parallelism
         labels = labels.to(lm_logits.device)
-        shift_logits = lm_logits.contiguous()
-        shift_labels = labels.contiguous().long()
-        # Flatten the tokens. We compute here, the loss per token.
-        loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        return loss
+        return self.loss_fn(lm_logits, labels)
+
+    def compile(self, fullgraph: bool, options: dict[str, Any]) -> None:
+        """Compiles the pure-tensor loss computation in place via torch.compile.
+
+        Args:
+            fullgraph (bool): Flag enforcing compilation without graph breaks.
+            options (dict[str, Any]): Additional options forwarded to torch.compile.
+        """
+        self.loss_fn = torch.compile(self.loss_fn, fullgraph=fullgraph, options=options)
 
     def _parse_arguments(
         self,
@@ -164,4 +203,29 @@ class NCELoss(Loss):
         loss = nce_loss(
             contiguous_embedding1, contiguous_embedding2, embedding1.device, self.is_asymmetric, self.temperature
         )
+        return loss
+
+
+class LossFactory:
+    """Factory for constructing and transforming loss functions."""
+
+    @staticmethod
+    def get_compiled_loss(loss: Loss, fullgraph: bool, debug: Optional[bool] = False) -> Loss:
+        """Applies torch.compile to the tensor computation of the given loss.
+
+        Only the pure-tensor computation of the loss is compiled, while the Python-side argument
+        parsing is left uncompiled to avoid graph breaks. The loss is modified in place and returned,
+        analogous to ModelFactory.get_compiled_model. Inspired by torchtitan, which compiles the
+        pure loss function: https://github.com/pytorch/torchtitan
+
+        Args:
+            loss (Loss): The loss whose tensor computation should be compiled.
+            fullgraph (bool): Flag enforcing compilation without graph breaks.
+            debug (Optional[bool]): Flag to enable debug (trace) mode. Default is False.
+
+        Returns:
+            Loss: The same loss instance with its tensor computation compiled.
+        """
+        options = {"trace.enabled": True} if debug else {}
+        loss.compile(fullgraph=fullgraph, options=options)
         return loss

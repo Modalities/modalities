@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from modalities.batch import InferenceResultBatch
-from modalities.loss_functions import NCELoss, nce_loss
+from modalities.loss_functions import CLMCrossEntropyLoss, LossFactory, NCELoss, nce_loss
 
 
 @pytest.fixture
@@ -36,3 +36,58 @@ def test_nce_loss_correctness(embedding1, embedding2):
     bidirectional_loss = nce_loss(embedding1, embedding2, device="cpu", is_asymmetric=False, temperature=1.0)
     assert unidirectional_loss == pytest.approx(1.1300, 0.0001)
     assert bidirectional_loss == pytest.approx(2.2577, 0.0001)
+
+
+def test_clm_cross_entropy_loss_matches_reference():
+    torch.manual_seed(0)
+    logits = torch.randn(4, 8, 16)  # (batch, sequence, vocab)
+    targets = torch.randint(0, 16, (4, 8))
+
+    loss_func = CLMCrossEntropyLoss(target_key="target", prediction_key="logits")
+    actual = loss_func(logits, targets)
+
+    expected = torch.nn.functional.cross_entropy(logits.view(-1, 16), targets.view(-1), reduction="mean")
+    assert torch.allclose(actual, expected)
+
+
+def test_clm_cross_entropy_loss_ignores_masked_tokens():
+    # tokens labeled with -100 must be excluded from the loss (used for loss masking)
+    torch.manual_seed(0)
+    logits = torch.randn(2, 4, 8)
+    targets = torch.randint(0, 8, (2, 4))
+    masked_targets = targets.clone()
+    masked_targets[:, 2:] = -100
+
+    loss_func = CLMCrossEntropyLoss(target_key="target", prediction_key="logits")
+    actual = loss_func(logits, masked_targets)
+
+    # equals the loss computed only over the unmasked tokens
+    expected = torch.nn.functional.cross_entropy(
+        logits[:, :2].reshape(-1, 8), targets[:, :2].reshape(-1), reduction="mean"
+    )
+    assert torch.allclose(actual, expected)
+
+
+def test_get_compiled_loss_matches_eager():
+    torch.manual_seed(0)
+    logits = torch.randn(4, 8, 16)
+    targets = torch.randint(0, 16, (4, 8))
+
+    expected = CLMCrossEntropyLoss(target_key="target", prediction_key="logits")(logits, targets)
+
+    loss = CLMCrossEntropyLoss(target_key="target", prediction_key="logits")
+    compiled_loss = LossFactory.get_compiled_loss(loss, fullgraph=True)
+
+    # the loss is compiled in place and returned, preserving its identity and interface
+    assert compiled_loss is loss
+    assert compiled_loss.tag == "CLMCrossEntropyLoss"
+    assert compiled_loss.target_key == "target"
+
+    actual = compiled_loss(logits, targets)
+    assert torch.allclose(actual, expected, rtol=1e-4, atol=1e-5)
+
+
+def test_get_compiled_loss_raises_for_unsupported_loss():
+    loss = NCELoss(prediction_key1="embedding", prediction_key2="embedding")
+    with pytest.raises(NotImplementedError):
+        LossFactory.get_compiled_loss(loss, fullgraph=True)

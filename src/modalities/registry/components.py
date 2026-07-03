@@ -10,10 +10,11 @@ from torch.utils.data import BatchSampler, DistributedSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.checkpointing.checkpoint_saving_strategies import (
+    KeepEveryKStepsAndMMostRecentCheckpointingStrategy,
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
-from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import DCPCheckpointLoading, FSDP1CheckpointLoading
+from modalities.checkpointing.fsdp.fsdp_checkpoint_loading import FSDP1CheckpointLoading
 from modalities.checkpointing.fsdp.fsdp_checkpoint_saving import DCPCheckpointSaving, FSDP1CheckpointSaving
 from modalities.checkpointing.stateful.app_state_factory import AppStateFactory
 from modalities.checkpointing.torch.torch_checkpoint_loading import TorchCheckpointLoading
@@ -25,11 +26,11 @@ from modalities.config.config import (
     CheckpointSavingConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
+    CompiledLossConfig,
     CompiledModelConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
     DCPAppStateConfig,
-    DCPCheckpointLoadingConfig,
     DCPCheckpointSavingConfig,
     DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
@@ -47,6 +48,7 @@ from modalities.config.config import (
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
     GPT2ModelTPConfig,
+    KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig,
     LinearLRSchedulerConfig,
     LinearWarmupCosineAnnealingLRSchedulerConfig,
     LLMDataLoaderConfig,
@@ -82,7 +84,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import CLMCrossEntropyLoss, LossFactory
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -250,6 +252,7 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity("loss", "compiled", LossFactory.get_compiled_loss, CompiledLossConfig),
     # optimizers
     ComponentEntity(
         "optimizer", "adam", maybe_model_list_for_optimizer(OptimizerFactory.get_adam), AdamOptimizerConfig
@@ -353,12 +356,18 @@ COMPONENTS = [
         SaveKMostRecentCheckpointsStrategy,
         SaveKMostRecentCheckpointsStrategyConfig,
     ),
+    ComponentEntity(
+        "checkpoint_saving_strategy",
+        "keep_every_k_steps_and_m_most_recent_checkpointing_strategy",
+        KeepEveryKStepsAndMMostRecentCheckpointingStrategy,
+        KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig,
+    ),
     # checkpoint saving execution
     ComponentEntity("checkpoint_saving_execution", "fsdp1", FSDP1CheckpointSaving, FSDP1CheckpointSavingConfig),
     ComponentEntity("checkpoint_saving_execution", "dcp", DCPCheckpointSaving, DCPCheckpointSavingConfig),
     # checkpoint loading
     ComponentEntity("checkpoint_loading", "fsdp1", FSDP1CheckpointLoading, FSDP1CheckpointLoadingConfig),
-    ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
+    # ComponentEntity("checkpoint_loading", "dcp", DCPCheckpointLoading, DCPCheckpointLoadingConfig),
     ComponentEntity("checkpoint_loading", "torch", TorchCheckpointLoading, TorchCheckpointLoadingConfig),
     # Progress subscriber
     ComponentEntity(

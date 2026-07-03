@@ -46,6 +46,11 @@ class NNModel(nn.Module):
         """
         return self._weight_decay_groups
 
+    @property
+    def has_tied_word_embeddings(self) -> bool:
+        """Whether the model currently uses tied token embedding and output weights."""
+        return False
+
     @abstractmethod
     def forward(self, inputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """

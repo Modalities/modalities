@@ -11,6 +11,7 @@ from transformers import GPT2Tokenizer as GPT2TokenizerFast
 from transformers import LlamaTokenizer as LlamaTokenizerFast
 from typing_extensions import deprecated
 
+from modalities.checkpointing.stateful.app_state import StatefulComponents
 from modalities.config.lookup_enum import LookupEnum
 from modalities.config.pydantic_if_types import (
     PydanticAppStateType,
@@ -23,6 +24,7 @@ from modalities.config.pydantic_if_types import (
     PydanticFSDP1ModuleType,
     PydanticFSDP2ModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLossIFType,
     PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -33,6 +35,7 @@ from modalities.config.pydantic_if_types import (
     PydanticTokenizerIFType,
 )
 from modalities.config.utils import parse_torch_device
+from modalities.models.weight_tying import has_tied_word_embeddings
 from modalities.running_env.env_utils import (
     FSDP2MixedPrecisionSettings,
     MixedPrecisionSettings,
@@ -83,6 +86,12 @@ class CLMCrossEntropyLossConfig(BaseModel):
     prediction_key: str
 
 
+class CompiledLossConfig(BaseModel):
+    loss: PydanticLossIFType
+    fullgraph: Optional[bool] = True
+    debug: Optional[bool] = False
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
@@ -90,6 +99,11 @@ class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
 
 class SaveKMostRecentCheckpointsStrategyConfig(BaseModel):
     k: Annotated[int, Field(strict=True, ge=-1)]
+
+
+class KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig(BaseModel):
+    k: Annotated[int, Field(strict=True, gt=0)]
+    num_recent_checkpoints_to_keep: Annotated[int, Field(strict=True, ge=1)] = 2
 
 
 class TorchCheckpointLoadingConfig(BaseModel):
@@ -122,10 +136,6 @@ class FSDP1CheckpointLoadingConfig(BaseModel):
     @field_validator("sharding_strategy", mode="before")
     def parse_sharding_strategy_by_name(cls, name: str) -> ShardingStrategy:
         return parse_enum_by_name(name=name, enum_type=ShardingStrategy)
-
-
-class DCPCheckpointLoadingConfig(BaseModel):
-    global_rank: Annotated[int, Field(strict=True, ge=0)]
 
 
 class FSDP1CheckpointSavingConfig(BaseModel):
@@ -341,6 +351,13 @@ class GPT2ModelTPConfig(BaseModel):
             raise ValueError("data_parallel_replicate_degree > 1 cannot be used with Tensor Parallelism.")
         return self
 
+    @model_validator(mode="after")
+    def validate_untied_word_embeddings(self) -> "GPT2ModelTPConfig":
+        models = self.model if isinstance(self.model, list) else [self.model]
+        if any(has_tied_word_embeddings(model) for model in models):
+            raise ValueError("Tied word embeddings are not supported with Tensor Parallelism.")
+        return self
+
 
 class CompiledModelConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
@@ -383,11 +400,13 @@ class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType
     lr_scheduler: Optional[PydanticLRSchedulerIFType] = None
+    components_to_load: Optional[list[StatefulComponents]] = None
 
 
 class DCPAppStateConfig(BaseModel):
     raw_app_state: PydanticAppStateType
     checkpoint_dir_path: Path
+    allow_partial_load: bool = False
 
 
 class PreTrainedHFTokenizerConfig(BaseModel):
