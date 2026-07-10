@@ -1,3 +1,4 @@
+import copy
 import warnings
 
 import torch
@@ -112,7 +113,12 @@ def check_converted_dcp_model(
     if isinstance(device_id_modalities, str):
         device_id_modalities = int(device_id_modalities.replace("cuda:", ""))
     with MultiProcessingCudaEnv(
-        ProcessGroupBackendType.nccl, 0, 0, 1, find_free_port(), device_id=device_id_modalities
+        ProcessGroupBackendType.nccl,
+        0,
+        device_id_modalities,
+        1,
+        find_free_port(),
+        device_id=device_id_modalities,
     ):
         modalities_model = get_model_from_config(new_config, model_type=ModelTypeEnum.DCP_CHECKPOINTED_MODEL)
         check_converted_model(hf_model, modalities_model, num_testruns=num_testruns, vocab_size=vocab_size)
@@ -152,9 +158,9 @@ def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
     _, dcp_config = load_dcp_config(dcp_dir)
     model_key = "model_raw" if "model_raw" in dcp_config else "model"
     new_config: ConfigDictType = {
-        "fsdp_model": dcp_config["fsdp_model"],
-        "initialized_model": dcp_config["initialized_model"],
-        model_key: dcp_config[model_key],
+        "fsdp_model": copy.deepcopy(dcp_config["fsdp_model"]),
+        "initialized_model": copy.deepcopy(dcp_config["initialized_model"]),
+        model_key: copy.deepcopy(dcp_config[model_key]),
     }
     if "settings" in dcp_config:
         new_config["settings"] = dcp_config["settings"]
@@ -182,8 +188,14 @@ def _build_single_node_dcp_config(dcp_dir: str) -> ConfigDictType:
             "world_size": 1,
         },
     }
-    new_config["fsdp_model"]["config"]["model"]["instance_key"] = model_key
-    new_config["initialized_model"]["config"]["model"] = {"instance_key": "fsdp_model", "pass_type": "BY_REFERENCE"}
+    # For single-rank validation on a non-default GPU, initialize before FSDP2 wrapping.
+    # Resetting DTensor-backed parameters after fully_shard() can trigger NCCL collectives
+    # on cuda:0 even when the process group is bound to another device.
+    new_config[model_key]["config"]["use_meta_device"] = False
+    new_config["initialized_model"]["config"]["model"] = {"instance_key": model_key, "pass_type": "BY_REFERENCE"}
+    new_config["fsdp_model"]["config"]["model"] = {"instance_key": "initialized_model", "pass_type": "BY_REFERENCE"}
+    raw_app_state = new_config["app_state"]["config"]["raw_app_state"]
+    raw_app_state["config"]["model"] = {"instance_key": "fsdp_model", "pass_type": "BY_REFERENCE"}
     return new_config
 
 
