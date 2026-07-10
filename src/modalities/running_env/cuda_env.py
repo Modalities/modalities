@@ -13,6 +13,20 @@ from modalities.utils.logger_utils import get_logger
 logger = get_logger(__name__)
 
 
+def _resolve_cuda_device_index(device_id: Any, local_rank: int) -> int:
+    if device_id is None:
+        return local_rank
+    if isinstance(device_id, torch.device):
+        return device_id.index if device_id.index is not None else local_rank
+    if isinstance(device_id, str):
+        if device_id.startswith("cuda:"):
+            return int(device_id.split(":", maxsplit=1)[1])
+        if device_id == "cuda":
+            return local_rank
+        return int(device_id)
+    return int(device_id)
+
+
 class CudaEnv:
     """Context manager to set the CUDA environment for distributed training."""
 
@@ -45,7 +59,7 @@ class CudaEnv:
         local_rank = int(os.getenv("LOCAL_RANK", "-1"))
         if local_rank == -1:
             raise ValueError("LOCAL_RANK environment variable is not set. Please set it before using CudaEnv.")
-        torch.cuda.set_device(local_rank)
+        torch.cuda.set_device(_resolve_cuda_device_index(self._process_group_kwargs.get("device_id"), local_rank))
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
