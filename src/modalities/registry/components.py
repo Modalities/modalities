@@ -10,6 +10,7 @@ from torch.utils.data import BatchSampler, DistributedSampler, SequentialSampler
 
 from modalities.checkpointing.checkpoint_saving import CheckpointSaving
 from modalities.checkpointing.checkpoint_saving_strategies import (
+    KeepEveryKStepsAndMMostRecentCheckpointingStrategy,
     SaveEveryKStepsCheckpointingStrategy,
     SaveKMostRecentCheckpointsStrategy,
 )
@@ -46,6 +47,7 @@ from modalities.config.config import (
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
     GPT2ModelTPConfig,
+    KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig,
     LinearLRSchedulerConfig,
     LinearWarmupCosineAnnealingLRSchedulerConfig,
     LLMDataLoaderConfig,
@@ -351,6 +353,12 @@ COMPONENTS = [
         "save_k_most_recent_checkpoints_strategy",
         SaveKMostRecentCheckpointsStrategy,
         SaveKMostRecentCheckpointsStrategyConfig,
+    ),
+    ComponentEntity(
+        "checkpoint_saving_strategy",
+        "keep_every_k_steps_and_m_most_recent_checkpointing_strategy",
+        KeepEveryKStepsAndMMostRecentCheckpointingStrategy,
+        KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig,
     ),
     # checkpoint saving execution
     ComponentEntity("checkpoint_saving_execution", "fsdp1", FSDP1CheckpointSaving, FSDP1CheckpointSavingConfig),
