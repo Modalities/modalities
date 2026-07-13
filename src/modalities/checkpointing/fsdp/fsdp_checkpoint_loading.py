@@ -103,17 +103,18 @@ class FSDP1CheckpointLoading(FSDP1CheckpointLoadingIF):
 class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
     """Distributed checkpoint loading interface for loading PyTorch models and optimizer checkpoints."""
 
-    def __init__(self, global_rank: int):
+    def __init__(self, global_rank: int, allow_partial_load: bool = False):
         """
         Initializes the DCPCheckpointLoading object.
 
         Args:
             global_rank (int): The global rank of the process.
-
+            allow_partial_load (bool, optional): Whether to allow partial loading of the checkpoint. Defaults to False.
         Returns:
             None
         """
         self._global_rank = global_rank
+        self._allow_partial_load = allow_partial_load
 
     @torch.no_grad()
     def load_checkpoint_(self, app_state: AppState, checkpoint_dir_path: Path):
@@ -129,5 +130,6 @@ class DCPCheckpointLoading(DistributedCheckpointLoadingIF):
         dcp.load(
             state_dict={"app": app_state},
             checkpoint_id=checkpoint_dir_path,
+            planner=dcp.DefaultLoadPlanner(allow_partial_load=self._allow_partial_load),
         )
         get_logger().info(f"Distributed checkpoint loaded on rank {self._global_rank}.")

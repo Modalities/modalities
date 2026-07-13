@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import overload
 
 import torch
+import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
@@ -85,6 +86,84 @@ class CLMCrossEntropyLoss(Loss):
         else:
             raise TypeError("Invalid arguments for CLMCrossEntropyLoss.__call__")
         return labels, lm_logits
+
+
+def _ce_loss_mean(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    return F.cross_entropy(logits, labels, reduction="mean")
+
+
+def _ce_loss_sum(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    return F.cross_entropy(logits, labels, reduction="sum")
+
+
+class ChunkedCLMCrossEntropyLoss(Loss):
+    """Cross-entropy loss computed in chunks with optional torch.compile.
+
+    Splits the flattened token sequence into ``num_chunks`` chunks and
+    accumulates a sum-then-normalize loss.  This limits the peak memory for
+    intermediate float32 tensors (log-softmax, gradients) from O(B·L·V) to
+    O(B·L/num_chunks·V).  Setting ``use_compile=True`` additionally fuses the
+    per-chunk loss kernels via ``torch.compile``, avoiding float32 intermediate
+    materialisations entirely for each chunk.
+
+    Use ``num_chunks=1, use_compile=True`` for compiled-only mode (kernel
+    fusion savings without chunking).
+
+    Args:
+        target_key: Key to access labels in the ``InferenceResultBatch``.
+        prediction_key: Key to access logits in the ``InferenceResultBatch``.
+        num_chunks: Number of chunks to split the token sequence into. Must
+            be >= 1.  Defaults to 1 (no splitting).
+        use_compile: Apply ``torch.compile`` to the per-chunk loss function.
+            Defaults to ``True``.
+        tag: Loss tag used for logging. Defaults to
+            ``"ChunkedCLMCrossEntropyLoss"``.
+    """
+
+    def __init__(
+        self,
+        target_key: str,
+        prediction_key: str,
+        num_chunks: int = 1,
+        use_compile: bool = True,
+        tag: str = "ChunkedCLMCrossEntropyLoss",
+    ):
+        super().__init__(tag)
+        if num_chunks < 1:
+            raise ValueError(f"num_chunks must be >= 1, got {num_chunks}")
+        self.target_key = target_key
+        self.prediction_key = prediction_key
+        self.num_chunks = num_chunks
+
+        if num_chunks == 1:
+            # No chunking — use mean-reduction directly.
+            base_fn = _ce_loss_mean
+            self._use_chunks = False
+        else:
+            base_fn = _ce_loss_sum
+            self._use_chunks = True
+
+        self._loss_fn = torch.compile(base_fn) if use_compile else base_fn
+
+    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
+        labels = forward_batch.get_targets(self.target_key)
+        lm_logits = forward_batch.get_predictions(self.prediction_key)
+
+        labels = labels.to(lm_logits.device)
+        flat_logits = lm_logits.contiguous().view(-1, lm_logits.size(-1))
+        flat_labels = labels.contiguous().view(-1).long()
+
+        if not self._use_chunks:
+            return self._loss_fn(flat_logits, flat_labels)
+
+        logit_chunks = flat_logits.tensor_split(self.num_chunks, dim=0)
+        label_chunks = flat_labels.tensor_split(self.num_chunks, dim=0)
+
+        total_loss = flat_logits.new_zeros(())
+        for logit_chunk, label_chunk in zip(logit_chunks, label_chunks):
+            total_loss = total_loss + self._loss_fn(logit_chunk, label_chunk)
+
+        return total_loss / flat_labels.numel()
 
 
 def nce_loss(

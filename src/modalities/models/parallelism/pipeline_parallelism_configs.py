@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from modalities.config.pydantic_if_types import (
     PydanticDeviceMeshIFType,
@@ -11,6 +11,7 @@ from modalities.config.pydantic_if_types import (
     PydanticStagesGeneratorType,
 )
 from modalities.models.parallelism.pipeline_parallelism import PipelineSelectionTypes
+from modalities.models.weight_tying import has_tied_word_embeddings
 from modalities.utils.deprecated_alias import add_deprecated_alias
 
 
@@ -25,6 +26,12 @@ class StagedPipelineConfig(BaseModel):
     local_rank: Annotated[int, Field(strict=True, ge=0)]
     pp_schedule_name: str
     num_layers_per_stage: Annotated[int, Field(strict=True, ge=1)]
+
+    @model_validator(mode="after")
+    def validate_untied_word_embeddings(self) -> "StagedPipelineConfig":
+        if has_tied_word_embeddings(self.whole_model):
+            raise ValueError("Tied word embeddings are not supported with Pipeline Parallelism.")
+        return self
 
 
 class ScheduledPipelineConfig(BaseModel):
