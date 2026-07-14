@@ -14,7 +14,7 @@ from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.loss_functions import Loss
+from modalities.loss_functions import ChunkedLMHeadCrossEntropyLoss, Loss
 from modalities.models.model import model_predict_batch
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
@@ -160,6 +160,10 @@ class Trainer:
                         if a training step was performed otherwise return None.
         """
         if scheduled_pipeline is not None:
+            if isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss):
+                raise NotImplementedError(
+                    "ChunkedLMHeadCrossEntropyLoss is not supported with pipeline parallelism."
+                )
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
             # with self.train_context(optional_context_parallel_ctx):
@@ -175,6 +179,17 @@ class Trainer:
                 pp_schedule.step(target=targets, losses=losses)
             loss = (
                 torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.has_last_pp_stage else None
+            )
+        elif isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss):
+            # The model returns hidden states (return_hidden_states=True); the loss applies the
+            # lm_head chunk-wise and owns the full backward pass, so no backward() call here.
+            if loss_fun.lm_head is None:
+                loss_fun.bind_lm_head(model_parts[0])
+            result_batch = model_predict_batch(model=model_parts[0], batch=batch)
+            loss = loss_fun.compute_and_backward(
+                hidden_states=result_batch.get_predictions(loss_fun.prediction_key),
+                labels=result_batch.get_targets(loss_fun.target_key),
+                grad_scale=1.0 / self.gradient_acc_steps,
             )
         else:
             # else continue with loss calculation

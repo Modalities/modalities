@@ -9,6 +9,7 @@ from modalities.batch import DatasetBatch, EvaluationResultBatch, InferenceResul
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
+from modalities.loss_functions import ChunkedLMHeadCrossEntropyLoss
 from modalities.models.model import model_predict_batch
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
@@ -81,6 +82,8 @@ class Evaluator:
                     else None
                 )
             else:
+                if isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss) and loss_fun.lm_head is None:
+                    loss_fun.bind_lm_head(model[0])
                 result_batch = model_predict_batch(model=model[0], batch=batch)
                 loss = loss_fun(result_batch)
         return loss

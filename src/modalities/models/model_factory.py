@@ -173,6 +173,7 @@ class ModelFactory:
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
         layers_per_fsdp_unit: int = 1,
+        wrap_lm_head_separately: bool = False,
     ) -> FSDP2:
         """Get the FSDP2-wrapped model.
 
@@ -187,6 +188,10 @@ class ModelFactory:
             mixed_precision_settings (FSDP2MixedPrecisionSettings): Mixed precision settings.
             reshard_after_forward (bool): Whether to reshard after forward.
             layers_per_fsdp_unit (int): Number of layers per FSDP unit. Default is 1.
+            wrap_lm_head_separately (bool): Whether to wrap the lm_head (transformer.lm_head)
+                as its own FSDP unit instead of leaving it in the root unit. Required for
+                ChunkedLMHeadCrossEntropyLoss, which calls the lm_head standalone outside the
+                model forward. Not supported with tied word embeddings. Defaults to False.
 
         Returns:
             FSDP2: The FSDP2-wrapped model.
@@ -236,6 +241,16 @@ class ModelFactory:
                 **fsdp_config,
                 reshard_after_forward=reshard_block_after_forward,
             )
+
+        if wrap_lm_head_separately:
+            # The lm_head gets its own FSDP unit so that ChunkedLMHeadCrossEntropyLoss can call
+            # it standalone (outside the model forward) with proper unshard/reshard hooks and
+            # per-chunk gradient sync control. With tied embeddings, wte and lm_head would share
+            # one parameter across two FSDP units, which is not supported.
+            if getattr(model, "has_tied_word_embeddings", False):
+                raise ValueError("wrap_lm_head_separately is not supported with tied word embeddings.")
+            lm_head = model.get_submodule("transformer.lm_head")
+            fully_shard(lm_head, **fsdp_config, reshard_after_forward=reshard_after_forward)
 
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
@@ -616,6 +631,7 @@ class GPT2ModelFactory:
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
+        return_hidden_states: bool = False,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -638,6 +654,7 @@ class GPT2ModelFactory:
             lm_head_norm_config=lm_head_norm_config,
             use_weight_tying=use_weight_tying,
             enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
+            return_hidden_states=return_hidden_states,
         )
         if use_meta_device and use_weight_tying:
             raise ValueError(

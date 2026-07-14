@@ -25,6 +25,7 @@ from modalities.config.config import (
     BatchSamplerConfig,
     CheckpointSavingConfig,
     ChunkedCLMCrossEntropyLossConfig,
+    ChunkedLMHeadCrossEntropyLossConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
     CompiledModelConfig,
@@ -84,7 +85,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import ChunkedCLMCrossEntropyLoss, CLMCrossEntropyLoss
+from modalities.loss_functions import ChunkedCLMCrossEntropyLoss, ChunkedLMHeadCrossEntropyLoss, CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -254,6 +255,9 @@ COMPONENTS = [
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
     ComponentEntity(
         "loss", "chunked_clm_cross_entropy_loss", ChunkedCLMCrossEntropyLoss, ChunkedCLMCrossEntropyLossConfig
+    ),
+    ComponentEntity(
+        "loss", "chunked_lm_head_cross_entropy_loss", ChunkedLMHeadCrossEntropyLoss, ChunkedLMHeadCrossEntropyLossConfig
     ),
     # optimizers
     ComponentEntity(
