@@ -203,7 +203,9 @@ class Trainer:
             scheduler.step()
             optimizer.zero_grad()
             step_performed = True
-            gradient_norm_score = gradient_norm_score.detach().cpu()
+            # Keep the norm on device: .cpu() here would force a host-GPU sync every
+            # step, stalling CPU dispatch. It is moved to CPU only at logging time.
+            gradient_norm_score = gradient_norm_score.detach()
         else:
             step_performed = False
             gradient_norm_score = None
@@ -300,15 +302,16 @@ class Trainer:
 
                 # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
                 if batch_loss is not None:
-                    # Save the batch loss
-                    cumulated_losses[0] += batch_loss.detach().item()
+                    # Save the batch loss. Accumulate on device: .item() would force a
+                    # host-GPU sync every step and stall CPU dispatch of the next step.
+                    cumulated_losses[0] += batch_loss.detach()
                     # This works, because we always drop the last batch in case
                     # it has less samples than the batch size
                     cumulated_losses[-1] += 1  # number of local batches
 
                 # gradient norm is already synced across all ranks
                 if gradient_norm_score is not None:
-                    gradient_norm_scores.append(gradient_norm_score.item())
+                    gradient_norm_scores.append(gradient_norm_score)
 
                 local_num_seen_samples += len(batch)
 
@@ -319,7 +322,9 @@ class Trainer:
                 )
                 # Check if model performance should be logged
                 if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
-                    dist.barrier()
+                    # NOTE: no dist.barrier() here. FSDP's per-step collectives already keep
+                    # ranks aligned; a world-wide barrier per log interval only adds latency
+                    # (measurable at large world sizes with small log intervals).
                     forward_backward_time_recorder.stop()
                     forward_backward_time = forward_backward_time_recorder.delta_t
                     forward_backward_time_recorder.reset()
@@ -331,7 +336,7 @@ class Trainer:
 
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     # add the loss and gradient norm for the LAST batch
-                    cumulated_losses[1] = batch_loss.detach().item() if batch_loss is not None else 0.0
+                    cumulated_losses[1] = batch_loss.detach() if batch_loss is not None else 0.0
 
                     reduced_losses = (
                         Reducer.reduce(
@@ -358,8 +363,9 @@ class Trainer:
 
                     metrics = {
                         "consumed tokens": ResultItem(torch.tensor(training_progress.num_seen_tokens_total), 0),
-                        "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
-                        "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
+                        # gradient_norm_scores hold device tensors; sync to CPU only here, at log time
+                        "grad norm avg": ResultItem(torch.stack(gradient_norm_scores).mean().cpu(), 2),
+                        "grad norm last": ResultItem(gradient_norm_scores[-1].cpu(), 2),
                     }
                     gradient_norm_scores = []
                     mfu_score = torch.tensor(-1.0)
