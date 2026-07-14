@@ -44,6 +44,7 @@ initialized_model:
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
+        seed: 42
 
 scheduled_pipeline:
   component_key: pipeline
@@ -132,7 +133,6 @@ model_raw:
   component_key: model
   variant_key: gpt2
   config:
-    seed: 42
     use_meta_device: true
     use_weight_tying: false
     sample_key: input_ids

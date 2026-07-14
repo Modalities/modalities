@@ -212,7 +212,11 @@ def test_build_single_node_dcp_config_preserves_optional_sections(monkeypatch: p
         "dp_degree": 2,
         "optimizer": {"name": "adamw"},
         "lr_scheduler": {"name": "onecycle"},
-        "app_state": {"component_key": "app_state", "variant_key": "raw"},
+        "app_state": {
+            "component_key": "app_state",
+            "variant_key": "raw",
+            "config": {"model": {"instance_key": "old_model"}},
+        },
     }
 
     monkeypatch.setattr(
@@ -228,8 +232,11 @@ def test_build_single_node_dcp_config_preserves_optional_sections(monkeypatch: p
     assert new_config["lr_scheduler"] == {"name": "onecycle"}
     assert new_config["app_state"]["variant_key"] == "dcp"
     assert new_config["app_state"]["config"]["checkpoint_dir_path"] == "/tmp/checkpoint"
-    assert new_config["fsdp_model"]["config"]["model"]["instance_key"] == "model_raw"
-    assert new_config["initialized_model"]["config"]["model"]["instance_key"] == "fsdp_model"
+    # In the current version of the conversion code we need to run init before fsdp.
+    assert new_config["model_raw"]["config"]["use_meta_device"] is False
+    assert new_config["initialized_model"]["config"]["model"]["instance_key"] == "model_raw"
+    assert new_config["fsdp_model"]["config"]["model"]["instance_key"] == "initialized_model"
+    assert new_config["app_state"]["config"]["raw_app_state"]["config"]["model"]["instance_key"] == "fsdp_model"
 
 
 def test_load_hf_model_for_dcp_comparison_sets_attention_implementation(monkeypatch: pytest.MonkeyPatch):
