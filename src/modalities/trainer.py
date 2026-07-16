@@ -161,9 +161,7 @@ class Trainer:
         """
         if scheduled_pipeline is not None:
             if isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss):
-                raise NotImplementedError(
-                    "ChunkedLMHeadCrossEntropyLoss is not supported with pipeline parallelism."
-                )
+                raise NotImplementedError("ChunkedLMHeadCrossEntropyLoss is not supported with pipeline parallelism.")
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
             # with self.train_context(optional_context_parallel_ctx):
@@ -250,10 +248,10 @@ class Trainer:
             m.train()
 
         local_num_seen_samples = 0
-        cumulated_losses = torch.zeros(3).cuda()
 
         # throughput
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        cumulated_losses = torch.zeros(3, device=device)
 
         # batch loop
         batch: DatasetBatch
