@@ -88,7 +88,7 @@ class CLMCrossEntropyLossConfig(BaseModel):
 class ChunkedCLMCrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
-    num_chunks: int = 1
+    num_chunks: Annotated[int, Field(strict=True, ge=1)] = 1
     use_compile: bool = True
 
 

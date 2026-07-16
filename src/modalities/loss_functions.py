@@ -245,6 +245,11 @@ class ChunkedLMHeadCrossEntropyLoss(Loss):
             self.lm_head.set_modules_to_backward_prefetch([self.lm_head])
 
     def _chunk(self, t: torch.Tensor) -> list[torch.Tensor]:
+        """Splits a [B, L, ...] tensor into ``num_chunks`` equal pieces along the sequence dim.
+
+        Raises:
+            ValueError: If the sequence length is not divisible by ``num_chunks``.
+        """
         seq_len = t.shape[1]
         if seq_len % self.num_chunks != 0:
             raise ValueError(
@@ -253,11 +258,16 @@ class ChunkedLMHeadCrossEntropyLoss(Loss):
         return list(t.tensor_split(self.num_chunks, dim=1))
 
     def _chunk_ce_sum(self, hidden_chunk: torch.Tensor, label_chunk: torch.Tensor) -> torch.Tensor:
+        """Projects one hidden-state chunk through the lm_head and sums its token-level CE loss."""
         logits = self.lm_head(hidden_chunk)
         return self._loss_fn(logits.reshape(-1, logits.size(-1)), label_chunk.reshape(-1).long())
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
-        """Forward-only chunked loss (used for evaluation, typically under ``torch.no_grad()``)."""
+        """Forward-only chunked loss (used for evaluation, typically under ``torch.no_grad()``).
+
+        Raises:
+            RuntimeError: If ``bind_lm_head`` has not been called yet.
+        """
         if self.lm_head is None:
             raise RuntimeError(
                 "lm_head is not set. Call bind_lm_head(model) before computing "
@@ -285,6 +295,10 @@ class ChunkedLMHeadCrossEntropyLoss(Loss):
 
         Returns:
             The detached mean loss over non-ignored tokens.
+
+        Raises:
+            RuntimeError: If ``bind_lm_head`` has not been called yet, or if
+                ``hidden_states`` does not require grad (use ``__call__`` for evaluation).
         """
         if self.lm_head is None:
             raise RuntimeError(

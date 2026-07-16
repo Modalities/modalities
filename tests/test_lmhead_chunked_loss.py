@@ -34,7 +34,9 @@ class TinyModelWithLMHead(nn.Module):
         self.transformer = nn.ModuleDict(dict(lm_head=lm_head))
 
 
-def _make_modules_and_data(seed: int = 42, mask_some_labels: bool = False):
+def _make_modules_and_data(
+    seed: int = 42, mask_some_labels: bool = False
+) -> tuple[TinyTrunk, nn.Linear, torch.Tensor, torch.Tensor]:
     torch.manual_seed(seed)
     trunk = TinyTrunk()
     lm_head = nn.Linear(HIDDEN_DIM, VOCAB_SIZE, bias=False)
@@ -45,7 +47,9 @@ def _make_modules_and_data(seed: int = 42, mask_some_labels: bool = False):
     return trunk, lm_head, inputs, labels
 
 
-def _reference_loss_and_grads(trunk, lm_head, inputs, labels):
+def _reference_loss_and_grads(
+    trunk: TinyTrunk, lm_head: nn.Linear, inputs: torch.Tensor, labels: torch.Tensor
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Unchunked reference: full logits, CE with mean reduction, single backward."""
     hidden = trunk(inputs)
     logits = lm_head(hidden)
@@ -58,7 +62,14 @@ def _reference_loss_and_grads(trunk, lm_head, inputs, labels):
     return loss.detach(), grads
 
 
-def _chunked_loss_and_grads(trunk, lm_head, inputs, labels, num_chunks, grad_scale=1.0):
+def _chunked_loss_and_grads(
+    trunk: TinyTrunk,
+    lm_head: nn.Linear,
+    inputs: torch.Tensor,
+    labels: torch.Tensor,
+    num_chunks: int,
+    grad_scale: float = 1.0,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     loss_fn = ChunkedLMHeadCrossEntropyLoss(
         target_key="target", prediction_key="prediction", num_chunks=num_chunks, use_compile=False
     )
