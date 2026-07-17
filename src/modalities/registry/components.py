@@ -85,7 +85,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import CLMCrossEntropyLoss, MoECrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -99,8 +99,6 @@ from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.gpt2.llama3_like_initialization import Llama3Initializer, Llama3InitializerConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
-from modalities.models.moe.loss_functions import MoECrossEntropyLoss
-from modalities.models.moe.model_factory import get_ep_wrapped_model
 from modalities.models.moe.qwen_model import QwenModel, QwenModelConfig
 from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
 from modalities.models.parallelism.pipeline_parallelism_configs import (
@@ -196,7 +194,7 @@ COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity("model", "moe", QwenModel, QwenModelConfig),
-    ComponentEntity("model", "ep_wrapped", get_ep_wrapped_model, EPWrappedModelConfig),
+    ComponentEntity("model", "ep_wrapped", ModelFactory.get_ep_wrapped_model, EPWrappedModelConfig),
     ComponentEntity(
         "model", "gpt2_tp", maybe_model_list(GPT2ModelFactory.get_gpt2_tensor_parallelized_model), GPT2ModelTPConfig
     ),

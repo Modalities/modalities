@@ -2,7 +2,7 @@ import torch
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
-from modalities.models.moe.loss_functions import MoECrossEntropyLoss
+from modalities.loss_functions import MoECrossEntropyLoss
 
 
 class DummyLayer:
