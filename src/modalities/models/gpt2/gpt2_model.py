@@ -3,7 +3,7 @@ import math
 from abc import abstractmethod
 from enum import Enum
 from numbers import Real
-from typing import Annotated, Literal, Optional, overload
+from typing import Annotated, Literal, Optional, cast, overload
 
 import torch
 import torch.nn as nn
@@ -16,6 +16,13 @@ from modalities.models.components.layer_norms import (
     PytorchRMSLayerNormConfig,
     RMSLayerNorm,
     RMSLayerNormConfig,
+)
+from modalities.models.components.rotary_embedding import (
+    apply_rotary_pos_emb,
+    compute_default_inv_freq,
+    compute_yarn_inv_freq_and_attention_scaling,
+    rotate_half,
+    update_cos_sin_tables,
 )
 from modalities.models.model import ActivationType, NNModel, SwiGLU
 from modalities.util import parse_enum_by_name
@@ -221,9 +228,7 @@ class RotaryTransform(QueryKeyValueTransform):
         if rope_type == "yarn":
             inv_freq, self.attention_scaling = self._compute_yarn_parameters(device=device)
         else:
-            inv_freq = 1.0 / (
-                self.base_freq ** (torch.arange(0, self.dim_model, 2, device=device).float() / self.dim_model)
-            )
+            inv_freq = compute_default_inv_freq(dim_model=self.dim_model, base_freq=self.base_freq, device=device)
             self.attention_scaling = 1.0
 
         self.register_buffer("inv_freq", inv_freq)
@@ -243,8 +248,7 @@ class RotaryTransform(QueryKeyValueTransform):
             torch.Tensor: The output tensor.
 
         """
-        x1, x2 = x.chunk(2, dim=-1)
-        return torch.cat((-x2, x1), dim=-1)
+        return rotate_half(x)
 
     def apply_rotary_pos_emb(self, x, cos, sin):
         """
@@ -258,16 +262,7 @@ class RotaryTransform(QueryKeyValueTransform):
         Returns:
             torch.Tensor: Tensor after applying rotary positional embedding.
         """
-        # NOTE: This could probably be moved to Triton
-
-        # Handle a possible sequence length mismatch in between q and k
-        cos = cos[:, :, : x.shape[self.seq_length_dim], :]
-        sin = sin[:, :, : x.shape[self.seq_length_dim], :]
-
-        # the rotation is not really a rotation in higher dimensions,
-        # It merely swaps and negates certain dimensions to make
-        # the rotation below work
-        return (x * cos) + (self.rotate_half(x) * sin)
+        return apply_rotary_pos_emb(x=x, cos=cos, sin=sin, seq_length_dim=self.seq_length_dim)
 
     def forward(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
@@ -297,109 +292,31 @@ class RotaryTransform(QueryKeyValueTransform):
         if self.max_position_embeddings is None:
             raise ValueError("YaRN requires max_position_embeddings to be set.")
 
-        original_max_position_embeddings = self.rope_scaling.original_max_position_embeddings
-        factor = self.rope_scaling.factor
-        if factor is None:
-            factor = self.max_position_embeddings / original_max_position_embeddings
-        factor_float = float(factor)
-
-        attention_factor = self.rope_scaling.attention_factor
-        mscale_pair = None
-        if self.rope_scaling.mscale is not None and self.rope_scaling.mscale_all_dim is not None:
-            mscale_pair = (self.rope_scaling.mscale, self.rope_scaling.mscale_all_dim)
-
-        beta_fast = self.rope_scaling.beta_fast
-        beta_slow = self.rope_scaling.beta_slow
-        truncate = self.rope_scaling.truncate
-
-        def get_mscale(scale: float, mscale: float = 1.0) -> float:
-            """Return the YaRN mscale coefficient for a given scaling factor."""
-            if scale <= 1:
-                return 1.0
-            return 0.1 * mscale * math.log(scale) + 1.0
-
-        if attention_factor is None:
-            if mscale_pair is not None:
-                mscale, mscale_all_dim = mscale_pair
-                attention_factor = float(
-                    get_mscale(factor_float, float(mscale)) / get_mscale(factor_float, float(mscale_all_dim))
-                )
-            else:
-                attention_factor = get_mscale(factor_float)
-
-        def find_correction_dim(num_rotations: float, dim: int, base: int, max_position_embeddings: int) -> float:
-            """Map a target number of rotations to a rotary dimension index."""
-            return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (2 * math.log(base))
-
-        def find_correction_range(
-            low_rot: float,
-            high_rot: float,
-            dim: int,
-            base: int,
-            max_position_embeddings: int,
-            truncate: bool,
-        ) -> tuple[float, float]:
-            """Compute the lower and upper rotary-dimension correction bounds for YaRN."""
-            low = find_correction_dim(low_rot, dim, base, max_position_embeddings)
-            high = find_correction_dim(high_rot, dim, base, max_position_embeddings)
-            if truncate:
-                low = math.floor(low)
-                high = math.ceil(high)
-            return max(low, 0), min(high, dim - 1)
-
-        def linear_ramp_factor(min_value: float, max_value: float, dim: int) -> torch.Tensor:
-            """Create a clamped linear ramp used to blend interpolation and extrapolation."""
-            if min_value == max_value:
-                max_value += 0.001
-            linear_func = (torch.arange(dim, dtype=torch.float32, device=device) - min_value) / (max_value - min_value)
-            ramp_func = torch.clamp(linear_func, 0, 1)
-            return ramp_func
-
-        dim = self.dim_model
-        base = self.base_freq
-
-        pos_freqs = base ** (torch.arange(0, dim, 2, device=device, dtype=torch.float) / dim)
-        inv_freq_extrapolation = 1.0 / pos_freqs
-        inv_freq_interpolation = 1.0 / (factor_float * pos_freqs)
-
-        low, high = find_correction_range(
-            beta_fast,
-            beta_slow,
-            dim,
-            base,
-            original_max_position_embeddings,
-            bool(truncate),
+        return compute_yarn_inv_freq_and_attention_scaling(
+            dim_model=self.dim_model,
+            base_freq=self.base_freq,
+            max_position_embeddings=self.max_position_embeddings,
+            original_max_position_embeddings=self.rope_scaling.original_max_position_embeddings,
+            factor=self.rope_scaling.factor,
+            attention_factor=self.rope_scaling.attention_factor,
+            mscale=self.rope_scaling.mscale,
+            mscale_all_dim=self.rope_scaling.mscale_all_dim,
+            beta_fast=self.rope_scaling.beta_fast,
+            beta_slow=self.rope_scaling.beta_slow,
+            truncate=self.rope_scaling.truncate,
+            device=device,
         )
-        inv_freq_extrapolation_factor = 1 - linear_ramp_factor(low, high, dim // 2).to(device=device, dtype=torch.float)
-        inv_freq = (
-            inv_freq_interpolation * (1 - inv_freq_extrapolation_factor)
-            + inv_freq_extrapolation * inv_freq_extrapolation_factor
-        )
-
-        return inv_freq, float(attention_factor)
 
     def _update_cos_sin_tables(self, x):
-        # Update the cosine and sine tables.
-        seq_len = x.shape[self.seq_length_dim]
-
-        # Reset the tables if the sequence length has changed,
-        # or if we're on a new device (possibly due to tracing for instance)
-        if (
-            seq_len != self._seq_len_cached
-            or self._cos_cached is None
-            or self._sin_cached is None
-            or self._cos_cached.device != x.device
-            or self._cos_cached.dtype != x.dtype
-        ):
-            self._seq_len_cached = seq_len
-            t = torch.arange(x.shape[self.seq_length_dim], device=x.device, dtype=torch.float32)
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq.to(x.dtype))
-            emb = torch.cat((freqs, freqs), dim=-1).to(
-                x.device
-            )  # here, we combine the two matrices (not zipping them).
-            self._cos_cached = (emb.cos() * self.attention_scaling)[None, None, :, :].to(x.dtype)
-            self._sin_cached = (emb.sin() * self.attention_scaling)[None, None, :, :].to(x.dtype)
-
+        self._seq_len_cached, self._cos_cached, self._sin_cached = update_cos_sin_tables(
+            x=x,
+            inv_freq=cast(torch.Tensor, self.inv_freq),
+            attention_scaling=self.attention_scaling,
+            seq_length_dim=self.seq_length_dim,
+            seq_len_cached=self._seq_len_cached,
+            cos_cached=self._cos_cached,
+            sin_cached=self._sin_cached,
+        )
         return self._cos_cached, self._sin_cached
 
 

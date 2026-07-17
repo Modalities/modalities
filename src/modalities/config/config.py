@@ -85,6 +85,16 @@ class CLMCrossEntropyLossConfig(BaseModel):
     prediction_key: str
 
 
+class MoECrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+    model: Any
+    tag: str = "MoECrossEntropyLoss"
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
@@ -168,6 +178,19 @@ class AdamWOptimizerConfig(BaseModel):
     weight_decay_groups_excluded: list[str]
     foreach: bool | None = None
     fused: bool | None = None
+
+
+class EPAdamWConfig(BaseModel):
+    wrapped_model: PydanticPytorchModuleOrListType
+    device_mesh: PydanticDeviceMeshIFType
+    lr: float
+    betas: tuple[float, float]
+    eps: float
+    weight_decay: float
+    weight_decay_groups_excluded: list[str]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -312,6 +335,13 @@ class FSDP2WrappedModelConfig(BaseModel):
         if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
             raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
         return self
+
+
+class EPWrappedModelConfig(BaseModel):
+    model: PydanticPytorchModuleOrListType
+    block_names: list[str]
+    device_mesh: PydanticDeviceMeshIFType
+    mixed_precision_settings: FSDP2MixedPrecisionSettings
 
 
 class DebuggingEnrichedModelConfig(BaseModel):

@@ -93,6 +93,7 @@ def _test_dataloader_produces_different_samples_in_different_dp_ranks(process_id
             tensor_parallel_degree=2,
             pipeline_parallel_degree=2,
             context_parallel_degree=1,
+            expert_parallel_degree=1,
             enable_loss_parallel=False,
             world_size=world_size,
         )
@@ -117,6 +118,7 @@ def _test_dataloader_produces_same_samples_in_connected_non_dp_ranks(process_id:
             tensor_parallel_degree=2,
             pipeline_parallel_degree=2,
             context_parallel_degree=1,
+            expert_parallel_degree=1,
             enable_loss_parallel=False,
             world_size=world_size,
         )

@@ -208,6 +208,16 @@ class ModelStateRetriever(StateRetrieverIF):
 
 class OptimizerStateRetriever(StateRetrieverIF):
     @staticmethod
+    def _uses_standard_optimizer_state_dict(app_state: AppState) -> bool:
+        """Checks whether the optimizer state dict follows the standard torch Optimizer schema.
+
+        Standard optimizer state dicts contain top-level "state" and "param_groups" keys,
+        which are required by distributed optimizer checkpoint utilities.
+        """
+        state_dict = app_state.optimizer.state_dict()
+        return isinstance(state_dict, dict) and "state" in state_dict and "param_groups" in state_dict
+
+    @staticmethod
     def get_state_dict(app_state: AppState) -> dict[str, Any]:
         """Returns the state dict of the optimizer in the AppState object.
 
@@ -218,6 +228,10 @@ class OptimizerStateRetriever(StateRetrieverIF):
             dict[str, Any]: The state dict of the optimizer in the AppState object.
         """
         if isinstance(app_state.optimizer, OptimizersList):
+            sd = app_state.optimizer.state_dict()
+        elif not OptimizerStateRetriever._uses_standard_optimizer_state_dict(app_state):
+            # Custom optimizers (e.g. EP wrappers) may not expose the standard torch
+            # optimizer format expected by get_optimizer_state_dict.
             sd = app_state.optimizer.state_dict()
         else:
             assert len(app_state.model_parts) == 1, "Expected a single model part for non-OptimizersList optimizer."
@@ -239,6 +253,8 @@ class OptimizerStateRetriever(StateRetrieverIF):
             state_dict (dict[str, Any]): The state dict to load into the optimizer.
         """
         if isinstance(app_state.optimizer, OptimizersList):
+            app_state.optimizer.load_state_dict(state_dict)
+        elif not OptimizerStateRetriever._uses_standard_optimizer_state_dict(app_state):
             app_state.optimizer.load_state_dict(state_dict)
         else:
             assert len(app_state.model_parts) == 1, "Expected a single model part for non-OptimizersList optimizer."
