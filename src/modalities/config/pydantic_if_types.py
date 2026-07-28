@@ -22,6 +22,7 @@ from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
+from modalities.models.nemotron.nemotron_layer_specs import NemotronLayerSpecIF
 from modalities.models.parallelism.pipeline_parallelism import Pipeline, StagesGenerator
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
@@ -98,3 +99,4 @@ PydanticRemovableHandleType = Annotated[
     torch.utils.hooks.RemovableHandle, PydanticThirdPartyTypeIF(torch.utils.hooks.RemovableHandle)
 ]
 PydanticDebuggingType = Annotated[Debugging, PydanticThirdPartyTypeIF(Debugging)]
+PydanticNemotronLayerSpecIFType = Annotated[NemotronLayerSpecIF, PydanticThirdPartyTypeIF(NemotronLayerSpecIF)]

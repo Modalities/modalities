@@ -1,0 +1,84 @@
+model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: nemotron
+        weight_init_type: WILL_BE_REPLACED
+        mean: 0.0
+        std: WILL_BE_REPLACED
+        num_layers: ${model_raw.config.n_layer}
+
+model_raw:
+  component_key: model
+  variant_key: nemotron
+  config:
+    sample_key: "input_ids"
+    prediction_key: "logits"
+    aux_loss_key: "moe_aux_loss"
+    sequence_length: 256
+    vocab_size: 512
+    n_embd: 256
+    n_layer: 8
+    # A miniature of the Nemotron-3 Nano pattern: mostly Mamba/MoE with one attention layer and
+    # one dense MLP layer, so that all four layer types are exercised.
+    layer_pattern: "MEMEM*E-"
+    use_weight_tying: false
+    lm_head_norm_config: &nemotron_norm_config
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    layer_specs:
+      "M":
+        component_key: nemotron_layer_spec
+        variant_key: mamba2
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          mamba_n_heads: 8
+          mamba_head_dim: 32
+          mamba_state_dim: 16
+          mamba_n_groups: 2
+          d_conv: 4
+          chunk_size: 32
+          ssd_backend: native
+          norm_config: *nemotron_norm_config
+      "E":
+        component_key: nemotron_layer_spec
+        variant_key: moe
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          num_experts: 8
+          moe_ffn_hidden: 64
+          top_k: 2
+          route_scale: 2.5
+          score_function: sigmoid
+          use_expert_bias: true
+          router_dtype: float32
+          num_shared_experts: 2
+          aux_loss_coeff: 1.0e-4
+          experts_backend: looped
+          norm_config: *nemotron_norm_config
+      "*":
+        component_key: nemotron_layer_spec
+        variant_key: attention
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head_q: 8
+          n_head_kv: 2
+          head_dim: 32
+          attention_implementation: pytorch_flash
+          norm_config: *nemotron_norm_config
+      "-":
+        component_key: nemotron_layer_spec
+        variant_key: mlp
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          ffn_hidden: 128
+          norm_config: *nemotron_norm_config

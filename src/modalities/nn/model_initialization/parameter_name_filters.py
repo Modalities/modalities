@@ -13,6 +13,7 @@ class WeightInitTypes(Enum):
 class SupportWeightInitModels(Enum):
     GPT2 = "gpt2"
     COCA = "coca"
+    NEMOTRON = "nemotron"
 
 
 class RegexFilter(BaseModel):
@@ -73,5 +74,53 @@ NAMED_PARAMETER_INIT_GROUPS = {
         ),
         WeightInitTypes.SCALED: RegexFilter(weights=[], biases=[]),
         WeightInitTypes.SCALED_EMBED: RegexFilter(weights=[], biases=[]),
+    },
+    SupportWeightInitModels.NEMOTRON: {
+        # Only the linear and embedding weights of the hybrid Mamba-Transformer are drawn from a
+        # normal distribution. The state space parameters (A_log, D, dt_bias, conv1d_*) follow
+        # their own distributions, defined in Mamba2Mixer.reset_parameters, and the router bias
+        # must stay at zero; none of them may be matched here or they would be overwritten.
+        WeightInitTypes.PLAIN: RegexFilter(
+            weights=[
+                # Mamba-2 mixer projections
+                r"transformer\.h\.\d+\.mixer\.(in_proj|out_proj)\.weight",
+                # attention projections
+                r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.weight",
+                # dense feed-forward
+                r"transformer\.h\.\d+\.mlp\.(c_fc|c_proj)\.weight",
+                # mixture-of-experts: router gate, routed experts, shared experts
+                r"transformer\.h\.\d+\.moe\.router\.gate\.weight",
+                r"transformer\.h\.\d+\.moe\.experts\.w[12]",
+                r"transformer\.h\.\d+\.moe\.shared_experts\.(c_fc|c_proj)\.weight",
+                # embeddings and (untied) language model head
+                r"transformer\.wte\.weight",
+                r"transformer\.lm_head\.weight",
+            ],
+            biases=[
+                # Nemotron uses no biases, but they remain configurable per component.
+                r"transformer\.h\.\d+\.mixer\.(in_proj|out_proj)\.bias",
+                r"transformer\.h\.\d+\.attn\.(q_attn|k_attn|v_attn|c_proj)\.bias",
+                r"transformer\.h\.\d+\.mlp\.(c_fc|c_proj)\.bias",
+                r"transformer\.h\.\d+\.moe\.shared_experts\.(c_fc|c_proj)\.bias",
+            ],
+        ),
+        # scaled: down-scale every projection that writes into the residual stream, so that the
+        # variance contributed by the residual branches does not grow with depth
+        # (https://arxiv.org/abs/2312.16903).
+        WeightInitTypes.SCALED: RegexFilter(
+            weights=[
+                r"transformer\.h\.\d+\.mixer\.out_proj\.weight",
+                r"transformer\.h\.\d+\.attn\.c_proj\.weight",
+                r"transformer\.h\.\d+\.mlp\.c_proj\.weight",
+                r"transformer\.h\.\d+\.moe\.experts\.w2",
+                r"transformer\.h\.\d+\.moe\.shared_experts\.c_proj\.weight",
+            ]
+        ),
+        WeightInitTypes.SCALED_EMBED: RegexFilter(
+            weights=[
+                r"transformer\.wte\.weight",
+                r"transformer\.lm_head\.weight",
+            ]
+        ),
     },
 }

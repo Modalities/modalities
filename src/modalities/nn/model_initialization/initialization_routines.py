@@ -18,6 +18,34 @@ class MultiDeviceGeneratorPolicy(str, Enum):
     ERROR = "error"
 
 
+# Wrappers that insert themselves into a parameter's fully qualified name without changing which
+# logical parameter it is. The initialization filters are written against the plain model FQNs, so
+# these prefixes are stripped before matching. Without this, applying activation checkpointing (or
+# torch.compile) before initialization would silently prevent every per-layer regex from matching,
+# leaving the model with its default rather than its configured initialization.
+_FQN_WRAPPER_PREFIXES = (
+    "_orig_mod.",  # torch.compile
+    "_checkpoint_wrapped_module.",  # activation checkpointing
+    "_fsdp_wrapped_module.",  # FSDP1
+)
+
+
+def normalize_parameter_name(parameter_name: str) -> str:
+    """
+    Removes wrapper prefixes from a parameter's fully qualified name.
+
+    Args:
+        parameter_name (str): The fully qualified parameter name, possibly containing wrapper
+            segments such as ``_checkpoint_wrapped_module.``.
+
+    Returns:
+        str: The name as it would appear on the unwrapped model.
+    """
+    for prefix in _FQN_WRAPPER_PREFIXES:
+        parameter_name = parameter_name.replace(prefix, "")
+    return parameter_name
+
+
 class PlainInitializationConfig(BaseModel):
     mean: float
     std: Annotated[float, Field(strict=True, ge=0.0)] | str  # can be float or "auto"
@@ -85,9 +113,9 @@ class NamedParameterwiseNormalInitialization(ModelInitializationIF):
         weight_regexes = self.parameter_name_regexes.weights
         bias_regexes = self.parameter_name_regexes.biases or []
         for parameter_name, p in model.named_parameters():
-            parameter_name = parameter_name.replace(
-                "_orig_mod.", ""
-            )  # remove FQN modification from torch.compile if present
+            # Strip FQN modifications introduced by torch.compile, activation checkpointing and
+            # FSDP1 so that the filters can be written against the plain model.
+            parameter_name = normalize_parameter_name(parameter_name)
             for weight_regex in weight_regexes:
                 if re.fullmatch(weight_regex, parameter_name):
                     nn.init.normal_(p, mean=self.mean, std=self.std, generator=self._get_generator(p))

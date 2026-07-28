@@ -10,6 +10,20 @@
 | model          | fsdp_wrapped                 | [ModelFactory.get_fsdp_wrapped_model](../../src/modalities/models/model_factory.py)        | [FSDPWrappedModelConfig](../../src/modalities/config/config.py)                                  | [NNModel](../../src/modalities/models/model.py)                             | Model that has been sharded via FSDP                                     |
 | model          | model_initialized            | [ModelFactory.get_weight_initialized_model](../../src/modalities/models/model_factory.py)  | [WeightInitializedModelConfig](../../src/modalities/config/config.py)                            | [nn.Module](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) | Model with initialized weights                                           |
 | model          | coca                         | [CoCa](../../src/modalities/models/coca/coca_model.py)                                     | [CoCaConfig](../../src/modalities/models/coca/coca_model.py)                                     | [NNModel](../../src/modalities/models/model.py)                             | [CoCa Model (Contrastive Captioners) ](https://arxiv.org/abs/2205.01917) |
+| model          | nemotron                     | [NemotronModelFactory.get_nemotron_model](../../src/modalities/models/nemotron/nemotron_model_factory.py) | [NemotronLLMConfig](../../src/modalities/models/nemotron/nemotron_model.py) | [NNModel](../../src/modalities/models/model.py) | Hybrid Mamba-Transformer with sparse MoE layers (Nemotron-3 Nano). See [nemotron.md](nemotron.md) |
+
+## Nemotron layer specs
+
+The network components of a hybrid model are configured as *layer specs*: builders that the model
+invokes once per layer position, so that repeated layer types get independent weights. See
+[nemotron.md](nemotron.md).
+
+| Component type      | Component Version | Implementation                                                                                          | Configuration                                                                                                   | Component Interface                                                                            | Description                                     |
+|---------------------|-------------------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| nemotron_layer_spec | mamba2            | [Mamba2LayerSpec](../../src/modalities/models/nemotron/nemotron_layer_specs.py)            | [Mamba2LayerSpecConfig](../../src/modalities/models/nemotron/nemotron_layer_specs.py)            | [NemotronLayerSpecIF](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | Mamba-2 selective state space mixer layer (`M`) |
+| nemotron_layer_spec | attention         | [NemotronAttentionLayerSpec](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | [NemotronAttentionLayerSpecConfig](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | [NemotronLayerSpecIF](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | Grouped-query causal self-attention layer (`*`) |
+| nemotron_layer_spec | moe               | [NemotronMoELayerSpec](../../src/modalities/models/nemotron/nemotron_layer_specs.py)       | [NemotronMoELayerSpecConfig](../../src/modalities/models/nemotron/nemotron_layer_specs.py)       | [NemotronLayerSpecIF](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | Sparse mixture-of-experts layer (`E`)           |
+| nemotron_layer_spec | mlp               | [NemotronMLPLayerSpec](../../src/modalities/models/nemotron/nemotron_layer_specs.py)       | [NemotronMLPLayerSpecConfig](../../src/modalities/models/nemotron/nemotron_layer_specs.py)       | [NemotronLayerSpecIF](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | Dense squared-ReLU feed-forward layer (`-`)     |
 
 ## Weight Initialization
 
@@ -24,6 +38,8 @@ The composed initializer supports seeded weight initialization for reproducibili
 | Component type | Component Version      | Implementation                                                | Configuration                                                      | Component Interface                            | Description                 |
 |----------------|------------------------|---------------------------------------------------------------|--------------------------------------------------------------------|------------------------------------------------|-----------------------------|
 | loss           | clm_cross_entropy_loss | [CLMCrossEntropyLoss](../../src/modalities/loss_functions.py) | [CLMCrossEntropyLossConfig](../../src/modalities/config/config.py) | [Loss](../../src/modalities/loss_functions.py) | Cross-entropy loss function |
+| loss           | moe_aux_loss           | [MoEAuxLoss](../../src/modalities/models/components/moe/moe_losses.py) | [MoEAuxLossConfig](../../src/modalities/models/components/moe/moe_losses.py) | [Loss](../../src/modalities/loss_functions.py) | Surfaces the pre-computed MoE load-balancing penalty |
+| loss           | weighted_sum           | [WeightedSumLoss](../../src/modalities/models/components/moe/moe_losses.py) | [WeightedSumLossConfig](../../src/modalities/models/components/moe/moe_losses.py) | [Loss](../../src/modalities/loss_functions.py) | Weighted sum of several losses (e.g. CLM + MoE auxiliary loss) |
 
 ## Optimizers
 
@@ -32,6 +48,7 @@ The composed initializer supports seeded weight initialization for reproducibili
 | optimizer      | adam              | [OptimizerFactory.get_adam](../../src/modalities/optimizers/optimizer_factory.py)                   | [AdamOptimizerConfig](../../src/modalities/config/config.py)         | [Optimizer](../../src/modalities/models/model.py) | ADAM optimizer                         |
 | optimizer      | adam_w            | [OptimizerFactory.get_adam_w](../../src/modalities/optimizers/optimizer_factory.py)                 | [AdamWOptimizerConfig](../../src/modalities/config/config.py)        | [Optimizer](../../src/modalities/models/model.py) | ADAMW Optimizer                        |
 | optimizer      | checkpointed      | [OptimizerFactory.get_checkpointed_optimizer](../../src/modalities/optimizers/optimizer_factory.py) | [CheckpointedOptimizerConfig](../../src/modalities/config/config.py) | [Optimizer](../../src/modalities/models/model.py) | Optimizer instantiated from checkpoint |
+| optimizer      | moe_load_balanced | [MoEBalancing.register_expert_bias_update_hook](../../src/modalities/models/components/moe/load_balancing.py) | [MoELoadBalancedOptimizerConfig](../../src/modalities/config/config.py) | [Optimizer](../../src/modalities/models/model.py) | Decorator adding auxiliary-loss-free MoE load balancing to any optimizer |
 
 ## LR Scheduling
 

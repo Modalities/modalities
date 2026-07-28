@@ -4,6 +4,7 @@
 |------------------|------------|---------------|------------------|------------------------------------------------------------------------------------------------|
 | [#141](#pr-141-towards-stable-modalities-version)  | Bug Fix    |  [#129](https://github.com/Modalities/modalities/issues/129)         | **Yes**              | Towards stable modalities version                                                               |
 | [#154](pr-154-manual-swiglu-implementation)  | Bug Fix    |  [#14](https://github.com/Modalities/modalities/issues/14)         | **Yes**              | Towards stable modalities version                                                               |
+| [#nemotron](#pr-nemotron-3-nano-hybrid-mamba-transformer-moe-architecture)  | Feature    |  --         | No               | Nemotron-3 Nano hybrid Mamba-Transformer MoE architecture                                      |
 |    |   |           |        |                                                                |
 
 
@@ -218,3 +219,53 @@ This PR improves training monitoring and logging across runs besides some other 
 
 **Breaking Changes**
 * experiments_root_path is now exposed on an API level
+
+## PR Nemotron 3 Nano hybrid Mamba-Transformer MoE architecture
+
+Adds support for hybrid Mamba-Transformer architectures with sparse mixture-of-experts feed-forward
+layers, targeting **Nemotron-3 Nano 30B-A3B** ([arXiv:2512.20848](https://arxiv.org/abs/2512.20848)).
+See [docs/components/nemotron.md](docs/components/nemotron.md) for the full guide.
+
+**General changes:**
+* New `model` variant `nemotron`: a decoder-only LM whose layer stack is described by a *layer
+  pattern* string (`M` = Mamba-2, `*` = attention, `E` = MoE, `-` = dense MLP), where each character
+  is one single-operator pre-norm residual layer. No positional embeddings; the Mamba-2 layers carry
+  the positional information.
+* New `nemotron_layer_spec` component type with the variants `mamba2`, `attention`, `moe` and `mlp`.
+  These are *builders*, not modules: the model calls `build()` once per layer position, so repeated
+  layer types get independent weights while every hyperparameter stays configurable from YAML.
+* New reusable components under `models/components/`: a Mamba-2 mixer with a dependency-free
+  pure-PyTorch state space scan (`ssd_backend: native`) plus an optional fused Triton backend
+  (`ssd_backend: fused`, new `mamba` extra), and a mixture-of-experts block with a sigmoid top-k
+  router, grouped-matmul experts and shared experts.
+* New `optimizer` variant `moe_load_balanced`: an optimizer decorator implementing auxiliary-loss-free
+  load balancing ([arXiv:2408.15664](https://arxiv.org/abs/2408.15664)) as a step pre-hook, which
+  makes the expert bias update correct under gradient accumulation.
+* New `loss` variants `moe_aux_loss` and `weighted_sum`, so the sequence-level MoE load-balancing
+  penalty can be added to the language modelling objective.
+* New `stages_generator` variant `nemotron_stages_generator`, which balances pipeline stages by
+  per-layer-type computational cost instead of layer count, and guarantees that every module is
+  assigned to exactly one stage.
+* New `mfu_calculator` variant `nemotron`, which uses *active* parameters and charges the quadratic
+  attention term only to the attention layers.
+* New `model_initialization` model type `nemotron`. The state space parameters (`A_log`, `D`,
+  `dt_bias`, `conv1d_*`) are excluded from the regex-driven initializer and initialized by
+  `Mamba2Mixer.reset_parameters` instead, matching the reference distributions.
+* Ready-to-run config: `config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml`.
+
+**Bug fixes (pre-existing, surfaced by the distributed tests for this feature):**
+* `NamedParameterwiseNormalInitialization` only stripped torch.compile's `_orig_mod.` prefix from
+  parameter names before matching the initialization filters. Activation checkpointing and FSDP1
+  insert their own segments (`_checkpoint_wrapped_module.`, `_fsdp_wrapped_module.`), so any config
+  that applied activation checkpointing before weight initialization silently matched *no* per-layer
+  regex and left the model with its default initialization. All wrapper prefixes are now normalized
+  away. This affected GPT2 configs as well. Note that `Llama3Initializer` (in the GPT2 package) still
+  has the same gap and was deliberately left untouched.
+
+**Breaking changes:**
+* None. The GPT2 implementation is untouched.
+
+**Known limitations:**
+* Tensor, expert and context parallelism are not supported for this architecture yet. FSDP2,
+  activation checkpointing, pipeline parallelism and `torch.compile` are.
+* Multi-token prediction (MTP) and HuggingFace checkpoint conversion are not included.
