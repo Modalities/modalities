@@ -1,3 +1,7 @@
+# `ssd_recurrent_reference` transcribes the Mamba-2 selective state space recurrence
+# (Dao & Gu, 2024, https://arxiv.org/abs/2405.21060) directly from its definition, so that the
+# chunk-parallel implementation is validated against the mathematics rather than against a port.
+
 """Correctness tests for the pure-PyTorch Mamba-2 SSD primitives.
 
 The chunked scan is the numerical foundation of every Mamba layer, so it is validated against a

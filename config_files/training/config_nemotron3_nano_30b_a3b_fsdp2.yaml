@@ -1,7 +1,9 @@
 # Nemotron-3 Nano 30B-A3B pretraining configuration.
 #
 # Architecture from the model report (arXiv:2512.20848, Table 1 / Figure 2) and cross-checked
-# against the Megatron-Bridge recipe `recipes/nemotronh/h100/nemotron_3_nano.py`:
+# against the Megatron-Bridge recipe `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`
+# (Copyright (c) 2026, NVIDIA CORPORATION, licensed under the Apache License, Version 2.0), from
+# which the hyperparameter values below are adopted:
 #
 #   52 layers   pattern MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME
 #               -> 23 Mamba-2, 23 MoE, 6 attention

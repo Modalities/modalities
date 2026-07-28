@@ -1,3 +1,8 @@
+# The layer-pattern symbols are adopted from NVIDIA's Megatron-LM
+# (megatron/core/models/hybrid/hybrid_layer_allocation.py::Symbols) so that pattern strings are
+# portable between the two frameworks.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+
 """Layer pattern parsing for hybrid Mamba-Transformer models.
 
 A hybrid model such as Nemotron-3 Nano is described by a pattern string in which every

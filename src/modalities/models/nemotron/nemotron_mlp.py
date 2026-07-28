@@ -1,3 +1,6 @@
+# The squared ReLU activation follows NVIDIA's Megatron-LM (megatron/core/activations.py),
+# Copyright (c) NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+
 """Non-gated squared-ReLU feed-forward network.
 
 Nemotron models use ``ReLU(x)^2`` rather than a gated activation such as SwiGLU. This halves the

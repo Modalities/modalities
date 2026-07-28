@@ -1,3 +1,11 @@
+# Portions of this file are adapted from NVIDIA's Megatron-LM
+# (megatron/core/transformer/moe/moe_utils.py::topk_routing_with_score_function): the sigmoid
+# scoring path, the selection-only expert bias, and the top-k renormalization.
+# Copyright (c) 2025, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+#
+# The router interface is additionally inspired by Meta's open-source project TorchTitan
+# (torchtitan/models/common/moe.py::TokenChoiceTopKRouter), licensed under the BSD 3-Clause License.
+
 """Top-k mixture-of-experts router.
 
 Implements the routing scheme used by Nemotron-3 Nano: sigmoid gating with an additive

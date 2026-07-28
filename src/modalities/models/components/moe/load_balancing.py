@@ -1,3 +1,11 @@
+# Portions of this file are adapted from NVIDIA's Megatron-LM
+# (megatron/core/transformer/moe/moe_utils.py::get_updated_expert_bias): the sign-based
+# per-expert bias update rule.
+# Copyright (c) 2025, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+#
+# Applying the update as an optimizer step pre-hook follows Meta's open-source project TorchTitan
+# (torchtitan/models/common/moe.py), licensed under the BSD 3-Clause License.
+
 """Auxiliary-loss-free load balancing for mixture-of-experts layers.
 
 Implements the update rule of "Auxiliary-Loss-Free Load Balancing Strategy for Mixture-of-Experts"

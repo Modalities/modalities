@@ -1,3 +1,8 @@
+# The layer-spec (declarative builder) pattern is adapted from NVIDIA's Megatron-LM
+# (megatron/core/transformer/spec_utils.py::ModuleSpec and
+# megatron/core/models/hybrid/hybrid_layer_specs.py).
+# Copyright (c) 2023-2026, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+
 """Layer specifications: configurable builders for the sublayers of a hybrid model.
 
 A hybrid model contains dozens of layers of a handful of types. Modalities' component factory

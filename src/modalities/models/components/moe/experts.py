@@ -1,3 +1,11 @@
+# Some portions of this implementation are inspired, adapted, or refactored from Meta's
+# open-source project TorchTitan (torchtitan/models/common/moe.py::GroupedExperts),
+# licensed under the BSD 3-Clause License. Specifically the stacked per-expert weight
+# layout and the torch._grouped_mm call over expert-sorted tokens.
+#
+# The squared ReLU activation follows NVIDIA's Megatron-LM (megatron/core/activations.py),
+# Copyright (c) NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+
 """Grouped expert feed-forward networks for mixture-of-experts layers.
 
 All experts of a layer are stored in two stacked weight tensors so that the whole layer can be

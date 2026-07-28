@@ -177,3 +177,58 @@ Decaying the SSM dynamics parameters or the router gate destabilizes training.
 | `stages_generator` | `nemotron_stages_generator` | [NemotronStagesGenerator](../../src/modalities/models/nemotron/nemotron_stages_generator.py) |
 | `mfu_calculator` | `nemotron` | [NemotronMFUCalculator](../../src/modalities/utils/nemotron_mfu.py) |
 | `model_initialization` | `composed` (`model_type: nemotron`) | [ComposedInitializationRoutines](../../src/modalities/nn/model_initialization/composed_initialization.py) |
+
+## Attribution
+
+Modalities is MIT licensed. The files below adapt code from third-party projects and carry the
+corresponding notices in their file headers, as required by those licenses.
+
+**NVIDIA Megatron-LM** — Copyright (c) NVIDIA CORPORATION, Apache License 2.0.
+Portions additionally Copyright (c) 2024, Tri Dao, Albert Gu.
+
+| File | What was adapted | Upstream |
+|------|------------------|----------|
+| [mamba2_mixer.py](../../src/modalities/models/components/mamba2/mamba2_mixer.py) | Packed `[z, x, B, C, dt]` projection layout; `conv1d`/`A_log`/`D`/`dt_bias` shapes and init distributions | `megatron/core/ssm/mamba_mixer.py` |
+| [layer_pattern.py](../../src/modalities/models/nemotron/layer_pattern.py) | Layer pattern symbols (`M`, `*`, `E`, `-`) | `megatron/core/models/hybrid/hybrid_layer_allocation.py::Symbols` |
+| [nemotron_layers.py](../../src/modalities/models/nemotron/nemotron_layers.py) | Single-operator pre-norm residual layer structure | `megatron/core/ssm/mamba_layer.py`, `.../hybrid/hybrid_block.py` |
+| [nemotron_layer_specs.py](../../src/modalities/models/nemotron/nemotron_layer_specs.py) | Declarative layer-spec/builder pattern | `megatron/core/transformer/spec_utils.py::ModuleSpec`, `.../hybrid/hybrid_layer_specs.py` |
+| [nemotron_model.py](../../src/modalities/models/nemotron/nemotron_model.py) | Hybrid model structure (pattern-driven stack) | `megatron/core/models/hybrid/hybrid_model.py` |
+| [router.py](../../src/modalities/models/components/moe/router.py) | Sigmoid scoring, selection-only expert bias, top-k renormalization | `megatron/core/transformer/moe/moe_utils.py::topk_routing_with_score_function` |
+| [moe.py](../../src/modalities/models/components/moe/moe.py) | Load-balancing loss formula and its sequence-level variant | `.../moe_utils.py::switch_load_balancing_loss_func` |
+| [load_balancing.py](../../src/modalities/models/components/moe/load_balancing.py) | Sign-based expert bias update rule | `.../moe_utils.py::get_updated_expert_bias` |
+| [experts.py](../../src/modalities/models/components/moe/experts.py), [nemotron_mlp.py](../../src/modalities/models/nemotron/nemotron_mlp.py) | Squared ReLU activation | `megatron/core/activations.py` |
+
+**state-spaces/mamba** — Copyright (c) 2024, Tri Dao, Albert Gu, Apache License 2.0.
+
+| File | What was adapted | Upstream |
+|------|------------------|----------|
+| [ssd.py](../../src/modalities/models/components/mamba2/ssd.py) | Chunk-parallel SSD block decomposition (`ssd_minimal_discrete` / `segsum`); `GatedRMSNorm` semantics | `ssd_minimal_discrete`, `mamba_ssm.ops.triton.layernorm_gated.rmsnorm_fn` |
+
+**Meta TorchTitan** — BSD 3-Clause License. (Modalities already adapts from TorchTitan elsewhere.)
+
+| File | What was adapted | Upstream |
+|------|------------------|----------|
+| [experts.py](../../src/modalities/models/components/moe/experts.py) | Stacked per-expert weight layout; `torch._grouped_mm` over expert-sorted tokens | `torchtitan/models/common/moe.py::GroupedExperts` |
+| [moe.py](../../src/modalities/models/components/moe/moe.py) | Dispatch/combine structure; expert-bias and token-count buffers | `.../moe.py::MoE` |
+| [router.py](../../src/modalities/models/components/moe/router.py) | Router interface shape | `.../moe.py::TokenChoiceTopKRouter` |
+| [load_balancing.py](../../src/modalities/models/components/moe/load_balancing.py) | Applying the bias update as an optimizer step pre-hook | `.../moe.py` |
+| [nemotron_stages_generator.py](../../src/modalities/models/nemotron/nemotron_stages_generator.py) | Pipeline split-point structure (via Modalities' own `StagesGenerator`) | TorchTitan pipeline utilities |
+
+**Meta Llama** — [facebookresearch/llama](https://github.com/facebookresearch/llama).
+
+| File | What was adapted | Upstream |
+|------|------------------|----------|
+| [nemotron_attention.py](../../src/modalities/models/nemotron/nemotron_attention.py) | Grouped-query key/value head repetition (`_repeat_kv`), via Modalities' own GPT-2 | `llama/model.py` |
+
+**NVIDIA Megatron-Bridge** — Copyright (c) 2026, NVIDIA CORPORATION, Apache License 2.0.
+The hyperparameter values in
+[config_nemotron3_nano_30b_a3b_fsdp2.yaml](../../config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml)
+and the two Nemotron test configs are adopted from
+`src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py` and cross-checked against the model
+report. No code was taken from Megatron-Bridge; it served as the configuration reference, and
+`src/megatron/bridge/models/nemotronh/nemotron_h_bridge.py` documents the HF parameter mapping that
+guided the module naming.
+
+Files with **no** third-party derivation (written for Modalities, structured after its existing
+GPT-2 components): `norms.py`, `nemotron_model_factory.py`, `nemotron_mfu.py`, and the
+partitioning algorithm in `nemotron_stages_generator.py`.

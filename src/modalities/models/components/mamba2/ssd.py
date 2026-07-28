@@ -1,3 +1,9 @@
+# Portions of this file are adapted from the Mamba-2 reference implementation in
+# state-spaces/mamba (https://github.com/state-spaces/mamba): the chunk-parallel SSD block
+# decomposition follows `ssd_minimal_discrete` / `segsum`, and GatedRMSNorm reproduces the
+# semantics of `mamba_ssm.ops.triton.layernorm_gated.rmsnorm_fn` with norm_before_gate=False.
+# Copyright (c) 2024, Tri Dao, Albert Gu. Licensed under the Apache License, Version 2.0.
+
 """Pure-PyTorch Mamba-2 primitives (state space dual / SSD).
 
 This module provides a dependency-free, CPU-runnable and ``torch.compile``-friendly

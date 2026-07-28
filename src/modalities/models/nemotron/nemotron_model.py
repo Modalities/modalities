@@ -1,3 +1,11 @@
+# The hybrid model structure (embedding, pattern-driven layer stack, final norm, LM head) is
+# adapted from NVIDIA's Megatron-LM (megatron/core/models/hybrid/hybrid_model.py::HybridModel and
+# megatron/core/models/hybrid/hybrid_block.py::HybridStack).
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+#
+# The module tree deliberately mirrors modalities/models/gpt2/gpt2_model.py::GPT2LLM so that the
+# existing FSDP / activation-checkpointing / pipeline components apply unchanged.
+
 """Nemotron-style hybrid Mamba-Transformer language model.
 
 The architecture (Nemotron-3 Nano 30B-A3B, arXiv:2512.20848) interleaves Mamba-2 mixers,

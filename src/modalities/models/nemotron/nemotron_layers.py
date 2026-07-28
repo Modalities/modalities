@@ -1,3 +1,9 @@
+# The single-operator pre-norm residual layer structure is adapted from NVIDIA's Megatron-LM
+# (megatron/core/ssm/mamba_layer.py::MambaLayer and
+# megatron/core/models/hybrid/hybrid_block.py::HybridStack).
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. Copyright (c) 2024, Tri Dao, Albert Gu.
+# Licensed under the Apache License, Version 2.0.
+
 """The four residual sublayer types of a hybrid Mamba-Transformer stack.
 
 Unlike a classical transformer block, which bundles attention and a feed-forward network, every

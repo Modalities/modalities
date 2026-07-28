@@ -1,3 +1,7 @@
+# Hyperparameters are a scaled-down derivative of the Nemotron-3 Nano 30B-A3B architecture
+# (arXiv:2512.20848), cross-checked against the Megatron-Bridge recipe
+# `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`, Copyright (c) 2026,
+# NVIDIA CORPORATION, licensed under the Apache License, Version 2.0.
 # Minimal Nemotron hybrid Mamba-Transformer config for distributed FSDP2 tests.
 # Exercises all four layer types (Mamba-2, MoE, attention, dense MLP) at a size that fits
 # comfortably on two GPUs.

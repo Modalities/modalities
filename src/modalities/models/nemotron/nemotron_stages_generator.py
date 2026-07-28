@@ -1,3 +1,7 @@
+# Some portions of this implementation are inspired, adapted, or refactored
+# from Meta's open-source project TorchTitan,
+# licensed under the BSD 3-Clause License.
+
 """Pipeline stage generation for the Nemotron hybrid model.
 
 The GPT2 stages generator assumes every layer costs the same. That is a poor assumption for a hybrid

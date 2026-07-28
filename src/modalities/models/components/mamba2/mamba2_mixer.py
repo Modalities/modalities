@@ -1,3 +1,9 @@
+# Portions of this file are adapted from NVIDIA's Megatron-LM
+# (megatron/core/ssm/mamba_mixer.py): the packed [z, x, B, C, dt] input-projection layout, the
+# conv1d / A_log / D / dt_bias parameter shapes, and their initialization distributions.
+# Copyright (c) 2024, NVIDIA CORPORATION. Copyright (c) 2024, Tri Dao, Albert Gu.
+# Licensed under the Apache License, Version 2.0.
+
 """Mamba-2 mixer, the sequence-mixing operator of hybrid Mamba-Transformer models.
 
 The layout follows the Megatron-LM reference implementation

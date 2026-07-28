@@ -1,3 +1,12 @@
+# Portions of this file are adapted from NVIDIA's Megatron-LM
+# (megatron/core/transformer/moe/moe_utils.py::switch_load_balancing_loss_func): the
+# load-balancing loss formula E * sum_i(f_i * P_i) and its sequence-level variant.
+# Copyright (c) 2025, NVIDIA CORPORATION. Licensed under the Apache License, Version 2.0.
+#
+# The dispatch/combine structure and the expert-bias / token-count buffers are inspired by Meta's
+# open-source project TorchTitan (torchtitan/models/common/moe.py::MoE), licensed under the
+# BSD 3-Clause License.
+
 """Mixture-of-experts feed-forward layer.
 
 The layer combines a :class:`TopKRouter`, a :class:`GroupedExperts` stack and an optional always-on

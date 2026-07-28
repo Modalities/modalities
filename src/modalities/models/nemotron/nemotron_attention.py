@@ -1,3 +1,7 @@
+# The grouped-query key/value head repetition follows Meta's Llama implementation
+# (https://github.com/facebookresearch/llama), as already adapted in
+# modalities/models/gpt2/gpt2_model.py::CausalSelfAttention._repeat_kv.
+
 """Grouped-query causal self-attention with a head dimension decoupled from the model dimension.
 
 This cannot reuse the GPT2 attention module: GPT2 derives the head dimension as
