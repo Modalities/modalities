@@ -346,3 +346,47 @@ def test_full_config_layer_specs_validate():
 
     attention_spec = NemotronAttentionLayerSpec(**{**config["layer_specs"]["*"]["config"], "norm_config": norm_config})
     assert attention_spec.config.n_head_q // attention_spec.config.n_head_kv == 16
+
+
+def test_mfu_calculator_derives_active_params_when_omitted(monkeypatch):
+    # Hardcoding num_active_params in a config silently goes stale when the layer pattern or the
+    # expert count changes, so omitting it must derive the value from the model. The GPU peak
+    # performance lookup is stubbed out: it needs an FSDP-wrapped model, which is unrelated to the
+    # derivation being tested here (the wrapped path is covered by the 4-GPU config run).
+    monkeypatch.setattr(
+        "modalities.utils.mfu.MFUCalculatorABC._get_theoretical_gpu_peak_performance",
+        staticmethod(lambda model_parts, world_size: 1.0),
+    )
+    model = _make_model(layer_pattern="ME*-", n_layer=4)
+    expected = NemotronMFUCalculator.count_active_parameters(model)
+
+    common = dict(layer_pattern="ME*-", sequence_length=32, n_embd=model.n_embd, n_head_q=4, head_dim=16)
+    explicit = NemotronMFUCalculator(**common, num_active_params=expected, world_size=1, model_parts=model)
+    derived = NemotronMFUCalculator(**common, world_size=1, model_parts=model)
+    assert derived._theoretical_flops_per_token == explicit._theoretical_flops_per_token
+    # And the derived value really is the sparse one, not the total parameter count.
+    assert expected < sum(p.numel() for p in model.parameters())
+
+
+def test_mfu_calculator_rejects_deriving_active_params_from_pipeline_stages():
+    # Each stage holds only a subset of the layers, so summing per-stage counts would be wrong.
+    model = _make_model(layer_pattern="ME", n_layer=2)
+    with pytest.raises(ValueError, match="list of pipeline stages"):
+        NemotronMFUCalculator.count_active_parameters([model, model])
+    with pytest.raises(ValueError, match="no model was provided"):
+        NemotronMFUCalculator.count_active_parameters(None)
+
+
+def test_mfu_calculator_config_allows_omitting_active_params():
+    from modalities.utils.nemotron_mfu import NemotronMFUCalculatorConfig
+
+    config = NemotronMFUCalculatorConfig(
+        layer_pattern="ME",
+        sequence_length=32,
+        n_embd=128,
+        n_head_q=4,
+        head_dim=16,
+        world_size=1,
+        model_parts=_make_model(layer_pattern="ME", n_layer=2),
+    )
+    assert config.num_active_params is None

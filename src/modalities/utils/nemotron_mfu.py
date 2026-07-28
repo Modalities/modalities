@@ -34,8 +34,9 @@ class NemotronMFUCalculatorConfig(BaseModel):
         n_embd (int): Model dimension.
         n_head_q (int): Number of query heads of the attention layers.
         head_dim (int): Head dimension of the attention layers.
-        num_active_params (int): Number of parameters visited per token. See
-            :meth:`NemotronMFUCalculator.count_active_parameters`.
+        num_active_params (int | None): Number of parameters visited per token. Derived from
+            ``model_parts`` when omitted, which is what you normally want: hardcoding it in a config
+            silently goes stale as soon as the layer pattern or expert count changes.
         world_size (int): Number of ranks.
         model_parts (nn.Module | list[nn.Module]): The wrapped model (or pipeline stages).
         device_mesh (DeviceMesh | None): The device mesh, if any.
@@ -46,7 +47,7 @@ class NemotronMFUCalculatorConfig(BaseModel):
     n_embd: Annotated[int, Field(strict=True, ge=1)]
     n_head_q: Annotated[int, Field(strict=True, ge=1)]
     head_dim: Annotated[int, Field(strict=True, ge=1)]
-    num_active_params: Annotated[int, Field(strict=True, ge=1)]
+    num_active_params: Optional[Annotated[int, Field(strict=True, ge=1)]] = None
     world_size: Annotated[int, Field(strict=True, ge=1)]
     model_parts: PydanticPytorchModuleOrListType
     device_mesh: Optional[object] = None
@@ -65,9 +66,9 @@ class NemotronMFUCalculator(MFUCalculatorABC):
         n_embd: int,
         n_head_q: int,
         head_dim: int,
-        num_active_params: int,
-        world_size: int,
-        model_parts: torch.nn.Module | list[torch.nn.Module],
+        num_active_params: Optional[int] = None,
+        world_size: int = 1,
+        model_parts: torch.nn.Module | list[torch.nn.Module] = None,
         device_mesh: Optional[object] = None,
     ):
         """
@@ -79,12 +80,17 @@ class NemotronMFUCalculator(MFUCalculatorABC):
             n_embd (int): Model dimension.
             n_head_q (int): Number of query heads of the attention layers.
             head_dim (int): Head dimension of the attention layers.
-            num_active_params (int): Number of parameters visited per token.
+            num_active_params (int | None): Number of parameters visited per token. Derived from
+                ``model_parts`` when omitted.
             world_size (int): Number of ranks.
             model_parts (nn.Module | list[nn.Module]): The wrapped model or pipeline stages.
             device_mesh (DeviceMesh | None): The device mesh, if any.
+
+        Raises:
+            ValueError: If ``num_active_params`` is omitted and cannot be derived.
         """
-        del device_mesh  # only needed by the parameter-counting calculators
+        if num_active_params is None:
+            num_active_params = NemotronMFUCalculator.count_active_parameters(model_parts)
         self._sequence_length = sequence_length
         self._num_attention_layers = count_layers_by_type(layer_pattern)[LayerSymbol.ATTENTION]
         self._theoretical_flops_per_token = NemotronMFUCalculator._get_theoretical_flops_per_token(
@@ -97,7 +103,7 @@ class NemotronMFUCalculator(MFUCalculatorABC):
         self._theoretical_gpu_peak_performance = MFUCalculatorABC._get_theoretical_gpu_peak_performance(
             model_parts, world_size
         )
-        del n_embd  # part of the public config for symmetry with the GPT2 calculator
+        del n_embd, device_mesh  # part of the public config for symmetry with the GPT2 calculator
 
     @staticmethod
     def _get_theoretical_flops_per_token(
@@ -138,15 +144,30 @@ class NemotronMFUCalculator(MFUCalculatorABC):
         ``num_experts`` are evaluated per token, so their contribution is scaled accordingly. The
         router, the shared experts and all dense layers are always active.
 
+        Works on plain and FSDP2-wrapped models: ``numel()`` on a ``DTensor`` reports the unsharded
+        size, so the result is the global count regardless of sharding.
+
         Args:
-            model (nn.Module): The (unwrapped) model.
+            model (nn.Module | list[nn.Module]): The model. A list of pipeline stages is rejected,
+                because summing per-stage counts would not give the whole model's active parameters.
+
+        Raises:
+            ValueError: If ``model`` is None or a list of pipeline stages.
 
         Returns:
             int: The number of active parameters.
         """
         from modalities.models.components.moe.moe import MoE
 
-        total = sum(p.numel() for p in model.parameters())
+        if model is None:
+            raise ValueError("num_active_params was omitted but no model was provided to derive it from.")
+        if isinstance(model, list):
+            raise ValueError(
+                "Cannot derive num_active_params from a list of pipeline stages, since each stage holds "
+                "only a subset of the layers. Pass num_active_params explicitly."
+            )
+
+        total = sum(p.numel() for p in model.parameters() if p.requires_grad)
         for module in model.modules():
             if not isinstance(module, MoE):
                 continue

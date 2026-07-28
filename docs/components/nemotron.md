@@ -4,8 +4,17 @@ Modalities supports hybrid Mamba-Transformer architectures with sparse mixture-o
 layers, as introduced by NVIDIA's Nemotron-H and Nemotron-3 Nano families. The reference target is
 **Nemotron-3 Nano 30B-A3B** ([arXiv:2512.20848](https://arxiv.org/abs/2512.20848)).
 
-A ready-to-run pretraining configuration is at
-[config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml](../../config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml).
+Two ready-to-run configurations are provided:
+
+| Config | Scale | Verified on |
+|--------|-------|-------------|
+| [config_nemotron3_nano_30b_a3b_fsdp2.yaml](../../config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml) | Full 52-layer 30B-A3B | Not run (needs tensor/expert parallelism for real throughput) |
+| [config_lorem_ipsum_nemotron_nano_fsdp2.yaml](../../config_files/training/config_lorem_ipsum_nemotron_nano_fsdp2.yaml) | Full width, 16 layers, 9.67B params | 4x A100-SXM4-80GB, 162 steps, 46.1 GiB peak per GPU |
+
+The lorem-ipsum config keeps every width hyperparameter of the real model (dimension 2688, 128
+experts, 64 Mamba heads, 32/2 attention heads) and only trims the depth, so it exercises the real
+architecture end to end. Shorten `layer_pattern` to `"MEMEM*EME"` with `n_layer: 9` for 40GB cards
+(5.64B parameters, 28.9 GiB peak per GPU).
 
 ## Architecture
 
