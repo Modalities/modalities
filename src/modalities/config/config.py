@@ -170,6 +170,19 @@ class AdamWOptimizerConfig(BaseModel):
     fused: bool | None = None
 
 
+class MuonOptimizerConfig(BaseModel):
+    lr: float
+    weight_decay: float
+    momentum: float = 0.95
+    nesterov: bool = True
+    ns_coefficients: tuple[float, float, float] = (3.4445, -4.775, 2.0315)
+    eps: float = 1e-07
+    ns_steps: int = Field(default=5)
+    adjust_lr_fn: str | None = None
+    weight_decay_groups_excluded: list[str]
+    wrapped_model: PydanticPytorchModuleOrListType
+
+
 class DummyLRSchedulerConfig(BaseModel):
     optimizer: PydanticOptimizerIFType
 
