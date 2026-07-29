@@ -1,0 +1,165 @@
+# Hyperparameters are a scaled-down derivative of the Nemotron-3 Nano 30B-A3B architecture
+# (arXiv:2512.20848), cross-checked against the Megatron-Bridge recipe
+# `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`, Copyright (c) 2026,
+# NVIDIA CORPORATION, licensed under the Apache License, Version 2.0.
+# Minimal Nemotron hybrid Mamba-Transformer config for distributed FSDP2 tests.
+# Exercises all four layer types (Mamba-2, MoE, attention, dense MLP) at a size that fits
+# comfortably on two GPUs.
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    world_size: ${cuda_env:WORLD_SIZE}
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: nemotron
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: activation_checkpointed_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: FP_32
+    block_names: [Mamba2Layer, NemotronMoELayer, NemotronAttentionLayer, NemotronMLPLayer]
+
+activation_checkpointed_model:
+  component_key: model
+  variant_key: activation_checkpointed
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    ac_variant: full_activation_checkpointing
+    layers_fqn: transformer.h
+    ac_fun_params: {}
+
+model_raw:
+  component_key: model
+  variant_key: nemotron
+  config:
+    use_meta_device: true
+    sample_key: input_ids
+    prediction_key: logits
+    aux_loss_key: moe_aux_loss
+    sequence_length: 128
+    vocab_size: 512
+    n_embd: 256
+    n_layer: 8
+    layer_pattern: "MEMEM*E-"
+    use_weight_tying: false
+    lm_head_norm_config: &nemotron_norm_config
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    layer_specs:
+      "M":
+        component_key: nemotron_layer_spec
+        variant_key: mamba2
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          mamba_n_heads: 8
+          mamba_head_dim: 32
+          mamba_state_dim: 16
+          mamba_n_groups: 2
+          d_conv: 4
+          chunk_size: 32
+          ssd_backend: native
+          norm_config: *nemotron_norm_config
+      "E":
+        component_key: nemotron_layer_spec
+        variant_key: moe
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          num_experts: 8
+          moe_ffn_hidden: 64
+          top_k: 2
+          route_scale: 2.5
+          score_function: sigmoid
+          use_expert_bias: true
+          num_shared_experts: 2
+          aux_loss_coeff: 1.0e-4
+          experts_backend: grouped_mm
+          norm_config: *nemotron_norm_config
+      "*":
+        component_key: nemotron_layer_spec
+        variant_key: attention
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head_q: 8
+          n_head_kv: 2
+          head_dim: 32
+          attention_implementation: pytorch_flash
+          norm_config: *nemotron_norm_config
+      "-":
+        component_key: nemotron_layer_spec
+        variant_key: mlp
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          ffn_hidden: 128
+          norm_config: *nemotron_norm_config
+
+loss_fn:
+  component_key: loss
+  variant_key: weighted_sum
+  config:
+    weights: [1.0, 1.0]
+    losses:
+      - component_key: loss
+        variant_key: clm_cross_entropy_loss
+        config:
+          target_key: target_ids
+          prediction_key: logits
+      - component_key: loss
+        variant_key: moe_aux_loss
+        config:
+          prediction_key: moe_aux_loss
+
+optimizer:
+  component_key: optimizer
+  variant_key: moe_load_balanced
+  config:
+    expert_bias_update_rate: 1.0e-3
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    optimizer:
+      component_key: optimizer
+      variant_key: adam_w
+      config:
+        lr: 1.0e-4
+        betas: [0.9, 0.95]
+        eps: 1e-8
+        weight_decay: 0.1
+        weight_decay_groups_excluded: [embedding, layernorm, ssm, router]
+        wrapped_model:
+          instance_key: initialized_model
+          pass_type: BY_REFERENCE

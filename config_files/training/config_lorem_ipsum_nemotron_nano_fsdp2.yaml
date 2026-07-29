@@ -1,0 +1,476 @@
+# Nemotron-3 Nano lorem-ipsum training config for 4x A100 80GB.
+#
+# This keeps the *full width* of Nemotron-3 Nano 30B-A3B (arXiv:2512.20848) - model dimension 2688,
+# 64 Mamba-2 heads of dim 64, 128 routed experts of dim 1856 with top-6 routing and 2 shared
+# experts, 32 query / 2 KV attention heads of head dim 128 - and only cuts the depth from 52 to 16
+# layers so that it fits on four GPUs. The layer pattern is the first 16 characters of the published
+# pattern, which preserves the Mamba / MoE / attention interleaving and ratio (7 : 7 : 2 here versus
+# 23 : 23 : 6 in the full model).
+#
+# Hyperparameter values are adopted from the Megatron-Bridge recipe
+# `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`, Copyright (c) 2026,
+# NVIDIA CORPORATION, licensed under the Apache License, Version 2.0.
+#
+# Size and memory, measured on 4x A100-SXM4-80GB (FSDP2 full shard, AdamW, seq 512, micro batch 1):
+#
+#   layers  pattern             parameters   active/token   peak allocated / GPU
+#   16      MEMEM*EMEMEM*EME    9.67B        0.77B          46.1 GiB
+#    9      MEMEM*EME           5.64B        0.53B          28.9 GiB
+#
+# This file uses the 16-layer variant. For 40GB cards, set `n_layer: 9` and
+# `layer_pattern: "MEMEM*EME"`. Every MoE layer costs ~1.30B parameters, a Mamba layer ~39M and an
+# attention layer ~23M, so the depth/memory trade-off is driven almost entirely by the `E` count.
+#
+# Persistent state is 16 bytes per parameter (fp32 shard + fp32 grad + two fp32 Adam moments)
+# divided across the 4 ranks; the remainder of the peak is the unsharded bf16 all-gather of the
+# largest FSDP unit (one ~1.3B-parameter MoE layer, ~2.4 GiB) plus prefetch and activations.
+#
+# Run with:
+#   torchrun --nnodes 1 --nproc_per_node 4 --rdzv-endpoint=0.0.0.0:29555 \
+#     $(which modalities) run \
+#     --config_file_path config_files/training/config_lorem_ipsum_nemotron_nano_fsdp2.yaml \
+#     --experiments_root_path data/experiments
+#
+# NOTE ON THROUGHPUT: `ssd_backend: native` is the dependency-free pure-PyTorch state space scan.
+# It is correct but slow. Install the optional extra (`pip install -e '.[mamba]'`) and switch to
+# `ssd_backend: fused` for anything beyond a smoke test.
+
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpoint_saving_path: data/checkpoints
+    train_dataset_path: ./data/lorem_ipsum_long.pbin
+    test_dataset_path: ./data/lorem_ipsum.pbin
+    experiments_root_path: ${modalities_env:experiments_root_path}
+  intervals:
+    training_log_interval_in_steps: 1
+    # A DCP checkpoint of this model is ~109 GiB (9.67B parameters plus fp32 Adam state, written by
+    # all 4 ranks), so checkpoint once near the end rather than every 16 steps - the latter would
+    # write over 1 TB across a 162-step run. Raise the frequency only if you have the disk for it.
+    checkpointing_interval_in_steps: 160
+    evaluation_interval_in_steps: 16
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: false
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile:
+    gradient_accumulation_steps: 1
+    local_train_micro_batch_size: 1
+    # 512 with a Mamba chunk size of 128 gives four scan chunks, so the inter-chunk state passing
+    # is actually exercised rather than degenerating to a single chunk.
+    sequence_length: 512
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
+  training_target:
+    num_target_tokens:
+      component_key: number_conversion
+      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+      config:
+        dataset_path: ${settings.paths.train_dataset_path}
+        sequence_length: ${settings.step_profile.sequence_length}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+    num_target_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training_target.num_target_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  training_progress:
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    num_seen_samples: 0
+    last_step: -1
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.train_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: resumable_distributed_sampler
+          config:
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.test_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: test
+    dataset:
+      instance_key: test_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            drop_last: true
+            dataset:
+              instance_key: test_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: test_dataloader
+    pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        # -1 keeps every checkpoint, as in config_lorem_ipsum_long_fsdp2.yaml. Since only one
+        # checkpoint is written here (see checkpointing_interval_in_steps), rotation never kicks in.
+        # Setting a positive k does work - checkpoint rotation with the `dcp` execution is fixed -
+        # but each checkpoint of this model is ~109 GiB, so prefer a coarse interval over rotation.
+        k: -1
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: dcp
+      config:
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+# Language modelling loss plus the MoE load-balancing penalty. The penalty is computed inside each
+# MoE layer (coefficient 1e-4, per the model report) and summed by the model into `moe_aux_loss`.
+# The *primary* balancing mechanism is the auxiliary-loss-free expert bias; see the optimizer.
+loss_fn:
+  component_key: loss
+  variant_key: weighted_sum
+  config:
+    weights: [1.0, 1.0]
+    losses:
+      - component_key: loss
+        variant_key: clm_cross_entropy_loss
+        config:
+          target_key: ${settings.referencing_keys.target_key}
+          prediction_key: ${settings.referencing_keys.prediction_key}
+      - component_key: loss
+        variant_key: moe_aux_loss
+        config:
+          prediction_key: moe_aux_loss
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: nemotron
+        weight_init_type: scaled
+        mean: 0.0
+        # "auto" resolves to sqrt(2 / (5 * n_embd)) = 0.0172, which is what the reference recipe
+        # uses as init_method_std for this width.
+        std: auto
+        hidden_dim: ${model_raw.config.n_embd}
+        num_layers: ${model_raw.config.n_layer}
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: activation_checkpointed_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: FP_32
+    # One FSDP unit per layer, so only a single ~1.3B-parameter MoE block is unsharded at a time.
+    layers_per_fsdp_unit: 1
+    block_names: [Mamba2Layer, NemotronMoELayer, NemotronAttentionLayer, NemotronMLPLayer]
+
+activation_checkpointed_model:
+  component_key: model
+  variant_key: activation_checkpointed
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    ac_variant: full_activation_checkpointing
+    layers_fqn: transformer.h
+    ac_fun_params: {}
+
+model_raw:
+  component_key: model
+  variant_key: nemotron
+  config:
+    use_meta_device: true
+    sample_key: ${settings.referencing_keys.sample_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    aux_loss_key: moe_aux_loss
+    sequence_length: ${settings.step_profile.sequence_length}
+    # GPT-2 vocab of 50257, padded to a multiple of 128 (the lorem ipsum data is GPT-2 tokenized).
+    vocab_size: 50304
+    n_embd: 2688
+    # Full Nemotron-3 Nano is 52 layers; trimmed to 16 to fit four GPUs. Keep this in sync with
+    # the length of layer_pattern - the model validates it.
+    n_layer: 16
+    layer_pattern: "MEMEM*EMEMEM*EME"
+    use_weight_tying: false
+    lm_head_norm_config: &nemotron_norm_config
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    layer_specs:
+      "M":
+        component_key: nemotron_layer_spec
+        variant_key: mamba2
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          mamba_n_heads: 64
+          mamba_head_dim: 64
+          mamba_state_dim: 128
+          mamba_n_groups: 8
+          d_conv: 4
+          chunk_size: 128
+          ssd_backend: native   # switch to `fused` once mamba-ssm / causal-conv1d are installed
+          norm_config: *nemotron_norm_config
+      "E":
+        component_key: nemotron_layer_spec
+        variant_key: moe
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          num_experts: 128
+          moe_ffn_hidden: 1856
+          top_k: 6
+          route_scale: 2.5
+          score_function: sigmoid
+          use_expert_bias: true
+          router_dtype: float32
+          num_shared_experts: 2
+          shared_expert_ffn_hidden_per_expert: 1856   # -> one fused MLP of 3712 hidden units
+          aux_loss_coeff: 1.0e-4
+          experts_backend: grouped_mm
+          norm_config: *nemotron_norm_config
+      "*":
+        component_key: nemotron_layer_spec
+        variant_key: attention
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head_q: 32
+          n_head_kv: 2
+          head_dim: 128
+          attention_implementation: pytorch_flash
+          norm_config: *nemotron_norm_config
+
+lr_scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 4.5e-4
+    div_factor: 10
+    final_div_factor: 1
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.1
+    anneal_strategy: cos
+    last_epoch: ${settings.training_progress.last_step}
+
+# The `moe_load_balanced` decorator adds the auxiliary-loss-free expert bias update as an optimizer
+# step pre-hook. Pinning it to the optimizer step (rather than the forward pass) is what makes it
+# correct under gradient accumulation: token counts accumulate over micro-batches and are reduced
+# across data-parallel ranks exactly once per step.
+optimizer:
+  component_key: optimizer
+  variant_key: moe_load_balanced
+  config:
+    expert_bias_update_rate: 1.0e-3
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    optimizer:
+      component_key: optimizer
+      variant_key: adam_w
+      config:
+        lr: 4.5e-4
+        betas: [0.9, 0.95]
+        eps: 1e-8
+        weight_decay: 0.1
+        # The state space parameters (A_log, D, dt_bias, conv1d) parameterize the SSM dynamics and
+        # the router gate decides expert assignment; decaying either destabilizes training.
+        weight_decay_groups_excluded: [embedding, layernorm, ssm, router]
+        wrapped_model:
+          instance_key: initialized_model
+          pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp2
+  config:
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+
+progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: modalities_nemotron_tests
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: wandb_storage
+    config_file_path: ${settings.config_file_path}
+
+# num_active_params is derived from the model, so it stays correct if the layer pattern changes.
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: nemotron
+  config:
+    layer_pattern: ${model_raw.config.layer_pattern}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    n_head_q: 32
+    head_dim: 128
+    world_size: ${settings.cuda_env.world_size}
+    model_parts:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE

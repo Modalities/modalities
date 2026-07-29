@@ -52,6 +52,7 @@ from modalities.config.config import (
     LinearWarmupCosineAnnealingLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MoELoadBalancedOptimizerConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -92,11 +93,31 @@ from modalities.models.components.layer_norms import (
     RMSLayerNorm,
     RMSLayerNormConfig,
 )
+from modalities.models.components.moe.load_balancing import MoEBalancing
+from modalities.models.components.moe.moe_losses import (
+    MoEAuxLoss,
+    MoEAuxLossConfig,
+    WeightedSumLoss,
+    WeightedSumLossConfig,
+)
 from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.gpt2.llama3_like_initialization import Llama3Initializer, Llama3InitializerConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
 from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
+from modalities.models.nemotron.nemotron_layer_specs import (
+    Mamba2LayerSpec,
+    Mamba2LayerSpecConfig,
+    NemotronAttentionLayerSpec,
+    NemotronAttentionLayerSpecConfig,
+    NemotronMLPLayerSpec,
+    NemotronMLPLayerSpecConfig,
+    NemotronMoELayerSpec,
+    NemotronMoELayerSpecConfig,
+)
+from modalities.models.nemotron.nemotron_model import NemotronLLMConfig
+from modalities.models.nemotron.nemotron_model_factory import NemotronModelFactory
+from modalities.models.nemotron.nemotron_stages_generator import NemotronStagesGenerator, NemotronStagesGeneratorConfig
 from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
 from modalities.models.parallelism.pipeline_parallelism_configs import (
     ComponentSelectorFromPipelineConfig,
@@ -132,6 +153,7 @@ from modalities.utils.debug_components import Debugging, HookRegistration
 from modalities.utils.debugging_configs import DebuggingConfig, NaNHookConfig, PrintForwardHookConfig
 from modalities.utils.maybe_list_parameter import MaybeListDecorator, maybe_list_parameter
 from modalities.utils.mfu import GPT2MFUCalculator
+from modalities.utils.nemotron_mfu import NemotronMFUCalculator, NemotronMFUCalculatorConfig
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
@@ -221,6 +243,14 @@ COMPONENTS = [
     ),
     ComponentEntity("model", "compiled", maybe_model_list(ModelFactory.get_compiled_model), CompiledModelConfig),
     ComponentEntity("model", "coca", CoCa, CoCaConfig),
+    # Nemotron hybrid Mamba-Transformer
+    ComponentEntity("model", "nemotron", NemotronModelFactory.get_nemotron_model, NemotronLLMConfig),
+    # Nemotron layer specs. These are builders, not modules: the model calls build() once per
+    # layer position so that every layer gets its own parameters (see nemotron_layer_specs.py).
+    ComponentEntity("nemotron_layer_spec", "mamba2", Mamba2LayerSpec, Mamba2LayerSpecConfig),
+    ComponentEntity("nemotron_layer_spec", "attention", NemotronAttentionLayerSpec, NemotronAttentionLayerSpecConfig),
+    ComponentEntity("nemotron_layer_spec", "moe", NemotronMoELayerSpec, NemotronMoELayerSpecConfig),
+    ComponentEntity("nemotron_layer_spec", "mlp", NemotronMLPLayerSpec, NemotronMLPLayerSpecConfig),
     ComponentEntity(
         "model",
         "debugging_enriched",
@@ -233,6 +263,9 @@ COMPONENTS = [
     ComponentEntity("pipeline", "builder", PipelineFactory.get_pipeline, PipelineConfig),
     # Pipeline Stages Generators
     ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
+    ComponentEntity(
+        "stages_generator", "nemotron_stages_generator", NemotronStagesGenerator, NemotronStagesGeneratorConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     ComponentEntity("number_conversion", "parallel_degree", get_parallel_degree, ParallelDegreeConfig),
@@ -251,6 +284,8 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity("loss", "moe_aux_loss", MoEAuxLoss, MoEAuxLossConfig),
+    ComponentEntity("loss", "weighted_sum", WeightedSumLoss, WeightedSumLossConfig),
     # optimizers
     ComponentEntity(
         "optimizer", "adam", maybe_model_list_for_optimizer(OptimizerFactory.get_adam), AdamOptimizerConfig
@@ -263,6 +298,13 @@ COMPONENTS = [
         "fsdp1_checkpointed",
         OptimizerFactory.get_fsdp1_checkpointed_optimizer_,
         FSDP1CheckpointedOptimizerConfig,
+    ),
+    # Optimizer decorator: adds the auxiliary-loss-free MoE load balancing step to any optimizer.
+    ComponentEntity(
+        "optimizer",
+        "moe_load_balanced",
+        MoEBalancing.register_expert_bias_update_hook,
+        MoELoadBalancedOptimizerConfig,
     ),
     # App state
     ComponentEntity("app_state", "raw", AppStateFactory.get_raw_app_state, RawAppStateConfig),
@@ -414,6 +456,7 @@ COMPONENTS = [
     ),
     # MFU calculators
     ComponentEntity("mfu_calculator", "gpt2", GPT2MFUCalculator, GPT2MFUCalculatorConfig),
+    ComponentEntity("mfu_calculator", "nemotron", NemotronMFUCalculator, NemotronMFUCalculatorConfig),
     # Number conversion
     ComponentEntity(
         "number_conversion",

@@ -42,6 +42,15 @@ build-backend = "setuptools.build_meta"
 linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
 
+# Fused Mamba-2 kernels. Optional: the hybrid Mamba-Transformer models ship a pure-PyTorch
+# state space scan (ssd_backend="native") that runs everywhere. Install this extra and set
+# ssd_backend="fused" for large-scale training, where the Triton kernels are substantially
+# faster and use less activation memory. Requires a CUDA toolchain to build.
+mamba = [
+  "mamba-ssm>=2.2.0; platform_system != 'Darwin'",
+  "causal-conv1d>=1.4.0; platform_system != 'Darwin'",
+]
+
 cpu = ["torch>=2.10,<2.11.0", "torchvision"]
 cu126 = [
   "torch>=2.10,<2.11.0",

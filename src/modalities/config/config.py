@@ -388,6 +388,27 @@ class ActivationCheckpointedModelConfig(BaseModel):
     ac_fun_params: FullACParams | SelectiveLayerACParams | SelectiveOpACParams
 
 
+class MoELoadBalancedOptimizerConfig(BaseModel):
+    """Configuration of the auxiliary-loss-free MoE load balancing optimizer decorator.
+
+    Attributes:
+        optimizer (Optimizer): The optimizer to decorate.
+        model (nn.Module): The model whose MoE layers should be balanced.
+        expert_bias_update_rate (float): Step size of the per-expert bias update. Nemotron-3 Nano
+            uses 1e-3.
+        device_mesh (DeviceMesh | None): Device mesh used to resolve the reduction group for the
+            expert token counts.
+    """
+
+    optimizer: PydanticOptimizerIFType
+    model: PydanticPytorchModuleType
+    expert_bias_update_rate: Annotated[float, Field(strict=True, gt=0.0)]
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
+
+    # avoid the pydantic warning about the protected 'model_' namespace
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class RawAppStateConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     optimizer: PydanticOptimizerIFType

@@ -1,4 +1,5 @@
 import json
+import shutil
 from enum import Enum
 from pathlib import Path
 
@@ -273,10 +274,27 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
             num_target_steps=training_progress.num_target_steps,
             num_target_tokens=training_progress.num_target_tokens,
         )
-        if folder_path_to_delete.exists():
-            # unlink removes the file
-            folder_path_to_delete.rmdir()
-        else:
+        if not folder_path_to_delete.exists():
             raise CheckpointingError(
                 f"Checkpoint folder {folder_path_to_delete} could not be removed. It does not exist!"
             )
+        if not folder_path_to_delete.is_dir():
+            raise CheckpointingError(f"Checkpoint path {folder_path_to_delete} is not a directory and was not removed.")
+        # A distributed checkpoint is a *directory* of per-rank shard files, so it has to be removed
+        # recursively. Path.rmdir() only removes empty directories and therefore always raised
+        # OSError("Directory not empty") here, which broke every rotating checkpoint strategy
+        # (save_k_most_recent_checkpoints_strategy with k >= 1, keep_every_k_steps_...) when combined
+        # with this DCP execution.
+        #
+        # The path is not taken from user input: it is rebuilt from CHECKPOINT_FOLDER_STRUCTURE for a
+        # TrainingProgress that this instance previously saved. The guard below makes that explicit
+        # rather than implicit, so a recursive delete can never escape the configured checkpoint
+        # directory.
+        expected_parent = self.checkpoint_path.resolve()
+        resolved_path = folder_path_to_delete.resolve()
+        if resolved_path.parent != expected_parent:
+            raise CheckpointingError(
+                f"Refusing to delete {resolved_path}: it is not directly inside the configured "
+                f"checkpoint path {expected_parent}."
+            )
+        shutil.rmtree(resolved_path)
