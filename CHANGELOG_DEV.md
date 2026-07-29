@@ -253,7 +253,15 @@ See [docs/components/nemotron.md](docs/components/nemotron.md) for the full guid
   `Mamba2Mixer.reset_parameters` instead, matching the reference distributions.
 * Ready-to-run config: `config_files/training/config_nemotron3_nano_30b_a3b_fsdp2.yaml`.
 
-**Bug fixes (pre-existing, surfaced by the distributed tests for this feature):**
+**Bug fixes (pre-existing, surfaced while building and running this feature):**
+* `DCPCheckpointSaving._delete_checkpoint` removed checkpoints with `Path.rmdir()`, which only works
+  on *empty* directories. A distributed checkpoint is a directory of per-rank shard files, so
+  deleting one always raised `OSError("Directory not empty")`. Every rotating checkpoint strategy
+  (`save_k_most_recent_checkpoints_strategy` with `k >= 1`,
+  `keep_every_k_steps_and_m_most_recent_checkpointing_strategy`) was therefore broken when combined
+  with the `dcp` execution: training crashed at the first rotation. Deletion is now recursive, and
+  guarded so that it can only ever remove a directory located directly inside the configured
+  checkpoint path.
 * `NamedParameterwiseNormalInitialization` only stripped torch.compile's `_orig_mod.` prefix from
   parameter names before matching the initialization filters. Activation checkpointing and FSDP1
   insert their own segments (`_checkpoint_wrapped_module.`, `_fsdp_wrapped_module.`), so any config

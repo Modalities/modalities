@@ -200,10 +200,10 @@ checkpoint_saving:
       component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
-        # -1 keeps every checkpoint, as in config_lorem_ipsum_long_fsdp2.yaml. Do not set this to a
-        # positive value with the `dcp` execution: DCPCheckpointSaving._delete_checkpoint uses
-        # Path.rmdir(), which only removes empty directories, so rotating a DCP checkpoint raises
-        # OSError("Directory not empty"). That is a pre-existing bug, unrelated to this model.
+        # -1 keeps every checkpoint, as in config_lorem_ipsum_long_fsdp2.yaml. Since only one
+        # checkpoint is written here (see checkpointing_interval_in_steps), rotation never kicks in.
+        # Setting a positive k does work - checkpoint rotation with the `dcp` execution is fixed -
+        # but each checkpoint of this model is ~109 GiB, so prefer a coarse interval over rotation.
         k: -1
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution

@@ -152,8 +152,10 @@ def test_reset_parameters_is_a_noop_on_meta_device():
 @pytest.mark.skipif(HAS_FUSED_KERNELS, reason="mamba-ssm and causal-conv1d are installed")
 def test_fused_backend_raises_a_helpful_error_when_kernels_are_missing():
     # Requesting a backend whose dependencies are absent must fail loudly at construction time
-    # rather than silently falling back to a slower path.
-    with pytest.raises(ValueError, match="requires mamba-ssm and causal-conv1d"):
+    # rather than silently falling back to a slower path. The message names only the packages that
+    # are actually missing, so assert on the stable part rather than on a fixed package list -
+    # exactly one of the two extras may be installed.
+    with pytest.raises(ValueError, match=r"ssd_backend='fused' requires .* to be installed"):
         _make_mixer(ssd_backend=SSDBackend.FUSED)
 
 
