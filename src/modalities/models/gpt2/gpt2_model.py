@@ -528,6 +528,10 @@ class GPT2LLMConfig(BaseModel):
         enforce_swiglu_hidden_dim_multiple_of (int): If specified, enforces the hidden dimension
             in the SwiGLU layer to be a multiple of this value. Note that this is only relevant if the
             activation_type is SwiGLU. Defaults to 256.
+        return_hidden_states (bool): If True, forward returns the hidden states after lm_head_norm
+            instead of logits, i.e., the lm_head projection is skipped. Required for
+            ChunkedLMHeadCrossEntropyLoss, which applies the lm_head chunk-wise inside the loss.
+            Defaults to False.
     """
 
     sample_key: str
@@ -553,6 +557,7 @@ class GPT2LLMConfig(BaseModel):
     lm_head_norm_config: LayerNormWrapperConfig
     use_weight_tying: bool
     enforce_swiglu_hidden_dim_multiple_of: int = 256
+    return_hidden_states: bool = False
 
     @model_validator(mode="after")
     def check_divisibility(self) -> "GPT2LLMConfig":
@@ -1019,6 +1024,7 @@ class GPT2LLM(NNModel):
         lm_head_norm_config: LayerNormWrapperConfig,
         use_weight_tying: bool,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
+        return_hidden_states: bool = False,
     ):
         """
         Initializes the GPT2LLM object.
@@ -1046,6 +1052,8 @@ class GPT2LLM(NNModel):
             enforce_swiglu_hidden_dim_multiple_of (int): Enforces
                 the hidden dimension in the SwiGLU layer to be a multiple of this value.
                 Note that this is only relevant if the activation_type is SwiGLU. Defaults to 256.
+            return_hidden_states (bool): If True, forward returns the hidden states after lm_head_norm
+                instead of logits (the lm_head projection is skipped). Defaults to False.
         """
         weight_decay_groups = {
             "linear": [".attn", ".mlp", ".lm_head.weight"],
@@ -1059,6 +1067,7 @@ class GPT2LLM(NNModel):
         self.n_embd = n_embd
         self.n_layer = n_layer
         self.poe_type = poe_type
+        self.return_hidden_states = return_hidden_states
 
         assert vocab_size is not None
         assert sequence_length is not None
@@ -1205,6 +1214,10 @@ class GPT2LLM(NNModel):
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h)
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
+        if self.return_hidden_states:
+            # The lm_head projection is applied chunk-wise inside ChunkedLMHeadCrossEntropyLoss,
+            # so the full [B, L, vocab_size] logits tensor is never materialized.
+            return h
         h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
         return h
 

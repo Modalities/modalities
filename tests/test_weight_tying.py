@@ -97,7 +97,7 @@ def create_gpt2_model(
 
 def create_device_mesh_stub(*mesh_dim_names: str) -> DeviceMesh:
     device_mesh = DeviceMesh.__new__(DeviceMesh)
-    device_mesh.mesh_dim_names = mesh_dim_names
+    device_mesh._mesh_dim_names = mesh_dim_names
     return device_mesh
 
 

@@ -1,8 +1,15 @@
 import pytest
 import torch
+import torch.nn.functional as F
 
 from modalities.batch import InferenceResultBatch
-from modalities.loss_functions import NCELoss, nce_loss
+from modalities.loss_functions import ChunkedCLMCrossEntropyLoss, NCELoss, nce_loss
+
+BATCH_SIZE = 2
+SEQ_LEN = 16
+VOCAB_SIZE = 64
+PREDICTION_KEY = "logits"
+TARGET_KEY = "labels"
 
 
 @pytest.fixture
@@ -14,11 +21,51 @@ def dummy_result_batch() -> InferenceResultBatch:
     return result_batch
 
 
+@pytest.fixture
+def clm_batch() -> InferenceResultBatch:
+    torch.manual_seed(42)
+    logits = torch.randn(BATCH_SIZE, SEQ_LEN, VOCAB_SIZE)
+    labels = torch.randint(0, VOCAB_SIZE, (BATCH_SIZE, SEQ_LEN))
+    return InferenceResultBatch(
+        targets={TARGET_KEY: labels},
+        predictions={PREDICTION_KEY: logits},
+        batch_dim=BATCH_SIZE,
+    )
+
+
 # calculating asymmetric NCELoss between a batch of embeddings and itself --> zero
 @pytest.mark.parametrize("key", ["embedding"])
 def test_asymm_NCELoss_is_zero(dummy_result_batch, key):
     loss_func = NCELoss(prediction_key1=key, prediction_key2=key)
     assert loss_func(dummy_result_batch) <= 10e-6
+
+
+@pytest.mark.parametrize("num_chunks,use_compile", [(1, False), (1, True), (4, False), (4, True)])
+def test_chunked_clm_cross_entropy_matches_reference(clm_batch, num_chunks, use_compile):
+    """ChunkedCLMCrossEntropyLoss must match plain F.cross_entropy for all chunk/compile combos."""
+    loss_fn = ChunkedCLMCrossEntropyLoss(
+        target_key=TARGET_KEY,
+        prediction_key=PREDICTION_KEY,
+        num_chunks=num_chunks,
+        use_compile=use_compile,
+    )
+    result = loss_fn(clm_batch).item()
+
+    logits = clm_batch.get_predictions(PREDICTION_KEY)
+    labels = clm_batch.get_targets(TARGET_KEY)
+    reference = F.cross_entropy(logits.view(-1, VOCAB_SIZE), labels.view(-1).long(), reduction="mean").item()
+
+    assert result == pytest.approx(reference, rel=1e-4)
+
+
+def test_chunked_clm_cross_entropy_invalid_num_chunks():
+    with pytest.raises(ValueError, match="num_chunks must be >= 1"):
+        ChunkedCLMCrossEntropyLoss(target_key=TARGET_KEY, prediction_key=PREDICTION_KEY, num_chunks=0)
+
+
+def test_chunked_clm_cross_entropy_tag():
+    loss_fn = ChunkedCLMCrossEntropyLoss(target_key=TARGET_KEY, prediction_key=PREDICTION_KEY)
+    assert loss_fn.tag == "ChunkedCLMCrossEntropyLoss"
 
 
 # calculating nce_loss for two randomly generated batch of embeddings (manually calculated)

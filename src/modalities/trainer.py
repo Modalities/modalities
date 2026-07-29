@@ -14,7 +14,7 @@ from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, ProgressUpdate
 from modalities.logging_broker.publisher import MessagePublisher
-from modalities.loss_functions import Loss
+from modalities.loss_functions import ChunkedLMHeadCrossEntropyLoss, Loss
 from modalities.models.model import model_predict_batch
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
@@ -160,6 +160,8 @@ class Trainer:
                         if a training step was performed otherwise return None.
         """
         if scheduled_pipeline is not None:
+            if isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss):
+                raise NotImplementedError("ChunkedLMHeadCrossEntropyLoss is not supported with pipeline parallelism.")
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
             # with self.train_context(optional_context_parallel_ctx):
@@ -176,6 +178,17 @@ class Trainer:
             loss = (
                 torch.mean(torch.stack(losses)).to(losses[0].device) if scheduled_pipeline.has_last_pp_stage else None
             )
+        elif isinstance(loss_fun, ChunkedLMHeadCrossEntropyLoss):
+            # The model returns hidden states (return_hidden_states=True); the loss applies the
+            # lm_head chunk-wise and owns the full backward pass, so no backward() call here.
+            if loss_fun.lm_head is None:
+                loss_fun.bind_lm_head(model_parts[0])
+            result_batch = model_predict_batch(model=model_parts[0], batch=batch)
+            loss = loss_fun.compute_and_backward(
+                hidden_states=result_batch.get_predictions(loss_fun.prediction_key),
+                labels=result_batch.get_targets(loss_fun.target_key),
+                grad_scale=1.0 / self.gradient_acc_steps,
+            )
         else:
             # else continue with loss calculation
             result_batch = model_predict_batch(model=model_parts[0], batch=batch)
@@ -188,7 +201,9 @@ class Trainer:
             scheduler.step()
             optimizer.zero_grad()
             step_performed = True
-            gradient_norm_score = gradient_norm_score.detach().cpu()
+            # Keep the norm on device: .cpu() here would force a host-GPU sync every
+            # step, stalling CPU dispatch. It is moved to CPU only at logging time.
+            gradient_norm_score = gradient_norm_score.detach()
         else:
             step_performed = False
             gradient_norm_score = None
@@ -233,10 +248,10 @@ class Trainer:
             m.train()
 
         local_num_seen_samples = 0
-        cumulated_losses = torch.zeros(3).cuda()
 
         # throughput
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        cumulated_losses = torch.zeros(3, device=device)
 
         # batch loop
         batch: DatasetBatch
@@ -285,15 +300,16 @@ class Trainer:
 
                 # The batch_loss might be None if we use pipeline parallelism and are not the last stage.
                 if batch_loss is not None:
-                    # Save the batch loss
-                    cumulated_losses[0] += batch_loss.detach().item()
+                    # Save the batch loss. Accumulate on device: .item() would force a
+                    # host-GPU sync every step and stall CPU dispatch of the next step.
+                    cumulated_losses[0] += batch_loss.detach()
                     # This works, because we always drop the last batch in case
                     # it has less samples than the batch size
                     cumulated_losses[-1] += 1  # number of local batches
 
                 # gradient norm is already synced across all ranks
                 if gradient_norm_score is not None:
-                    gradient_norm_scores.append(gradient_norm_score.item())
+                    gradient_norm_scores.append(gradient_norm_score)
 
                 local_num_seen_samples += len(batch)
 
@@ -304,7 +320,9 @@ class Trainer:
                 )
                 # Check if model performance should be logged
                 if training_progress.num_seen_steps_total % training_log_interval_in_steps == 0 and step_performed:
-                    dist.barrier()
+                    # NOTE: no dist.barrier() here. FSDP's per-step collectives already keep
+                    # ranks aligned; a world-wide barrier per log interval only adds latency
+                    # (measurable at large world sizes with small log intervals).
                     forward_backward_time_recorder.stop()
                     forward_backward_time = forward_backward_time_recorder.delta_t
                     forward_backward_time_recorder.reset()
@@ -316,7 +334,7 @@ class Trainer:
 
                     # TODO: insert reducer from outside so Trainer is independent of FSDP
                     # add the loss and gradient norm for the LAST batch
-                    cumulated_losses[1] = batch_loss.detach().item() if batch_loss is not None else 0.0
+                    cumulated_losses[1] = batch_loss.detach() if batch_loss is not None else 0.0
 
                     reduced_losses = (
                         Reducer.reduce(
@@ -343,8 +361,9 @@ class Trainer:
 
                     metrics = {
                         "consumed tokens": ResultItem(torch.tensor(training_progress.num_seen_tokens_total), 0),
-                        "grad norm avg": ResultItem(torch.mean(torch.Tensor(gradient_norm_scores)), 2),
-                        "grad norm last": ResultItem(torch.tensor(gradient_norm_scores[-1]), 2),
+                        # gradient_norm_scores hold device tensors; sync to CPU only here, at log time
+                        "grad norm avg": ResultItem(torch.stack(gradient_norm_scores).mean().cpu(), 2),
+                        "grad norm last": ResultItem(gradient_norm_scores[-1].cpu(), 2),
                     }
                     gradient_norm_scores = []
                     mfu_score = torch.tensor(-1.0)

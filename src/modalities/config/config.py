@@ -85,6 +85,20 @@ class CLMCrossEntropyLossConfig(BaseModel):
     prediction_key: str
 
 
+class ChunkedCLMCrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+    num_chunks: Annotated[int, Field(strict=True, ge=1)] = 1
+    use_compile: bool = True
+
+
+class ChunkedLMHeadCrossEntropyLossConfig(BaseModel):
+    target_key: str
+    prediction_key: str
+    num_chunks: Annotated[int, Field(strict=True, ge=1)] = 8
+    use_compile: bool = True
+
+
 # Checkpointing
 class SaveEveryKStepsCheckpointingStrategyConfig(BaseModel):
     k: PositiveInt
@@ -141,6 +155,7 @@ class DCPCheckpointSavingConfig(BaseModel):
     checkpoint_path: Path
     global_rank: Annotated[int, Field(strict=True, ge=0)]
     experiment_id: str
+    use_gloo_process_group_for_planning: bool = False
 
 
 class CheckpointSavingConfig(BaseModel):
@@ -308,6 +323,7 @@ class FSDP2WrappedModelConfig(BaseModel):
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
     layers_per_fsdp_unit: int = 1
+    wrap_lm_head_separately: bool = False
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):

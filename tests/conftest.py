@@ -197,7 +197,7 @@ def gradient_clipper_mock() -> GradientClipperIF:
 
 @pytest.fixture(scope="function")
 def loss_mock() -> Loss:
-    return MagicMock(spec=Loss, return_value=torch.rand(1, requires_grad=True))
+    return MagicMock(spec=Loss, return_value=torch.rand((), requires_grad=True))
 
 
 @pytest.fixture(scope="function")

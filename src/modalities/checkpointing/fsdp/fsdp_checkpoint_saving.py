@@ -1,4 +1,5 @@
 import json
+import inspect
 from enum import Enum
 from pathlib import Path
 
@@ -46,6 +47,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
+        use_gloo_process_group_for_planning: bool = False,
     ):
         """
         Initializes the FSDPCheckpointSaving class.
@@ -54,6 +56,8 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
+            use_gloo_process_group_for_planning (bool): Whether to use a temporary
+                Gloo process group for DCP planning collectives.
 
          Returns:
             None
@@ -61,6 +65,7 @@ class FSDP1CheckpointSaving(CheckpointSavingExecutionABC):
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.experiment_id = experiment_id
+        self.use_gloo_process_group_for_planning = use_gloo_process_group_for_planning
 
     def _get_checkpointing_path(
         self,
@@ -193,6 +198,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
         checkpoint_path: Path,
         experiment_id: str,
         global_rank: int,
+        use_gloo_process_group_for_planning: bool = False,
     ):
         """
         Initializes the FSDP2CheckpointSaving class.
@@ -201,6 +207,8 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
             checkpoint_path (Path): folder path to the checkpoint
             experiment_id (str): ID of the experiment
             global_rank (int): global rank within the current process group
+            use_gloo_process_group_for_planning (bool): Whether to use a temporary
+                Gloo process group for DCP planning collectives.
 
          Returns:
             None
@@ -208,6 +216,7 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
         self.checkpoint_path = checkpoint_path
         self.global_rank = global_rank
         self.experiment_id = experiment_id
+        self.use_gloo_process_group_for_planning = use_gloo_process_group_for_planning
 
     def _get_checkpointing_folder_path(
         self,
@@ -243,7 +252,31 @@ class DCPCheckpointSaving(CheckpointSavingExecutionABC):
         distributed_checkpoint_path.mkdir(parents=True, exist_ok=True)
         get_logger().info(f"Saving distributed model checkpoint to {distributed_checkpoint_path}...")
         state_dict = {"app": app_state}
-        dcp.save(state_dict, checkpoint_id=distributed_checkpoint_path)
+        # DCP performs object collectives while planning writes. On some clusters, these
+        # fail through NCCL; prefer a dedicated Gloo group for planning collectives.
+        dcp_kwargs = {}
+        gloo_group = None
+        try:
+            save_sig = inspect.signature(dcp.save)
+            if (
+                self.use_gloo_process_group_for_planning
+                and "process_group" in save_sig.parameters
+                and dist.is_initialized()
+            ):
+                try:
+                    gloo_group = dist.new_group(backend="gloo")
+                    dcp_kwargs["process_group"] = gloo_group
+                    get_logger().info("Using Gloo process group for DCP metadata collectives.")
+                except Exception as e:
+                    get_logger().warning(f"Could not create Gloo process group for DCP; using default group. {e}")
+
+            dcp.save(state_dict, checkpoint_id=distributed_checkpoint_path, **dcp_kwargs)
+        finally:
+            if gloo_group is not None:
+                try:
+                    dist.destroy_process_group(gloo_group)
+                except Exception as e:
+                    get_logger().warning(f"Failed to destroy temporary Gloo process group: {e}")
         get_logger().info("Distributed checkpoint saved.")
 
         if self.global_rank == 0:

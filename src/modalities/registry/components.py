@@ -24,6 +24,8 @@ from modalities.config.config import (
     AdamWOptimizerConfig,
     BatchSamplerConfig,
     CheckpointSavingConfig,
+    ChunkedCLMCrossEntropyLossConfig,
+    ChunkedLMHeadCrossEntropyLossConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
     CompiledModelConfig,
@@ -84,7 +86,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import ChunkedCLMCrossEntropyLoss, ChunkedLMHeadCrossEntropyLoss, CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -252,6 +254,12 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity(
+        "loss", "chunked_clm_cross_entropy_loss", ChunkedCLMCrossEntropyLoss, ChunkedCLMCrossEntropyLossConfig
+    ),
+    ComponentEntity(
+        "loss", "chunked_lm_head_cross_entropy_loss", ChunkedLMHeadCrossEntropyLoss, ChunkedLMHeadCrossEntropyLossConfig
+    ),
     # optimizers
     ComponentEntity(
         "optimizer", "adam", maybe_model_list_for_optimizer(OptimizerFactory.get_adam), AdamOptimizerConfig
