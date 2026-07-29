@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Literal
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -14,7 +15,8 @@ from modalities.config.config import ProcessGroupBackendType, PydanticPytorchMod
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.models.model_factory import ModelFactory
-from modalities.optimizers.optimizer_factory import get_optimizer_groups
+from modalities.optimizers import optimizer_factory as optimizer_factory_module
+from modalities.optimizers.optimizer_factory import OptimizerFactory, get_optimizer_groups
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
 from modalities.running_env.cuda_env import MultiProcessingCudaEnv
@@ -69,6 +71,131 @@ def test_get_optimizer_groups(
         ),
         nprocs=world_size,
         join=True,
+    )
+
+
+def test_get_adam_builds_optimizer_from_groups(monkeypatch):
+    wrapped_model = MagicMock()
+    optimizer_groups = [{"params": [MagicMock()], "weight_decay": 0.1}]
+    optimizer = MagicMock()
+    get_optimizer_groups_mock = MagicMock(return_value=optimizer_groups)
+    adam_mock = MagicMock(return_value=optimizer)
+
+    monkeypatch.setattr(optimizer_factory_module, "get_optimizer_groups", get_optimizer_groups_mock)
+    monkeypatch.setattr(optimizer_factory_module, "Adam", adam_mock)
+
+    result = OptimizerFactory.get_adam(
+        lr=1e-3,
+        betas=(0.9, 0.95),
+        eps=1e-8,
+        weight_decay=0.1,
+        weight_decay_groups_excluded=["embedding"],
+        wrapped_model=wrapped_model,
+        foreach=True,
+        fused=False,
+    )
+
+    assert result is optimizer
+    get_optimizer_groups_mock.assert_called_once_with(wrapped_model, 0.1, ["embedding"])
+    adam_mock.assert_called_once_with(
+        params=optimizer_groups,
+        lr=1e-3,
+        betas=(0.9, 0.95),
+        eps=1e-8,
+        foreach=True,
+        fused=False,
+    )
+
+
+def test_get_adam_w_builds_optimizer_from_groups(monkeypatch):
+    wrapped_model = MagicMock()
+    optimizer_groups = [{"params": [MagicMock()], "weight_decay": 0.2}]
+    optimizer = MagicMock()
+    get_optimizer_groups_mock = MagicMock(return_value=optimizer_groups)
+    adam_w_mock = MagicMock(return_value=optimizer)
+
+    monkeypatch.setattr(optimizer_factory_module, "get_optimizer_groups", get_optimizer_groups_mock)
+    monkeypatch.setattr(optimizer_factory_module, "AdamW", adam_w_mock)
+
+    result = OptimizerFactory.get_adam_w(
+        lr=2e-4,
+        betas=(0.8, 0.99),
+        eps=1e-6,
+        weight_decay=0.2,
+        weight_decay_groups_excluded=["layernorm"],
+        wrapped_model=wrapped_model,
+        foreach=False,
+        fused=True,
+    )
+
+    assert result is optimizer
+    get_optimizer_groups_mock.assert_called_once_with(wrapped_model, 0.2, ["layernorm"])
+    adam_w_mock.assert_called_once_with(
+        params=optimizer_groups,
+        lr=2e-4,
+        betas=(0.8, 0.99),
+        eps=1e-6,
+        foreach=False,
+        fused=True,
+    )
+
+
+def test_get_muon_builds_optimizer_from_groups(monkeypatch):
+    wrapped_model = MagicMock()
+    optimizer_groups = [{"params": [MagicMock()], "weight_decay": 0.05}]
+    optimizer = MagicMock()
+    get_optimizer_groups_mock = MagicMock(return_value=optimizer_groups)
+    muon_mock = MagicMock(return_value=optimizer)
+
+    monkeypatch.setattr(optimizer_factory_module, "get_optimizer_groups", get_optimizer_groups_mock)
+    monkeypatch.setattr(optimizer_factory_module, "Muon", muon_mock)
+
+    result = OptimizerFactory.get_muon(
+        lr=3e-4,
+        weight_decay=0.05,
+        momentum=0.95,
+        nesterov=True,
+        ns_coefficients=(1.0, 0.5, 0.25),
+        eps=1e-9,
+        ns_steps=7,
+        adjust_lr_fn="cosine",
+        weight_decay_groups_excluded=["embedding"],
+        wrapped_model=wrapped_model,
+    )
+
+    assert result is optimizer
+    get_optimizer_groups_mock.assert_called_once_with(wrapped_model, 0.05, ["embedding"])
+    muon_mock.assert_called_once_with(
+        params=optimizer_groups,
+        lr=3e-4,
+        weight_decay=0.05,
+        momentum=0.95,
+        nesterov=True,
+        ns_coefficients=(1.0, 0.5, 0.25),
+        eps=1e-9,
+        ns_steps=7,
+        adjust_lr_fn="cosine",
+    )
+
+
+def test_get_fsdp1_checkpointed_optimizer_loads_optimizer_state():
+    checkpoint_loading = MagicMock()
+    checkpoint_path = Path("/tmp/checkpoint")
+    wrapped_model = MagicMock()
+    optimizer = MagicMock()
+
+    result = OptimizerFactory.get_fsdp1_checkpointed_optimizer_(
+        checkpoint_loading=checkpoint_loading,
+        checkpoint_path=checkpoint_path,
+        wrapped_model=wrapped_model,
+        optimizer=optimizer,
+    )
+
+    assert result is optimizer
+    checkpoint_loading.load_optimizer_checkpoint_.assert_called_once_with(
+        file_path=checkpoint_path,
+        optimizer=optimizer,
+        model=wrapped_model,
     )
 
 

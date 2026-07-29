@@ -52,6 +52,7 @@ from modalities.config.config import (
     LinearWarmupCosineAnnealingLRSchedulerConfig,
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
+    MuonOptimizerConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -257,6 +258,9 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "optimizer", "adam_w", maybe_model_list_for_optimizer(OptimizerFactory.get_adam_w), AdamWOptimizerConfig
+    ),
+    ComponentEntity(
+        "optimizer", "muon", maybe_model_list_for_optimizer(OptimizerFactory.get_muon), MuonOptimizerConfig
     ),
     ComponentEntity(
         "optimizer",
