@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.utils.benchmarking.benchmarking_utils &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.utils.benchmarking.benchmarking_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.utils.benchmarking.benchmarking_utils</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SweepSets">
+<a class="viewcode-back" href="../../../../api/modalities.utils.benchmarking.html#modalities.utils.benchmarking.benchmarking_utils.SweepSets">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SweepSets</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="c1"># all configs found in the experiment root directory</span>
+    <span class="n">ALL_CONFIGS</span> <span class="o">=</span> <span class="s2">&quot;all_configs&quot;</span>
+    <span class="c1"># If a job failed then the very same config can be rerun in a new subfolder by copying over the config file.</span>
+    <span class="c1"># That&#39;s why, we only consider the most recent configs to determine the remaining configs.</span>
+    <span class="n">MOST_RECENT_CONFIGS</span> <span class="o">=</span> <span class="s2">&quot;most_recent_configs&quot;</span>
+    <span class="c1"># Configs for which we don&#39;t have any results yet.</span>
+    <span class="n">REMAINING_CONFIGS</span> <span class="o">=</span> <span class="s2">&quot;remaining_configs&quot;</span>
+    <span class="c1"># Configs that have to be run and for which we created new subfolders</span>
+    <span class="n">UPDATED_CONFIGS</span> <span class="o">=</span> <span class="s2">&quot;updated_configs&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="FileNames">
+<a class="viewcode-back" href="../../../../api/modalities.utils.benchmarking.html#modalities.utils.benchmarking.benchmarking_utils.FileNames">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FileNames</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">RESULTS_FILE</span> <span class="o">=</span> <span class="s2">&quot;evaluation_results.jsonl&quot;</span>
+    <span class="n">ERRORS_FILE_REGEX</span> <span class="o">=</span> <span class="s2">&quot;error_logs_*.log&quot;</span>  <span class="c1"># Format: errors_logs_&lt;hostname&gt;_&lt;local_rank&gt;.log</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_count_jsonl_lines</span><span class="p">(</span><span class="n">jsonl_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="c1"># counts the number of lines in a jsonl file</span>
+    <span class="k">with</span> <span class="n">jsonl_path</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">f</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_most_recent_configs</span><span class="p">(</span><span class="n">file_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Filter the list of file paths to only include the most recent config files.&quot;&quot;&quot;</span>
+    <span class="n">latest_configs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">file_paths</span><span class="p">:</span>
+        <span class="n">experiment_folder</span> <span class="o">=</span> <span class="n">file_path</span><span class="o">.</span><span class="n">parent</span>
+        <span class="n">hash_prefix</span><span class="p">,</span> <span class="n">ts</span> <span class="o">=</span> <span class="n">experiment_folder</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># assert file format: &lt;hash_prefix&gt;_YYYY-MM-DD__HH-MM-SS</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;^[a-zA-Z0-9]+_\d</span><span class="si">{4}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">__\d</span><span class="si">{2}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">-\d</span><span class="si">{2}</span><span class="s2">$&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">experiment_folder</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid file format in file path: </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">, Expected format in parent directory &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">experiment_folder</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: DDDDDDDD_YYYY-MM-DD__HH-MM-SS&quot;</span>
+            <span class="p">)</span>
+        <span class="n">experiment_folder_hash</span> <span class="o">=</span> <span class="n">experiment_folder</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">hash_prefix</span>
+        <span class="k">if</span> <span class="n">experiment_folder_hash</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">latest_configs</span> <span class="ow">or</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">latest_configs</span><span class="p">[</span><span class="n">experiment_folder_hash</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">latest_configs</span><span class="p">[</span><span class="n">experiment_folder_hash</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">config</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">latest_configs</span><span class="o">.</span><span class="n">values</span><span class="p">()]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_experiment_done</span><span class="p">(</span>
+    <span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">expected_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">skip_exception_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="c1"># Check if the experiment is done based on the number of steps in the results file and potential error types.</span>
+    <span class="n">results_path</span> <span class="o">=</span> <span class="n">config_file_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">FileNames</span><span class="o">.</span><span class="n">RESULTS_FILE</span><span class="o">.</span><span class="n">value</span>
+    <span class="c1"># Check if results file exists and has the expected number of steps</span>
+    <span class="k">if</span> <span class="n">results_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">steps_found</span> <span class="o">=</span> <span class="n">_count_jsonl_lines</span><span class="p">(</span><span class="n">results_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">steps_found</span> <span class="o">==</span> <span class="n">expected_steps</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+    <span class="c1"># Check if there are any errors due to which we want to skip the experiment (e.g., OOM errors)</span>
+    <span class="k">if</span> <span class="n">skip_exception_types</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">error_log_paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">config_file_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="n">FileNames</span><span class="o">.</span><span class="n">ERRORS_FILE_REGEX</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+        <span class="n">error_types</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">error_log_path</span> <span class="ow">in</span> <span class="n">error_log_paths</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">error_log_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">error_dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">][</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
+                <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to parse error log </span><span class="si">{</span><span class="n">error_log_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="s2">&quot;ErrorFileParsingError&quot;</span>
+            <span class="n">error_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">error_type</span><span class="p">)</span>
+        <span class="c1"># Check if any of the error types are in the skip list</span>
+        <span class="c1"># E.g., if we want to skip OOM errors (i.e., not rerun such experiments),</span>
+        <span class="c1"># then we can add &quot;OutOfMemoryError&quot; to the skip_exception_types list</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">skip_exception_types</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">error_types</span><span class="p">)))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_update_experiment_folder</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a new folder for the experiment based on the config file path.</span>
+<span class="sd">    The new folder will have the same hash as the original folder, but with a timestamp appended.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config_file_path (Path): The path to the config file.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        Path: The path to the new config file in the experiment folder.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">experiment_folder_path</span> <span class="o">=</span> <span class="n">config_file_path</span><span class="o">.</span><span class="n">parent</span>
+    <span class="c1"># copy the config file to a new folder</span>
+    <span class="n">hash_value</span> <span class="o">=</span> <span class="n">config_file_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">ts</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">__%H-%M-%S&quot;</span><span class="p">)</span>
+    <span class="n">new_folder_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">hash_value</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">ts</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">new_folder</span> <span class="o">=</span> <span class="n">experiment_folder_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">new_folder_name</span>
+    <span class="n">new_folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">new_config_path</span> <span class="o">=</span> <span class="n">new_folder</span> <span class="o">/</span> <span class="n">config_file_path</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">config_file_path</span><span class="p">,</span> <span class="n">new_config_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_config_path</span>
+
+
+<div class="viewcode-block" id="get_current_sweep_status">
+<a class="viewcode-back" href="../../../../api/modalities.utils.benchmarking.html#modalities.utils.benchmarking.benchmarking_utils.get_current_sweep_status">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_current_sweep_status</span><span class="p">(</span>
+    <span class="n">exp_root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">expected_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">skip_exception_types</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the status of the sweep by assigning the config file paths to categories</span>
+<span class="sd">    &#39;all&#39;, &#39;most_recent&#39;, and &#39;remaining&#39;.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        exp_root (Path): The root directory of the experiment.</span>
+<span class="sd">        expected_steps (int): The expected number of steps in the evaluation results.</span>
+<span class="sd">        world_size (Optional[int]): The number of ranks (world size) to filter the configs for.</span>
+<span class="sd">        skip_exception_types (Optional[list[str]]): List of exception types to skip when checking if</span>
+<span class="sd">            an experiment is done. A skipped experiment is considered as done in this case.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, list[Path]]: A dictionary with keys &#39;all_configs&#39;, &#39;most_recent_configs&#39;, and &#39;remaining_configs&#39;,</span>
+<span class="sd">            each containing a list of Path objects pointing to the respective config files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">exp_root</span> <span class="o">=</span> <span class="n">exp_root</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">file_list_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c1"># Find all candidate config files and filter out resolved configs</span>
+    <span class="n">candidate_configs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">exp_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;**/</span><span class="si">{</span><span class="s1">&#39;*&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">world_size</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="kc">None</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">world_size</span><span class="si">}</span><span class="s2">/*/*.yaml&quot;</span><span class="p">))</span>
+    <span class="n">candidate_configs</span> <span class="o">=</span> <span class="p">[</span><span class="n">yaml_path</span> <span class="k">for</span> <span class="n">yaml_path</span> <span class="ow">in</span> <span class="n">candidate_configs</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">yaml_path</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.resolved.yaml&quot;</span><span class="p">)]</span>
+    <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">ALL_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">candidate_configs</span>
+
+    <span class="c1"># filter only most recent configs</span>
+    <span class="n">candidate_configs</span> <span class="o">=</span> <span class="n">_get_most_recent_configs</span><span class="p">(</span><span class="n">candidate_configs</span><span class="p">)</span>
+    <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">MOST_RECENT_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">candidate_configs</span>
+
+    <span class="c1"># filter non-successful experiments, i.e., those that do not have the</span>
+    <span class="c1"># expected number of steps in evaluation_results.jsonl</span>
+    <span class="c1"># we can also skip certain exception types if specified (e.g., OOM errors)</span>
+    <span class="n">candidate_configs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">yaml_path</span>
+        <span class="k">for</span> <span class="n">yaml_path</span> <span class="ow">in</span> <span class="n">candidate_configs</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_is_experiment_done</span><span class="p">(</span><span class="n">yaml_path</span><span class="p">,</span> <span class="n">expected_steps</span><span class="p">,</span> <span class="n">skip_exception_types</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">REMAINING_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">candidate_configs</span>
+    <span class="k">return</span> <span class="n">file_list_dict</span></div>
+
+
+
+<div class="viewcode-block" id="get_updated_sweep_status">
+<a class="viewcode-back" href="../../../../api/modalities.utils.benchmarking.html#modalities.utils.benchmarking.benchmarking_utils.get_updated_sweep_status">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_updated_sweep_status</span><span class="p">(</span>
+    <span class="n">exp_root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">expected_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">skip_exception_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">world_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">create_new_folders_if_partially_done</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List all remaining runs in the experiment root directory and optionally write them to a file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        exp_root (Path): The root directory of the experiment.</span>
+<span class="sd">        expected_steps (int): The expected number of steps in the evaluation results.</span>
+<span class="sd">        file_list_path (Optional[Path]): If provided, the list of remaining runs will be written to this file.</span>
+<span class="sd">        skip_exception_types (Optional[list[str]]): List of exception types to skip when</span>
+<span class="sd">            checking if an experiment is done. A skipped experiment is considered as done in this case.</span>
+<span class="sd">        world_size (Optional[int]): The number of ranks (world size) to filter the configs for.</span>
+<span class="sd">        create_new_folders_if_partially_done (bool): If True, create new experiment folders for remaining configs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file_list_dict</span> <span class="o">=</span> <span class="n">get_current_sweep_status</span><span class="p">(</span>
+        <span class="n">exp_root</span><span class="o">=</span><span class="n">exp_root</span><span class="p">,</span>
+        <span class="n">world_size</span><span class="o">=</span><span class="n">world_size</span><span class="p">,</span>
+        <span class="n">expected_steps</span><span class="o">=</span><span class="n">expected_steps</span><span class="p">,</span>
+        <span class="n">skip_exception_types</span><span class="o">=</span><span class="n">skip_exception_types</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">ALL_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No configs found! Check the experiment root directory.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">file_list_dict</span>
+    <span class="k">elif</span> <span class="nb">set</span><span class="p">(</span><span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">REMAINING_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">])</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">ALL_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No runs executed so far. Returning the list of all configs without creating new sub folders.&quot;</span><span class="p">)</span>
+        <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">UPDATED_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">REMAINING_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">create_new_folders_if_partially_done</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Some runs have been executed. Creating new sub folders for remaining configs.&quot;</span><span class="p">)</span>
+        <span class="c1"># create new experiment folders for all remaining configs</span>
+        <span class="n">updated_configs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">_update_experiment_folder</span><span class="p">(</span><span class="n">yaml_path</span><span class="p">)</span> <span class="k">for</span> <span class="n">yaml_path</span> <span class="ow">in</span> <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">REMAINING_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">UPDATED_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">updated_configs</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Some runs have been executed. Returning the list of remaining configs without creating new sub folders.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">UPDATED_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_list_dict</span><span class="p">[</span><span class="n">SweepSets</span><span class="o">.</span><span class="n">REMAINING_CONFIGS</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">file_list_dict</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

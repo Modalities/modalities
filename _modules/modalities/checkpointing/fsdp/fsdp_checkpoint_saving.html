@@ -1,0 +1,418 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.checkpointing.fsdp.fsdp_checkpoint_saving &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.checkpointing.fsdp.fsdp_checkpoint_saving</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.checkpointing.fsdp.fsdp_checkpoint_saving</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed.checkpoint</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dcp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullOptimStateDictConfig</span><span class="p">,</span> <span class="n">FullStateDictConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">FullyShardedDataParallel</span> <span class="k">as</span> <span class="n">FSDP</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.distributed.fsdp</span><span class="w"> </span><span class="kn">import</span> <span class="n">StateDictType</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.checkpoint_saving_execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointSavingExecutionABC</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.checkpointing.stateful.app_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">AppState</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">CheckpointingError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.training.training_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingProgress</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.utils.logger_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logger</span>
+
+
+<div class="viewcode-block" id="CheckpointingEntityType">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.CheckpointingEntityType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CheckpointingEntityType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enum class representing the types of entities that can be checkpointed.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        MODEL (str): Represents the model entity.</span>
+<span class="sd">        OPTIMIZER (str): Represents the optimizer entity.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">MODEL</span> <span class="o">=</span> <span class="s2">&quot;model&quot;</span>
+    <span class="n">OPTIMIZER</span> <span class="o">=</span> <span class="s2">&quot;optimizer&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="FSDP1CheckpointSaving">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.FSDP1CheckpointSaving">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FSDP1CheckpointSaving</span><span class="p">(</span><span class="n">CheckpointSavingExecutionABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;FSDP1CheckpointSaving class for saving checkpoints of FSDP models and optimizers.</span>
+<span class="sd">    NOTE: This checkpoint saving routing loads the model into CPU memory before saving it to disk</span>
+<span class="sd">    and stores the model and optimizer in separate files.</span>
+<span class="sd">    This routine only works in conjunction with FSDP1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">CHECKPOINT_STRUCTURE</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;eid_</span><span class="si">{experiment_id}</span><span class="s2">-</span><span class="si">{entity}</span><span class="s2">-seen_steps_</span><span class="si">{num_seen_steps}</span><span class="s2">-seen_tokens_</span><span class="si">{num_seen_tokens}</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;-target_steps_</span><span class="si">{num_target_steps}</span><span class="s2">-target_tokens_</span><span class="si">{num_target_tokens}</span><span class="s2">.bin&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the FSDPCheckpointSaving class.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): folder path to the checkpoint</span>
+<span class="sd">            experiment_id (str): ID of the experiment</span>
+<span class="sd">            global_rank (int): global rank within the current process group</span>
+
+<span class="sd">         Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">checkpoint_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">=</span> <span class="n">global_rank</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span> <span class="o">=</span> <span class="n">experiment_id</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_checkpointing_path</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">num_seen_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_seen_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_target_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_target_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">entity_type</span><span class="p">:</span> <span class="n">CheckpointingEntityType</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+        <span class="n">entity_file_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">CHECKPOINT_STRUCTURE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span>
+            <span class="n">entity</span><span class="o">=</span><span class="n">entity_type</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">num_seen_steps</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_seen_steps</span><span class="p">),</span>
+            <span class="n">num_seen_tokens</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_seen_tokens</span><span class="p">),</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_target_steps</span><span class="p">),</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_target_tokens</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">full_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">entity_file_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">full_path</span>
+
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">):</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Gathering model and optimizer checkpoint...&quot;</span><span class="p">)</span>
+        <span class="c1"># saving the model via FULL_STATE_DICT and checkpoint via FULL_OPTIM_STATE_DICT</span>
+        <span class="n">model_save_policy</span> <span class="o">=</span> <span class="n">FullStateDictConfig</span><span class="p">(</span><span class="n">offload_to_cpu</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rank0_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">optim_save_policy</span> <span class="o">=</span> <span class="n">FullOptimStateDictConfig</span><span class="p">(</span><span class="n">offload_to_cpu</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rank0_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;FSDP1CheckpointSaving only supports a single model part.&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">app_state</span><span class="o">.</span><span class="n">model_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">app_state</span><span class="o">.</span><span class="n">optimizer</span>
+        <span class="k">with</span> <span class="n">FSDP</span><span class="o">.</span><span class="n">state_dict_type</span><span class="p">(</span>
+            <span class="n">module</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">state_dict_type</span><span class="o">=</span><span class="n">StateDictType</span><span class="o">.</span><span class="n">FULL_STATE_DICT</span><span class="p">,</span>
+            <span class="n">state_dict_config</span><span class="o">=</span><span class="n">model_save_policy</span><span class="p">,</span>
+            <span class="n">optim_state_dict_config</span><span class="o">=</span><span class="n">optim_save_policy</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">model_state</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+            <span class="n">optimizer_state</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>  <span class="c1"># this gets the optimizer state dict object for each rank</span>
+            <span class="n">optim_state_dict</span> <span class="o">=</span> <span class="n">FSDP</span><span class="o">.</span><span class="n">optim_state_dict</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">optim</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">optim_state_dict</span><span class="o">=</span><span class="n">optimizer_state</span>
+            <span class="p">)</span>  <span class="c1"># all the state dicts of the different ranks are synchronized</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># save model</span>
+            <span class="n">model_checkpoint_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_checkpointing_path</span><span class="p">(</span>
+                <span class="n">experiment_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span><span class="p">,</span>
+                <span class="n">num_seen_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+                <span class="n">num_seen_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">,</span>
+                <span class="n">num_target_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+                <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+                <span class="n">entity_type</span><span class="o">=</span><span class="n">CheckpointingEntityType</span><span class="o">.</span><span class="n">MODEL</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">model_checkpoint_folder_path</span> <span class="o">=</span> <span class="n">model_checkpoint_path</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">model_checkpoint_folder_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving model checkpoint to </span><span class="si">{</span><span class="n">model_checkpoint_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_state</span><span class="p">,</span> <span class="n">model_checkpoint_path</span><span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model checkpoint saved.&quot;</span><span class="p">)</span>
+
+            <span class="c1"># save optimizer</span>
+            <span class="n">optimizer_checkpoint_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_checkpointing_path</span><span class="p">(</span>
+                <span class="n">experiment_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span><span class="p">,</span>
+                <span class="n">num_seen_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+                <span class="n">num_seen_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">,</span>
+                <span class="n">num_target_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+                <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+                <span class="n">entity_type</span><span class="o">=</span><span class="n">CheckpointingEntityType</span><span class="o">.</span><span class="n">OPTIMIZER</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving optimizer checkpoint to </span><span class="si">{</span><span class="n">optimizer_checkpoint_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">optim_state_dict</span><span class="p">,</span> <span class="n">optimizer_checkpoint_path</span><span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Optimizer checkpoint saved.&quot;</span><span class="p">)</span>
+
+            <span class="n">checkpoint_info</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;model_checkpoint_path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">absolute</span><span class="p">(</span><span class="n">model_checkpoint_path</span><span class="p">)),</span>
+                <span class="s2">&quot;optimizer_checkpoint_path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">absolute</span><span class="p">(</span><span class="n">optimizer_checkpoint_path</span><span class="p">)),</span>
+            <span class="p">}</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving checkpoint info </span><span class="si">{</span><span class="n">checkpoint_info</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">model_checkpoint_folder_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">last_checkpoint_info_file_path</span> <span class="o">=</span> <span class="n">model_checkpoint_folder_path</span> <span class="o">/</span> <span class="s2">&quot;last_checkpoint_info.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">last_checkpoint_info_file_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">checkpoint_info</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Checkpoint info saved.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># we need this barrier here, such that all processes exit this function at the same time</span>
+        <span class="c1"># Since we run throughput measurements in the trainer, the non-checkpointing ranks would already</span>
+        <span class="c1"># trigger the time measurement in the trainer and would then wait for the checkpointing rank,</span>
+        <span class="c1"># leading to wrong throughput measurements.</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_paths_to_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_get_checkpointing_path</span><span class="p">(</span>
+                <span class="n">experiment_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span><span class="p">,</span>
+                <span class="n">entity_type</span><span class="o">=</span><span class="n">entity_type</span><span class="p">,</span>
+                <span class="n">num_seen_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+                <span class="n">num_seen_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">,</span>
+                <span class="n">num_target_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+                <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">entity_type</span> <span class="ow">in</span> <span class="n">CheckpointingEntityType</span>
+        <span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_delete_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">files_paths_to_delete</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_paths_to_delete</span><span class="p">(</span><span class="n">training_progress</span><span class="o">=</span><span class="n">training_progress</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">full_path</span> <span class="ow">in</span> <span class="n">files_paths_to_delete</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">full_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="c1"># unlink removes the file</span>
+                <span class="n">full_path</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">CheckpointingError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Checkpoint </span><span class="si">{</span><span class="n">full_path</span><span class="si">}</span><span class="s2"> could not be removed. It does not exist!&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DCPCheckpointSaving">
+<a class="viewcode-back" href="../../../../api/modalities.checkpointing.fsdp.html#modalities.checkpointing.fsdp.fsdp_checkpoint_saving.DCPCheckpointSaving">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DCPCheckpointSaving</span><span class="p">(</span><span class="n">CheckpointSavingExecutionABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DCPCheckpointSaving class for saving checkpoints of FSDP2 models and optimizers in a</span>
+<span class="sd">    distributed fashion. Each rank saves its own model and optimizer state in a combined file.</span>
+<span class="sd">    The advantage over FSDP1CheckpointSaving is that the model and optimizer states do not have to</span>
+<span class="sd">    synced to rank 0 or loaded into CPU memory.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">CHECKPOINT_FOLDER_STRUCTURE</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;eid_</span><span class="si">{experiment_id}</span><span class="s2">-seen_steps_</span><span class="si">{num_seen_steps}</span><span class="s2">-seen_tokens_</span><span class="si">{num_seen_tokens}</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;-target_steps_</span><span class="si">{num_target_steps}</span><span class="s2">-target_tokens_</span><span class="si">{num_target_tokens}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">global_rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the FSDP2CheckpointSaving class.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): folder path to the checkpoint</span>
+<span class="sd">            experiment_id (str): ID of the experiment</span>
+<span class="sd">            global_rank (int): global rank within the current process group</span>
+
+<span class="sd">         Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">checkpoint_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">=</span> <span class="n">global_rank</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span> <span class="o">=</span> <span class="n">experiment_id</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_checkpointing_folder_path</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">experiment_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">num_seen_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_seen_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_target_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_target_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+        <span class="n">entity_file_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">CHECKPOINT_FOLDER_STRUCTURE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">experiment_id</span><span class="o">=</span><span class="n">experiment_id</span><span class="p">,</span>
+            <span class="n">num_seen_steps</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_seen_steps</span><span class="p">),</span>
+            <span class="n">num_seen_tokens</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_seen_tokens</span><span class="p">),</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_target_steps</span><span class="p">),</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">num_target_tokens</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">full_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">entity_file_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">full_path</span>
+
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_state</span><span class="p">:</span> <span class="n">AppState</span><span class="p">,</span> <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">):</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Gathering model and optimizer checkpoint...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># save distributed checkpoint (DCP)</span>
+        <span class="n">distributed_checkpoint_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_checkpointing_folder_path</span><span class="p">(</span>
+            <span class="n">experiment_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span><span class="p">,</span>
+            <span class="n">num_seen_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+            <span class="n">num_seen_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">,</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">distributed_checkpoint_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving distributed model checkpoint to </span><span class="si">{</span><span class="n">distributed_checkpoint_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">state_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;app&quot;</span><span class="p">:</span> <span class="n">app_state</span><span class="p">}</span>
+        <span class="n">dcp</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">state_dict</span><span class="p">,</span> <span class="n">checkpoint_id</span><span class="o">=</span><span class="n">distributed_checkpoint_path</span><span class="p">)</span>
+        <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Distributed checkpoint saved.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># save checkpoint info</span>
+            <span class="n">checkpoint_info</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;checkpoint_folder_path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">absolute</span><span class="p">(</span><span class="n">distributed_checkpoint_path</span><span class="p">))}</span>
+            <span class="n">experiment_folder_path</span> <span class="o">=</span> <span class="n">distributed_checkpoint_path</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving checkpoint info </span><span class="si">{</span><span class="n">checkpoint_info</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">experiment_folder_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">last_checkpoint_info_file_path</span> <span class="o">=</span> <span class="n">experiment_folder_path</span> <span class="o">/</span> <span class="s2">&quot;last_checkpoint_info.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">last_checkpoint_info_file_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">checkpoint_info</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Checkpoint info saved.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># we need this barrier here, such that all processes exit this function at the same time</span>
+        <span class="c1"># Since we run throughput measurements in the trainer, the non-checkpointing ranks would already</span>
+        <span class="c1"># trigger the time measurement in the trainer and would then wait for the checkpointing rank,</span>
+        <span class="c1"># leading to wrong throughput measurements.</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_delete_checkpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_progress</span><span class="p">:</span> <span class="n">TrainingProgress</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">global_rank</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">folder_path_to_delete</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_checkpointing_folder_path</span><span class="p">(</span>
+            <span class="n">experiment_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">experiment_id</span><span class="p">,</span>
+            <span class="n">num_seen_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_steps_total</span><span class="p">,</span>
+            <span class="n">num_seen_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_seen_tokens_total</span><span class="p">,</span>
+            <span class="n">num_target_steps</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_steps</span><span class="p">,</span>
+            <span class="n">num_target_tokens</span><span class="o">=</span><span class="n">training_progress</span><span class="o">.</span><span class="n">num_target_tokens</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">folder_path_to_delete</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="c1"># unlink removes the file</span>
+            <span class="n">folder_path_to_delete</span><span class="o">.</span><span class="n">rmdir</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">CheckpointingError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Checkpoint folder </span><span class="si">{</span><span class="n">folder_path_to_delete</span><span class="si">}</span><span class="s2"> could not be removed. It does not exist!&quot;</span>
+            <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

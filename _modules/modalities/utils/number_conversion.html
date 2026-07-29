@@ -1,0 +1,568 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.utils.number_conversion &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.utils.number_conversion</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.utils.number_conversion</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.dataset_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetFactory</span>
+
+
+<div class="viewcode-block" id="LocalNumBatchesFromNumSamplesConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.LocalNumBatchesFromNumSamplesConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LocalNumBatchesFromNumSamplesConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_ranks</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">global_num_samples</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="LocalNumBatchesFromNumTokensConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.LocalNumBatchesFromNumTokensConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LocalNumBatchesFromNumTokensConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_ranks</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">global_num_tokens</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumSamplesFromNumTokensConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumSamplesFromNumTokensConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumSamplesFromNumTokensConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_tokens</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumStepsFromNumSamplesConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumStepsFromNumSamplesConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumStepsFromNumSamplesConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_ranks</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">global_num_samples</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumStepsFromNumTokensConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumStepsFromNumTokensConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumStepsFromNumTokensConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">dp_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">global_num_tokens</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumTokensFromNumStepsConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumTokensFromNumStepsConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumTokensFromNumStepsConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">num_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">dp_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumberConversionFromCheckpointPathConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversionFromCheckpointPathConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumberConversionFromCheckpointPathConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span></div>
+
+
+
+<div class="viewcode-block" id="NumTokensFromPackedMemMapDatasetContinuousConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumTokensFromPackedMemMapDatasetContinuousConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumTokensFromPackedMemMapDatasetContinuousConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">dataset_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">sequence_length</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">dp_degree</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">)</span>
+    <span class="n">reuse_last_target</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="NumStepsFromRawDatasetIndexConfig">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumStepsFromRawDatasetIndexConfig">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumStepsFromRawDatasetIndexConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">raw_index_path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">num_ranks</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+    <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="NumberConversion">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumberConversion</span><span class="p">:</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_checkpoint_parameter_value</span><span class="p">(</span><span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">matches</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="n">string</span><span class="p">)</span>
+
+        <span class="c1"># Extract the number of steps if a match is found</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">value</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected a single group in the match. Got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span><span class="si">}</span><span class="s2"> matches: </span><span class="si">{</span><span class="n">matches</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Pattern: </span><span class="si">{</span><span class="n">pattern</span><span class="si">}</span><span class="s2">, String: </span><span class="si">{</span><span class="n">string</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No match found for pattern </span><span class="si">{</span><span class="n">pattern</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">string</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="NumberConversion.get_local_num_batches_from_num_samples">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_local_num_batches_from_num_samples">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_local_num_batches_from_num_samples</span><span class="p">(</span>
+        <span class="n">num_ranks</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">global_num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of local batches for each rank, given the global</span>
+<span class="sd">        number of samples and number of ranks.</span>
+<span class="sd">        This helper function is primarily used to calculate the number of batches to</span>
+<span class="sd">        skip when resuming a dataloader during warmstart.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_ranks (int): Global number of ranks.</span>
+<span class="sd">            global_num_samples (int): Global number of samples.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of local batches for single rank.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">global_num_samples</span><span class="p">)</span> <span class="o">//</span> <span class="n">num_ranks</span> <span class="o">//</span> <span class="n">local_micro_batch_size</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_samples_from_num_tokens">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_samples_from_num_tokens">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_samples_from_num_tokens</span><span class="p">(</span><span class="n">num_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of samples given the global number of tokens and sequence length.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_tokens (int): Global number of tokens.</span>
+<span class="sd">            sequence_length (int): Sequence length of the model.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of samples.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_samples</span> <span class="o">=</span> <span class="n">num_tokens</span> <span class="o">//</span> <span class="n">sequence_length</span>
+        <span class="k">return</span> <span class="n">num_samples</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_local_num_batches_from_num_tokens">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_local_num_batches_from_num_tokens">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_local_num_batches_from_num_tokens</span><span class="p">(</span>
+        <span class="n">num_ranks</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">global_num_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of local batches for each rank, given the global</span>
+<span class="sd">        number of tokens and number of ranks.</span>
+<span class="sd">        This helper function is primarily used to calculate a dataloader&#39;s number of batches (total and to skip)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_ranks (int): Global number of ranks.</span>
+<span class="sd">            global_num_tokens (int): Global number of tokens.</span>
+<span class="sd">            sequence_length (int): Sequence length of the model.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of local batches for single rank.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">global_num_samples</span> <span class="o">=</span> <span class="n">global_num_tokens</span> <span class="o">//</span> <span class="n">sequence_length</span>
+        <span class="k">return</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_local_num_batches_from_num_samples</span><span class="p">(</span>
+            <span class="n">num_ranks</span><span class="o">=</span><span class="n">num_ranks</span><span class="p">,</span> <span class="n">global_num_samples</span><span class="o">=</span><span class="n">global_num_samples</span><span class="p">,</span> <span class="n">local_micro_batch_size</span><span class="o">=</span><span class="n">local_micro_batch_size</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_steps_from_num_samples">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_steps_from_num_samples">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_steps_from_num_samples</span><span class="p">(</span>
+        <span class="n">dp_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">global_num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of steps given the global</span>
+<span class="sd">        number of samples, local micro batch size, number of data parallel ranks and gradient accumulation steps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dp_degree (int): Number of data parallel ranks.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">            global_num_samples (int): Global number of samples.</span>
+<span class="sd">            gradient_accumulation_steps (int): Number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of steps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">global_num_samples</span> <span class="o">//</span> <span class="n">dp_degree</span> <span class="o">//</span> <span class="n">local_micro_batch_size</span> <span class="o">//</span> <span class="n">gradient_accumulation_steps</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_steps_from_num_tokens">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_steps_from_num_tokens">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_steps_from_num_tokens</span><span class="p">(</span>
+        <span class="n">dp_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">global_num_tokens</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of steps given the global</span>
+<span class="sd">        number of tokens, local micro batch size number of ranks and gradient accumulation steps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dp_degree (int): Number of data parallel ranks.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">            global_num_tokens (int): Global number of tokens.</span>
+<span class="sd">            sequence_length (int): Sequence length of the model.</span>
+<span class="sd">            gradient_accumulation_steps (int): Number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of steps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">global_num_samples</span> <span class="o">=</span> <span class="n">global_num_tokens</span> <span class="o">//</span> <span class="n">sequence_length</span>
+        <span class="k">return</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_num_samples</span><span class="p">(</span>
+            <span class="n">dp_degree</span><span class="o">=</span><span class="n">dp_degree</span><span class="p">,</span>
+            <span class="n">local_micro_batch_size</span><span class="o">=</span><span class="n">local_micro_batch_size</span><span class="p">,</span>
+            <span class="n">global_num_samples</span><span class="o">=</span><span class="n">global_num_samples</span><span class="p">,</span>
+            <span class="n">gradient_accumulation_steps</span><span class="o">=</span><span class="n">gradient_accumulation_steps</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_tokens_from_num_steps">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_tokens_from_num_steps">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_tokens_from_num_steps</span><span class="p">(</span>
+        <span class="n">num_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dp_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculates the number of global tokens given the number of steps, number of ranks, local micro batch size,</span>
+<span class="sd">            sequence length and gradient accumulation steps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_steps (int): Number of steps.</span>
+<span class="sd">            dp_degree (int): Number of data parallel ranks.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">            sequence_length (int): Sequence length of the model.</span>
+<span class="sd">            gradient_accumulation_steps (int): Number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of global tokens.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_tokens</span> <span class="o">=</span> <span class="n">num_steps</span> <span class="o">*</span> <span class="n">dp_degree</span> <span class="o">*</span> <span class="n">local_micro_batch_size</span> <span class="o">*</span> <span class="n">sequence_length</span> <span class="o">*</span> <span class="n">gradient_accumulation_steps</span>
+        <span class="k">return</span> <span class="n">num_tokens</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_last_step_from_checkpoint_path">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_last_step_from_checkpoint_path">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_last_step_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the last step from the checkpoint path.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): Path to the checkpoint file.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Last step from the checkpoint path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Regex pattern to match &#39;num_steps_&#39; followed by digits</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;seen_steps_(\d+)&quot;</span>
+        <span class="n">num_seen_steps</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">_get_checkpoint_parameter_value</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">num_seen_steps</span> <span class="o">-</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_seen_steps_from_checkpoint_path">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_seen_steps_from_checkpoint_path">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_seen_steps_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the number of seen steps from the checkpoint path.&quot;</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): Path to the checkpoint file.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of seen steps from the checkpoint path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Regex pattern to match &#39;num_steps_&#39; followed by digits</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;seen_steps_(\d+)&quot;</span>
+        <span class="n">num_seen_steps</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">_get_checkpoint_parameter_value</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">num_seen_steps</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_global_num_seen_tokens_from_checkpoint_path">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_global_num_seen_tokens_from_checkpoint_path">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_global_num_seen_tokens_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the global num seen tokens from the checkpoint path.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): Path to the checkpoint file.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Num seen tokens from the checkpoint path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Regex pattern to match &#39;num_steps_&#39; followed by digits</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;seen_tokens_(\d+)&quot;</span>
+        <span class="n">num_seen_tokens</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">_get_checkpoint_parameter_value</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">num_seen_tokens</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_global_num_target_tokens_from_checkpoint_path">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_global_num_target_tokens_from_checkpoint_path">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_global_num_target_tokens_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the global num target tokens from the checkpoint path.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            checkpoint_path (Path): Path to the checkpoint file.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Num target tokens from the checkpoint path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Regex pattern to match &#39;num_steps_&#39; followed by digits</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;target_tokens_(\d+)&quot;</span>
+        <span class="n">num_target_tokens</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">_get_checkpoint_parameter_value</span><span class="p">(</span><span class="n">pattern</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">num_target_tokens</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_target_steps_from_checkpoint_path">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_target_steps_from_checkpoint_path">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_target_steps_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">tokens_per_step</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_global_num_seen_tokens_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span>
+            <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_last_step_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="p">)</span>
+
+        <span class="n">global_num_target_tokens</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_global_num_target_tokens_from_checkpoint_path</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">)</span>
+
+        <span class="n">num_target_steps</span> <span class="o">=</span> <span class="n">global_num_target_tokens</span> <span class="o">//</span> <span class="n">tokens_per_step</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_target_steps</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">num_target_steps</span><span class="o">.</span><span class="n">is_integer</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of steps calculated is not an integer. </span><span class="si">{</span><span class="n">num_target_steps</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_target_steps</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_tokens_from_packed_mem_map_dataset_continuous">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_tokens_from_packed_mem_map_dataset_continuous</span><span class="p">(</span>
+        <span class="n">dataset_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">sequence_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dp_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">sample_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">reuse_last_target</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of tokens in a tokenized dataset that will be effectively used during training.</span>
+<span class="sd">            Due to the way the data is packed, batched and distributed, the number of tokens used during training</span>
+<span class="sd">            might not be the same as the number of tokens in the dataset.</span>
+
+<span class="sd">            The number of tokens that are used during training is calculated as follows:</span>
+<span class="sd">                num_steps = num_dataset_tokens // sequence_length// dp_degree //</span>
+<span class="sd">                            local_micro_batch_size // gradient_accumulation_steps</span>
+<span class="sd">                global_num_tokens = num_steps * sequence_length * dp_degree *</span>
+<span class="sd">                                    local_micro_batch_size * gradient_accumulation_steps</span>
+
+
+<span class="sd">        Args:</span>
+<span class="sd">            dataset_path (Path): Path to the tokenized dataset.</span>
+<span class="sd">            sequence_length (int): Sequence length of the model.</span>
+<span class="sd">            dp_degree (int): Number of data parallel ranks.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">            gradient_accumulation_steps (int): Number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of tokens that will be effectively used during training.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_packed_mem_map_dataset_continuous</span><span class="p">(</span>
+            <span class="n">raw_data_path</span><span class="o">=</span><span class="n">dataset_path</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="n">sequence_length</span><span class="p">,</span>
+            <span class="n">sample_key</span><span class="o">=</span><span class="n">sample_key</span><span class="p">,</span>
+            <span class="n">reuse_last_target</span><span class="o">=</span><span class="n">reuse_last_target</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">global_num_tokens_dataset</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span> <span class="o">*</span> <span class="n">sequence_length</span>
+        <span class="n">num_steps</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_num_tokens</span><span class="p">(</span>
+            <span class="n">dp_degree</span><span class="o">=</span><span class="n">dp_degree</span><span class="p">,</span>
+            <span class="n">local_micro_batch_size</span><span class="o">=</span><span class="n">local_micro_batch_size</span><span class="p">,</span>
+            <span class="n">global_num_tokens</span><span class="o">=</span><span class="n">global_num_tokens_dataset</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="n">sequence_length</span><span class="p">,</span>
+            <span class="n">gradient_accumulation_steps</span><span class="o">=</span><span class="n">gradient_accumulation_steps</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">global_num_tokens_actual</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_tokens_from_num_steps</span><span class="p">(</span>
+            <span class="n">dp_degree</span><span class="o">=</span><span class="n">dp_degree</span><span class="p">,</span>
+            <span class="n">local_micro_batch_size</span><span class="o">=</span><span class="n">local_micro_batch_size</span><span class="p">,</span>
+            <span class="n">sequence_length</span><span class="o">=</span><span class="n">sequence_length</span><span class="p">,</span>
+            <span class="n">gradient_accumulation_steps</span><span class="o">=</span><span class="n">gradient_accumulation_steps</span><span class="p">,</span>
+            <span class="n">num_steps</span><span class="o">=</span><span class="n">num_steps</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">global_num_tokens_actual</span></div>
+
+
+<div class="viewcode-block" id="NumberConversion.get_num_steps_from_raw_dataset_index">
+<a class="viewcode-back" href="../../../api/modalities.utils.html#modalities.utils.number_conversion.NumberConversion.get_num_steps_from_raw_dataset_index">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_steps_from_raw_dataset_index</span><span class="p">(</span>
+        <span class="n">raw_index_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">num_ranks</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">local_micro_batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">gradient_accumulation_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of steps from the raw index, number of ranks, local micro batch size</span>
+<span class="sd">        and gradient accumulation steps. The index is a list of tuples where each tuple contains</span>
+<span class="sd">        the offset and length of a sample in the raw data.</span>
+<span class="sd">        Note, the index is not packed and the number of samples in respective raw JSONL</span>
+<span class="sd">        file is the same as the length of the index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            raw_index_path (Path): Path to the raw index file of the JSONL dataset.</span>
+<span class="sd">            num_ranks (int): Global number of ranks.</span>
+<span class="sd">            local_micro_batch_size (int): Local micro batch size on single rank.</span>
+<span class="sd">            gradient_accumulation_steps (int): Number of gradient accumulation steps.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Number of steps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">DatasetFactory</span><span class="o">.</span><span class="n">get_raw_index</span><span class="p">(</span><span class="n">raw_index_path</span><span class="o">=</span><span class="n">raw_index_path</span><span class="p">)</span>
+        <span class="n">num_samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+        <span class="n">num_steps</span> <span class="o">=</span> <span class="n">NumberConversion</span><span class="o">.</span><span class="n">get_num_steps_from_num_samples</span><span class="p">(</span>
+            <span class="n">dp_degree</span><span class="o">=</span><span class="n">num_ranks</span><span class="p">,</span>
+            <span class="n">local_micro_batch_size</span><span class="o">=</span><span class="n">local_micro_batch_size</span><span class="p">,</span>
+            <span class="n">global_num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+            <span class="n">gradient_accumulation_steps</span><span class="o">=</span><span class="n">gradient_accumulation_steps</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">num_steps</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

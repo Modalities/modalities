@@ -1,0 +1,457 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.tokenization.tokenizer_wrapper &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.tokenization.tokenizer_wrapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.tokenization.tokenizer_wrapper</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">sentencepiece</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">spm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoTokenizer</span>
+
+
+<div class="viewcode-block" id="TokenizerWrapper">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TokenizerWrapper</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract interface for tokenizers.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TokenizerWrapper.tokenize">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper.tokenize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tokenize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tokenizes a text into a list of token IDs.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            text (str): Text to be tokenized.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[int]: List of token IDs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="TokenizerWrapper.decode">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper.decode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decodes a list of token IDs into the original text.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_ids (list[int]): List of token IDs.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Decoded text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">vocab_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the vocabulary size of the tokenizer.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Vocabulary size.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Tokenizer must be implemented by a subclass.&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TokenizerWrapper.get_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper.get_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the token ID for a given token.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token (str): Token to get the ID for.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="TokenizerWrapper.is_special_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.TokenizerWrapper.is_special_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_special_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns whether a token ID is a special token ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token_id (int): Token ID to check.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: Flag whether the token ID is a special token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreTrainedHFTokenizer">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedHFTokenizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreTrainedHFTokenizer</span><span class="p">(</span><span class="n">TokenizerWrapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrapper for pretrained Hugging Face tokenizers.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">pretrained_model_name_or_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">truncation</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">padding</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span> <span class="o">|</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">special_tokens</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the PreTrainedHFTokenizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            pretrained_model_name_or_path (str): Name or path of the pretrained model.</span>
+<span class="sd">            truncation (bool, optional): Flag whether to apply truncation. Defaults to False.</span>
+<span class="sd">            padding (bool | str, optional): Defines the padding strategy. Defaults to False.</span>
+<span class="sd">            max_length (int, optional): Maximum length of the tokenization output. Defaults to None.</span>
+<span class="sd">            special_tokens (dict[str, str], optional): Added token keys should be in the list</span>
+<span class="sd">                of predefined special attributes: [bos_token, eos_token, unk_token, sep_token, pad_token,</span>
+<span class="sd">                cls_token, mask_token, additional_special_tokens].</span>
+<span class="sd">                Example: {&quot;pad_token&quot;: &quot;[PAD]&quot;}</span>
+<span class="sd">                Tokens are only added if they are not already in the vocabulary (tested by checking</span>
+<span class="sd">                if the tokenizer assign the index of the unk_token to them). Defaults to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># also see here for the truncation and padding options and their effects:</span>
+        <span class="c1"># https://huggingface.co/docs/transformers/pad_truncation#padding-and-truncation</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">pretrained_model_name_or_path</span><span class="o">=</span><span class="n">pretrained_model_name_or_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">special_tokens</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">old_vocab_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">get_vocab</span><span class="p">())</span>
+            <span class="c1"># TODO check if we always want to set</span>
+            <span class="c1"># replace_additional_special_tokens=False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">add_special_tokens</span><span class="p">(</span>
+                <span class="n">special_tokens_dict</span><span class="o">=</span><span class="n">special_tokens</span><span class="p">,</span>
+                <span class="n">replace_additional_special_tokens</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">get_vocab</span><span class="p">())</span> <span class="o">&gt;</span> <span class="n">old_vocab_size</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s2">&quot;Currently only tokens already known to the tokenizers vocabulary can be added,&quot;</span>
+                    <span class="o">+</span> <span class="s2">&quot; as resizing the embedding matrix is not yet supported! &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Before: </span><span class="si">{</span><span class="n">old_vocab_size</span><span class="si">}</span><span class="s2">, after: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">get_vocab</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_length</span> <span class="o">=</span> <span class="n">max_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">truncation</span> <span class="o">=</span> <span class="n">truncation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">padding</span> <span class="o">=</span> <span class="n">padding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">special_token_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">all_special_ids</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">vocab_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the vocabulary size of the tokenizer.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Vocabulary size.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">vocab_size</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">special_tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the special tokens of the tokenizer.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, str | list[str]]: Special tokens dictionary.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">special_tokens_map</span>
+
+<div class="viewcode-block" id="PreTrainedHFTokenizer.tokenize">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedHFTokenizer.tokenize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tokenize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tokenizes a text into a list of token IDs.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            text (str): Text to be tokenized.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[int]: List of token IDs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_length</span><span class="p">,</span>
+            <span class="n">padding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">padding</span><span class="p">,</span>
+            <span class="n">truncation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">truncation</span><span class="p">,</span>
+        <span class="p">)[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">tokens</span></div>
+
+
+<div class="viewcode-block" id="PreTrainedHFTokenizer.decode">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedHFTokenizer.decode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decodes a list of token IDs into the original text.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_ids (list[int]): List of token IDs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Decoded text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">decoded_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">token_ids</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">decoded_text</span></div>
+
+
+<div class="viewcode-block" id="PreTrainedHFTokenizer.get_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedHFTokenizer.get_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the token ID for a given token.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token (str): Token to get the ID for.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the token cannot be represented by a single token ID.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">token_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">convert_tokens_to_ids</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">token_id</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Token is not represented by a single token id!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">token_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Token is not represented by a single token id!&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">token_id</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">unk_token_id</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The provided eod token </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2"> has the same token id (</span><span class="si">{</span><span class="n">token_id</span><span class="si">}</span><span class="s2">) as the unk token&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">token_id</span></div>
+
+
+<div class="viewcode-block" id="PreTrainedHFTokenizer.is_special_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedHFTokenizer.is_special_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_special_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns whether a token ID is a special token ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token_id (int): Token ID to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: Flag whether the token ID is a special token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">token_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">special_token_ids</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreTrainedSPTokenizer">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedSPTokenizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreTrainedSPTokenizer</span><span class="p">(</span><span class="n">TokenizerWrapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrapper for pretrained SentencePiece tokenizers.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tokenizer_model_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the PreTrainedSPTokenizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tokenizer_model_file (str): Path to the tokenizer model file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">spm</span><span class="o">.</span><span class="n">SentencePieceProcessor</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">Load</span><span class="p">(</span><span class="n">tokenizer_model_file</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreTrainedSPTokenizer.tokenize">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedSPTokenizer.tokenize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tokenize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tokenizes a text into a list of token IDs.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            text (str): Text to be tokenized.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[int]: List of token IDs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">token_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">Encode</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">token_ids</span></div>
+
+
+<div class="viewcode-block" id="PreTrainedSPTokenizer.decode">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedSPTokenizer.decode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decodes a list of token IDs into the original text.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_ids (list[int]): List of token IDs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Decoded text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">decoded_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">Decode</span><span class="p">(</span><span class="n">token_ids</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">decoded_text</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">vocab_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the vocabulary size of the tokenizer.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Vocabulary size.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">vocab_size</span><span class="p">()</span>
+
+<div class="viewcode-block" id="PreTrainedSPTokenizer.get_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedSPTokenizer.get_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the token ID for a given token.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token (str): Token to get the ID for.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the token cannot be represented by a single token ID.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">piece_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">PieceToId</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">piece_id</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Token cannot be represented by a single token ID!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">piece_id</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">unk_id</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Token  cannot be represented by a single token id!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">piece_id</span></div>
+
+
+<div class="viewcode-block" id="PreTrainedSPTokenizer.is_special_token_id">
+<a class="viewcode-back" href="../../../api/modalities.tokenization.html#modalities.tokenization.tokenizer_wrapper.PreTrainedSPTokenizer.is_special_token_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_special_token_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns whether a token ID is a special token ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            token_id (int): Token ID to check.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Must be implemented by a subclass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: Flag whether the token ID is a special token ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">IsControl</span><span class="p">(</span><span class="n">token_id</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

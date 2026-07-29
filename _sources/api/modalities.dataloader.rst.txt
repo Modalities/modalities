@@ -1,0 +1,117 @@
+modalities.dataloader package
+=============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.dataloader.preprocessing
+
+Submodules
+----------
+
+modalities.dataloader.apply\_chat\_template module
+--------------------------------------------------
+
+.. automodule:: modalities.dataloader.apply_chat_template
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.create\_index module
+------------------------------------------
+
+.. automodule:: modalities.dataloader.create_index
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.create\_instruction\_tuning\_data module
+--------------------------------------------------------------
+
+.. automodule:: modalities.dataloader.create_instruction_tuning_data
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.create\_packed\_data module
+-------------------------------------------------
+
+.. automodule:: modalities.dataloader.create_packed_data
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.dataloader module
+---------------------------------------
+
+.. automodule:: modalities.dataloader.dataloader
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.dataloader\_factory module
+------------------------------------------------
+
+.. automodule:: modalities.dataloader.dataloader_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.dataset module
+------------------------------------
+
+.. automodule:: modalities.dataloader.dataset
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.dataset\_factory module
+---------------------------------------------
+
+.. automodule:: modalities.dataloader.dataset_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.filter\_packed\_data module
+-------------------------------------------------
+
+.. automodule:: modalities.dataloader.filter_packed_data
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.large\_file\_lines\_reader module
+-------------------------------------------------------
+
+.. automodule:: modalities.dataloader.large_file_lines_reader
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.sampler\_factory module
+---------------------------------------------
+
+.. automodule:: modalities.dataloader.sampler_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.dataloader.samplers module
+-------------------------------------
+
+.. automodule:: modalities.dataloader.samplers
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.dataloader
+   :members:
+   :show-inheritance:
+   :undoc-members:

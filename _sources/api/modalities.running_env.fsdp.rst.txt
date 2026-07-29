@@ -1,0 +1,37 @@
+modalities.running\_env.fsdp package
+====================================
+
+Submodules
+----------
+
+modalities.running\_env.fsdp.device\_mesh module
+------------------------------------------------
+
+.. automodule:: modalities.running_env.fsdp.device_mesh
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.running\_env.fsdp.fsdp\_auto\_wrapper module
+-------------------------------------------------------
+
+.. automodule:: modalities.running_env.fsdp.fsdp_auto_wrapper
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.running\_env.fsdp.reducer module
+-------------------------------------------
+
+.. automodule:: modalities.running_env.fsdp.reducer
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.running_env.fsdp
+   :members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,0 +1,253 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>modalities.preprocessing.shuffle_data &mdash; Modalities 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Modalities
+              <img src="../../../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_cards.html">Model Cards</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../known_issues.html">Known Issues</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Datasets</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../memmap.html">MemMap Datasets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Entrypoints</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../entrypoints.html">Entrypoints</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">VSCode Setup</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../vs_code_setup.html">VSCode Setup</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Future Work</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../future_work.html">Future Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">modalities</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Modalities</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">modalities.preprocessing.shuffle_data</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for modalities.preprocessing.shuffle_data</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">Random</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">MutableSequence</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">modalities.dataloader.create_packed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmbeddedStreamData</span>
+
+
+<div class="viewcode-block" id="DataShuffler">
+<a class="viewcode-back" href="../../../api/modalities.preprocessing.html#modalities.preprocessing.shuffle_data.DataShuffler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DataShuffler</span><span class="p">:</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_shuffle_mutable_sequence_in_place</span><span class="p">(</span><span class="n">mutable_sequence</span><span class="p">:</span> <span class="n">MutableSequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shuffle a mutable sequence in-place.&quot;&quot;&quot;</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">Random</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="n">rng</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">mutable_sequence</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_batch</span><span class="p">(</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">start_position</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Process a batch of index entries to extract documents and create a new index.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            batch (list[tuple[int, int]]): List of index entries [(start, length), ...].</span>
+<span class="sd">            data (bytes): Byte stream of the entire data loaded in memory.</span>
+<span class="sd">            start_position (int): The starting position for this batch in the byte stream.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[bytes, list[tuple[int, int]]]: A tuple containing the processed data (bytes)</span>
+<span class="sd">            and the new index [(position, length), ...].</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">processed_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">new_index</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">current_position</span> <span class="o">=</span> <span class="n">start_position</span>
+
+        <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+            <span class="c1"># Access the data slice directly from the in-memory bytes</span>
+            <span class="n">document</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">start</span> <span class="p">:</span> <span class="n">start</span> <span class="o">+</span> <span class="n">length</span><span class="p">]</span>
+            <span class="n">processed_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>  <span class="c1"># Already bytes</span>
+
+            <span class="c1"># Record the current position and length in the new index</span>
+            <span class="n">new_index</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_position</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+            <span class="n">current_position</span> <span class="o">+=</span> <span class="n">length</span>
+
+        <span class="k">return</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">processed_data</span><span class="p">),</span> <span class="n">new_index</span>
+
+<div class="viewcode-block" id="DataShuffler.shuffle_tokenized_data">
+<a class="viewcode-back" href="../../../api/modalities.preprocessing.html#modalities.preprocessing.shuffle_data.DataShuffler.shuffle_tokenized_data">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shuffle_tokenized_data</span><span class="p">(</span>
+        <span class="n">input_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">output_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shuffles a tokenized file (.pbin).</span>
+<span class="sd">        Shuffled data is written to the specified output file.</span>
+
+<span class="sd">        Note that the tokenized data is fully materialized in-memory.</span>
+
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_data_path (Path): Path to the tokenized data (.pbin).</span>
+<span class="sd">            output_data_path (Path): Path to write the shuffled tokenized data.</span>
+<span class="sd">            batch_size (int): Number of documents to process per batch.</span>
+<span class="sd">            seed (Optional[int], optional): Seed for the random number generator. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Step 1: Load the entire data into memory</span>
+        <span class="k">with</span> <span class="n">input_data_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="c1"># Read the header</span>
+            <span class="n">data_section_length_in_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">DATA_SECTION_LENGTH_IN_BYTES</span><span class="p">)</span>
+            <span class="n">data_len</span> <span class="o">=</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">data_section_length_in_bytes</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;little&quot;</span><span class="p">)</span>
+
+            <span class="n">token_size_as_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">EmbeddedStreamData</span><span class="o">.</span><span class="n">TOKEN_SIZE_DESCRIPTOR_LENGTH_IN_BYTES</span><span class="p">)</span>
+
+            <span class="c1"># Load the data</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">data_len</span><span class="p">)</span>
+
+            <span class="c1"># Load the index</span>
+            <span class="n">pkl_encoded_index</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="n">index_base</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pkl_encoded_index</span><span class="p">)</span>
+
+        <span class="c1"># Step 2: Shuffle the index</span>
+        <span class="n">DataShuffler</span><span class="o">.</span><span class="n">_shuffle_mutable_sequence_in_place</span><span class="p">(</span><span class="n">mutable_sequence</span><span class="o">=</span><span class="n">index_base</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="c1"># Step 3: Divide the shuffled index into batches</span>
+        <span class="n">batches</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">index_base</span><span class="p">[</span><span class="n">i</span> <span class="p">:</span> <span class="n">i</span> <span class="o">+</span> <span class="n">batch_size</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_base</span><span class="p">),</span> <span class="n">batch_size</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">header_data</span> <span class="o">=</span> <span class="n">data_section_length_in_bytes</span> <span class="o">+</span> <span class="n">token_size_as_bytes</span>
+
+        <span class="n">output_data_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">output_data_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="c1"># Write the header data</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">header_data</span><span class="p">)</span>
+            <span class="n">current_position</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">final_index</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># Process and write each batch sequentially</span>
+            <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">batches</span><span class="p">:</span>
+                <span class="n">data_segment</span><span class="p">,</span> <span class="n">new_index</span> <span class="o">=</span> <span class="n">DataShuffler</span><span class="o">.</span><span class="n">_process_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">current_position</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data_segment</span><span class="p">)</span>
+                <span class="n">final_index</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">new_index</span><span class="p">)</span>
+                <span class="n">current_position</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_segment</span><span class="p">)</span>
+
+            <span class="c1"># Write the final index to the file</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">final_index</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="DataShuffler.shuffle_jsonl_data">
+<a class="viewcode-back" href="../../../api/modalities.preprocessing.html#modalities.preprocessing.shuffle_data.DataShuffler.shuffle_jsonl_data">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shuffle_jsonl_data</span><span class="p">(</span><span class="n">input_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">output_data_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># read jsonl and store in RAM</span>
+        <span class="k">with</span> <span class="n">input_data_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+
+        <span class="n">DataShuffler</span><span class="o">.</span><span class="n">_shuffle_mutable_sequence_in_place</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">output_data_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Fraunhofer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

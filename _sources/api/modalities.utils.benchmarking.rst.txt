@@ -1,0 +1,29 @@
+modalities.utils.benchmarking package
+=====================================
+
+Submodules
+----------
+
+modalities.utils.benchmarking.benchmarking\_utils module
+--------------------------------------------------------
+
+.. automodule:: modalities.utils.benchmarking.benchmarking_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.benchmarking.sweep\_utils module
+-------------------------------------------------
+
+.. automodule:: modalities.utils.benchmarking.sweep_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.utils.benchmarking
+   :members:
+   :show-inheritance:
+   :undoc-members:

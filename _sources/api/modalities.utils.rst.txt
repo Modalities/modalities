@@ -1,0 +1,126 @@
+modalities.utils package
+========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.utils.benchmarking
+   modalities.utils.profilers
+
+Submodules
+----------
+
+modalities.utils.communication\_test module
+-------------------------------------------
+
+.. automodule:: modalities.utils.communication_test
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.debug module
+-----------------------------
+
+.. automodule:: modalities.utils.debug
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.debug\_components module
+-----------------------------------------
+
+.. automodule:: modalities.utils.debug_components
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.debugging\_configs module
+------------------------------------------
+
+.. automodule:: modalities.utils.debugging_configs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.deprecated\_alias module
+-----------------------------------------
+
+.. automodule:: modalities.utils.deprecated_alias
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.file\_ops module
+---------------------------------
+
+.. automodule:: modalities.utils.file_ops
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.logger\_utils module
+-------------------------------------
+
+.. automodule:: modalities.utils.logger_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.maybe\_list\_parameter module
+----------------------------------------------
+
+.. automodule:: modalities.utils.maybe_list_parameter
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.mfu module
+---------------------------
+
+.. automodule:: modalities.utils.mfu
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.number\_conversion module
+------------------------------------------
+
+.. automodule:: modalities.utils.number_conversion
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.seeding module
+-------------------------------
+
+.. automodule:: modalities.utils.seeding
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.typing\_utils module
+-------------------------------------
+
+.. automodule:: modalities.utils.typing_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.utils.verify\_tokenization\_consistency module
+---------------------------------------------------------
+
+.. automodule:: modalities.utils.verify_tokenization_consistency
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:

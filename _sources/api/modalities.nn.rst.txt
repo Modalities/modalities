@@ -1,0 +1,37 @@
+modalities.nn package
+=====================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.nn.model_initialization
+
+Submodules
+----------
+
+modalities.nn.attention module
+------------------------------
+
+.. automodule:: modalities.nn.attention
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.nn.mlp module
+------------------------
+
+.. automodule:: modalities.nn.mlp
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.nn
+   :members:
+   :show-inheritance:
+   :undoc-members:

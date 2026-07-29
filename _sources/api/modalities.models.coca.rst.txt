@@ -1,0 +1,53 @@
+modalities.models.coca package
+==============================
+
+Submodules
+----------
+
+modalities.models.coca.attention\_pooling module
+------------------------------------------------
+
+.. automodule:: modalities.models.coca.attention_pooling
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.coca.coca\_model module
+-----------------------------------------
+
+.. automodule:: modalities.models.coca.coca_model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.coca.collator module
+--------------------------------------
+
+.. automodule:: modalities.models.coca.collator
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.coca.multi\_modal\_decoder module
+---------------------------------------------------
+
+.. automodule:: modalities.models.coca.multi_modal_decoder
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.coca.text\_decoder module
+-------------------------------------------
+
+.. automodule:: modalities.models.coca.text_decoder
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.coca
+   :members:
+   :show-inheritance:
+   :undoc-members:

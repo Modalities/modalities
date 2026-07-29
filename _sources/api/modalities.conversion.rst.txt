@@ -1,0 +1,18 @@
+modalities.conversion package
+=============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.conversion.gpt2
+
+Module contents
+---------------
+
+.. automodule:: modalities.conversion
+   :members:
+   :show-inheritance:
+   :undoc-members:

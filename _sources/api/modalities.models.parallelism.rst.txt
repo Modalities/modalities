@@ -1,0 +1,45 @@
+modalities.models.parallelism package
+=====================================
+
+Submodules
+----------
+
+modalities.models.parallelism.pipeline\_parallelism module
+----------------------------------------------------------
+
+.. automodule:: modalities.models.parallelism.pipeline_parallelism
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.parallelism.pipeline\_parallelism\_configs module
+-------------------------------------------------------------------
+
+.. automodule:: modalities.models.parallelism.pipeline_parallelism_configs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.parallelism.stages\_generator module
+------------------------------------------------------
+
+.. automodule:: modalities.models.parallelism.stages_generator
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.models.parallelism.stages\_generator\_configs module
+---------------------------------------------------------------
+
+.. automodule:: modalities.models.parallelism.stages_generator_configs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.models.parallelism
+   :members:
+   :show-inheritance:
+   :undoc-members:
