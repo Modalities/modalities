@@ -351,10 +351,11 @@ lr_scheduler:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    num_warmup_steps: 500
-    num_training_steps: ${settings.training_target.num_target_steps}
+    warmup_steps: 500
+    total_steps: ${settings.training_target.num_target_steps}
+    initial_lr: 4.5e-5
     max_lr: 4.5e-4
-    min_lr: 4.5e-5
+    final_lr: 4.5e-5
 
 # The `moe_load_balanced` decorator adds the auxiliary-loss-free expert bias update as an optimizer
 # step pre-hook. Pinning it to the optimizer step (rather than the forward pass) is what makes it

@@ -1,41 +1,66 @@
-# Nemotron-3 Nano lorem-ipsum training config for 4x A100 80GB.
+# Nemotron-3 Nano real-data training config for 4x A100 80GB.
 #
-# This keeps the *full width* of Nemotron-3 Nano 30B-A3B (arXiv:2512.20848) - model dimension 2688,
-# 64 Mamba-2 heads of dim 64, 128 routed experts of dim 1856 with top-6 routing and 2 shared
-# experts, 32 query / 2 KV attention heads of head dim 128 - and only cuts the depth from 52 to 16
-# layers so that it fits on four GPUs. The layer pattern is the first 16 characters of the published
-# pattern, which preserves the Mamba / MoE / attention interleaving and ratio (7 : 7 : 2 here versus
-# 23 : 23 : 6 in the full model).
+# This is the runnable-on-real-data counterpart to config_lorem_ipsum_nemotron_nano_fsdp2.yaml.
+# Same architecture, but at production sequence length (4096) on a Llama-3 tokenized FineWeb slice,
+# with the fused Mamba-2 kernels and a proper warmup + cosine schedule.
+#
+# ARCHITECTURE
+# Full width of Nemotron-3 Nano 30B-A3B (arXiv:2512.20848) - model dimension 2688, 64 Mamba-2 heads
+# of dim 64, 128 routed experts of dim 1856 with top-6 routing plus 2 shared experts, 32 query / 2 KV
+# attention heads of head dim 128 - with depth cut from 52 to 16 layers to fit four GPUs. The layer
+# pattern is the first 16 characters of the published pattern, preserving the Mamba / MoE / attention
+# interleaving and ratio (7 : 7 : 2 here versus 23 : 23 : 6 in the full model).
 #
 # Hyperparameter values are adopted from the Megatron-Bridge recipe
 # `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`, Copyright (c) 2026,
 # NVIDIA CORPORATION, licensed under the Apache License, Version 2.0.
 #
-# Size and memory, measured on 4x A100-SXM4-80GB (FSDP2 full shard, AdamW, seq 512, micro batch 1):
+# DATA
+# Both files are byte-exact, provably disjoint slices of a document-shuffled FineWeb sample-10BT
+# tokenized with the Llama-3 tokenizer (vocab 128256, 4 bytes per token):
 #
-#   layers  pattern             parameters   active/token   peak allocated / GPU
-#   16      MEMEM*EMEMEM*EME    9.67B        1.15B          46.1 GiB
-#    9      MEMEM*EME           5.64B        0.77B          28.9 GiB
+#   role   file                                                tokens         source token range
+#   train  ..._train-head-2B-tokens.pbin                       2,000,000,000  [0, 2e9)
+#   eval   ..._eval-tail-2M-tokens.pbin                            2,000,000  [9,692,110,008, 9,694,110,008)
 #
-# `active/token` counts the embedding and the untied lm_head, which together are 270M of it here.
+# The split is a head/tail cut rather than a random split so that disjointness is a property of the
+# byte offsets and needs no bookkeeping. The source file is document-shuffled (seed 42), so the head
+# is distributionally representative. A larger 20M-token held-out slice from the same tail region
+# (`..._eval-tail-20M-tokens.pbin`, 4,882 sequences) is also available for a final evaluation; it is
+# too slow for periodic in-training eval, which is why the 2M slice is wired up here.
 #
-# This file uses the 16-layer variant. For 40GB cards, set `n_layer: 9` and
-# `layer_pattern: "MEMEM*EME"`. Every MoE layer costs ~1.30B parameters, a Mamba layer ~39M and an
-# attention layer ~23M, so the depth/memory trade-off is driven almost entirely by the `E` count.
+# The 2B-token head is sized to what this hardware can actually consume, not to the full 9.69B-token
+# sample. To train on the full sample instead, point `train_dataset_path` at the original
+# `fineweb_sample-10BT-shuffled-seed_42-bs_100.pbin` - but note that it *contains* the eval tail, so
+# either re-carve a head slice or switch to a held-out set from a different corpus.
 #
-# Persistent state is 16 bytes per parameter (fp32 shard + fp32 grad + two fp32 Adam moments)
-# divided across the 4 ranks; the remainder of the peak is the unsharded bf16 all-gather of the
-# largest FSDP unit (one ~1.3B-parameter MoE layer, ~2.4 GiB) plus prefetch and activations.
+# SIZE AND MEMORY (4x A100-SXM4-80GB, FSDP2 full shard, AdamW, bf16 params / fp32 reduce)
+#
+#   parameters         10.09B      (16 layers; the larger vocab adds 419M over the GPT-2 vocab variant)
+#   active per token     1.57B      (includes the 690M embedding + untied lm_head)
+#   global batch          32 sequences = 131,072 tokens  (4 ranks x 1 micro batch x 8 accum steps)
+#   target steps       15,258       for one pass over the 2B-token head
+#
+# Persistent optimizer state dominates: fp32 shard + fp32 grad + two fp32 Adam moments is 16 bytes
+# per parameter, sharded four ways, i.e. 37.6 GiB per GPU. The rest of the peak is the unsharded bf16
+# all-gather of the largest FSDP unit (one ~1.3B-parameter MoE layer, ~2.6 GiB) plus its prefetch,
+# the checkpointed layer inputs (~350 MiB), and the vocabulary projection - 4096 x 128256 logits are
+# ~1 GiB in bf16 and the cross-entropy upcasts them, so budget ~5 GiB there. Expect ~51-55 GiB per
+# GPU. For 40GB cards set `n_layer: 9` with `layer_pattern: "MEMEM*EME"` (6.06B parameters,
+# 22.6 GiB of persistent state).
 #
 # Run with:
 #   torchrun --nnodes 1 --nproc_per_node 4 --rdzv-endpoint=0.0.0.0:29555 \
 #     $(which modalities) run \
-#     --config_file_path config_files/training/config_lorem_ipsum_nemotron_nano_fsdp2.yaml \
+#     --config_file_path config_files/training/config_fineweb_nemotron_nano_fsdp2.yaml \
 #     --experiments_root_path data/experiments
 #
-# NOTE ON THROUGHPUT: `ssd_backend: native` is the dependency-free pure-PyTorch state space scan.
-# It is correct but slow. Install the optional extra (`pip install -e '.[mamba]'`) and switch to
-# `ssd_backend: fused` for anything beyond a smoke test.
+# Use one virtual environment for both `torchrun` and `modalities` - mixing them picks up a different
+# torch build and the fused Mamba kernels will be missing.
+#
+# `ssd_backend: fused` requires the optional extra: `pip install -e '.[mamba]'`. The fused and native
+# backends are numerically equivalent (verified to 1e-3 in tests/models/components/test_mamba2.py);
+# switch to `native` if the kernels are unavailable, at a substantial throughput cost.
 
 settings:
   experiment_id: ${modalities_env:experiment_id}
@@ -50,27 +75,27 @@ settings:
     world_size: ${cuda_env:WORLD_SIZE}
   paths:
     checkpoint_saving_path: data/checkpoints
-    train_dataset_path: ./data/lorem_ipsum_long.pbin
-    test_dataset_path: ./data/lorem_ipsum.pbin
+    train_dataset_path: /raid/s3/opengptx/max_lue/repositories/training_datasets/processed/fineweb_sample-10BT-shuffled_train-head-2B-tokens.pbin
+    test_dataset_path: /raid/s3/opengptx/max_lue/repositories/training_datasets/processed/fineweb_sample-10BT-shuffled_eval-tail-2M-tokens.pbin
     experiments_root_path: ${modalities_env:experiments_root_path}
   intervals:
-    training_log_interval_in_steps: 1
-    # A DCP checkpoint of this model is ~109 GiB (9.67B parameters plus fp32 Adam state, written by
-    # all 4 ranks), so checkpoint once near the end rather than every 16 steps - the latter would
-    # write over 1 TB across a 162-step run. Raise the frequency only if you have the disk for it.
-    checkpointing_interval_in_steps: 160
-    evaluation_interval_in_steps: 16
+    training_log_interval_in_steps: 10
+    # A DCP checkpoint of this model is ~113 GiB (10.09B parameters plus fp32 Adam state, written by
+    # all 4 ranks). Combined with `k: 1` below, at most ~226 GiB is on disk transiently while a new
+    # checkpoint is written next to the retained one. Check free space before lowering this.
+    checkpointing_interval_in_steps: 5000
+    evaluation_interval_in_steps: 250
   consistency_enforcement:
-    enforce_tokens_per_step_consistency: false
+    enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
     enforce_last_step_evaluated: false
     enforce_last_step_checkpointed: false
   step_profile:
-    gradient_accumulation_steps: 1
+    # Gradient accumulation buys a sane global batch (32 sequences / 131k tokens) at micro batch 1,
+    # which is what the ~40 GiB of resident optimizer state leaves room for at sequence length 4096.
+    gradient_accumulation_steps: 8
     local_train_micro_batch_size: 1
-    # 512 with a Mamba chunk size of 128 gives four scan chunks, so the inter-chunk state passing
-    # is actually exercised rather than degenerating to a single chunk.
-    sequence_length: 512
+    sequence_length: 4096
     dp_degree:
       instance_key: dp_degree
       pass_type: BY_REFERENCE
@@ -117,6 +142,9 @@ train_dataset:
     raw_data_path: ${settings.paths.train_dataset_path}
     sequence_length: ${settings.step_profile.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
+    # Pretraining: the last target token of a sample is the first input token of the next, so no
+    # token is wasted at block boundaries.
+    reuse_last_target: true
 
 train_dataloader:
   component_key: data_loader
@@ -158,6 +186,7 @@ test_dataset:
     raw_data_path: ${settings.paths.test_dataset_path}
     sequence_length: ${settings.step_profile.sequence_length}
     sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: true
 
 test_dataloader:
   component_key: data_loader
@@ -173,7 +202,9 @@ test_dataloader:
       component_key: batch_sampler
       variant_key: default
       config:
-        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        # Forward-only, so a larger batch than training fits. 488 eval sequences across 4 ranks at
+        # batch size 2 is exactly 61 eval steps per pass.
+        batch_size: 2
         drop_last: true
         sampler:
           component_key: sampler
@@ -202,11 +233,9 @@ checkpoint_saving:
       component_key: checkpoint_saving_strategy
       variant_key: save_k_most_recent_checkpoints_strategy
       config:
-        # -1 keeps every checkpoint, as in config_lorem_ipsum_long_fsdp2.yaml. Since only one
-        # checkpoint is written here (see checkpointing_interval_in_steps), rotation never kicks in.
-        # Setting a positive k does work - checkpoint rotation with the `dcp` execution is fixed -
-        # but each checkpoint of this model is ~109 GiB, so prefer a coarse interval over rotation.
-        k: -1
+        # Keep only the newest checkpoint - each is ~113 GiB. Rotation with the `dcp` execution is
+        # fixed (see tests/checkpointing/test_dcp_checkpoint_deletion.py).
+        k: 1
     checkpoint_saving_execution:
       component_key: checkpoint_saving_execution
       variant_key: dcp
@@ -323,8 +352,9 @@ model_raw:
     prediction_key: ${settings.referencing_keys.prediction_key}
     aux_loss_key: moe_aux_loss
     sequence_length: ${settings.step_profile.sequence_length}
-    # GPT-2 vocab of 50257, padded to a multiple of 128 (the lorem ipsum data is GPT-2 tokenized).
-    vocab_size: 50304
+    # Llama-3 tokenizer, matching the tokenization of the FineWeb slices above. Already a multiple
+    # of 128 (128256 = 1002 * 128), so no padding is needed.
+    vocab_size: 128256
     n_embd: 2688
     # Full Nemotron-3 Nano is 52 layers; trimmed to 16 to fit four GPUs. Keep this in sync with
     # the length of layer_pattern - the model validates it.
@@ -347,8 +377,9 @@ model_raw:
           mamba_state_dim: 128
           mamba_n_groups: 8
           d_conv: 4
+          # 4096 / 128 = 32 scan chunks.
           chunk_size: 128
-          ssd_backend: native   # switch to `fused` once mamba-ssm / causal-conv1d are installed
+          ssd_backend: fused
           norm_config: *nemotron_norm_config
       "E":
         component_key: nemotron_layer_spec
@@ -378,20 +409,21 @@ model_raw:
           attention_implementation: pytorch_flash
           norm_config: *nemotron_norm_config
 
+# Warmup then cosine decay to 10% of peak, the standard LLM pretraining schedule and what the
+# reference recipe uses. `warmup_steps` is absolute, so it must stay well below `total_steps`
+# (~15,258 here); 750 is ~5% of the run. Re-tune it if you change the token budget or batch size.
 lr_scheduler:
   component_key: scheduler
-  variant_key: onecycle_lr
+  variant_key: linear_warmup_cosine_annealing_lr
   config:
     optimizer:
       instance_key: optimizer
       pass_type: BY_REFERENCE
-    max_lr: 4.5e-4
-    div_factor: 10
-    final_div_factor: 1
+    warmup_steps: 750
     total_steps: ${settings.training_target.num_target_steps}
-    pct_start: 0.1
-    anneal_strategy: cos
-    last_epoch: ${settings.training_progress.last_step}
+    initial_lr: 4.5e-5
+    max_lr: 4.5e-4
+    final_lr: 4.5e-5
 
 # The `moe_load_balanced` decorator adds the auxiliary-loss-free expert bias update as an optimizer
 # step pre-hook. Pinning it to the optimizer step (rather than the forward pass) is what makes it
@@ -453,7 +485,7 @@ evaluation_subscriber:
   variant_key: wandb
   config:
     global_rank: ${settings.cuda_env.global_rank}
-    project: modalities_nemotron_tests
+    project: modalities_nemotron_fineweb
     mode: OFFLINE
     experiment_id: ${settings.experiment_id}
     directory: wandb_storage
