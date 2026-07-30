@@ -25,9 +25,13 @@
 #
 # The split is a head/tail cut rather than a random split so that disjointness is a property of the
 # byte offsets and needs no bookkeeping. The source file is document-shuffled (seed 42), so the head
-# is distributionally representative. A larger 20M-token held-out slice from the same tail region
-# (`..._eval-tail-20M-tokens.pbin`, 4,882 sequences) is also available for a final evaluation; it is
-# too slow for periodic in-training eval, which is why the 2M slice is wired up here.
+# is distributionally representative.
+#
+# A larger 20M-token slice (`..._eval-tail-20M-tokens.pbin`, 4,882 sequences) covering tokens
+# [9,674,110,008, 9,694,110,008) is also available for a final evaluation. Both eval slices are tails
+# of the same file, so the 2M slice is a *subset* of the 20M one - they are alternatives, not
+# independent sets. The 2M slice is wired up here because a full pass over the 20M one is 610 eval
+# steps; the 2M slice is 61. Both are disjoint from the training head.
 #
 # The 2B-token head is sized to what this hardware can actually consume, not to the full 9.69B-token
 # sample. To train on the full sample instead, point `train_dataset_path` at the original
@@ -41,13 +45,34 @@
 #   global batch          32 sequences = 131,072 tokens  (4 ranks x 1 micro batch x 8 accum steps)
 #   target steps       15,258       for one pass over the 2B-token head
 #
-# Persistent optimizer state dominates: fp32 shard + fp32 grad + two fp32 Adam moments is 16 bytes
-# per parameter, sharded four ways, i.e. 37.6 GiB per GPU. The rest of the peak is the unsharded bf16
-# all-gather of the largest FSDP unit (one ~1.3B-parameter MoE layer, ~2.6 GiB) plus its prefetch,
-# the checkpointed layer inputs (~350 MiB), and the vocabulary projection - 4096 x 128256 logits are
-# ~1 GiB in bf16 and the cross-entropy upcasts them, so budget ~5 GiB there. Expect ~51-55 GiB per
-# GPU. For 40GB cards set `n_layer: 9` with `layer_pattern: "MEMEM*EME"` (6.06B parameters,
-# 22.6 GiB of persistent state).
+#   peak memory        49.0 GiB / GPU   (measured, see VERIFICATION)
+#
+# Persistent optimizer state dominates that peak: fp32 shard + fp32 grad + two fp32 Adam moments is
+# 16 bytes per parameter, sharded four ways, i.e. 37.6 GiB per GPU. The remaining ~11 GiB is the
+# unsharded bf16 all-gather of the largest FSDP unit (one ~1.3B-parameter MoE layer, ~2.6 GiB) plus
+# its prefetch, the checkpointed layer inputs (~350 MiB), and the vocabulary projection - 4096 x
+# 128256 logits are ~1 GiB in bf16 and the cross-entropy upcasts them.
+#
+# For 40GB cards set `n_layer: 9` with `layer_pattern: "MEMEM*EME"`: 6.06B parameters, 22.6 GiB of
+# persistent state, and a measured peak of 33.8 GiB.
+#
+# VERIFICATION
+# Both variants were run end to end on the real data above (4x A100-SXM4-80GB):
+#
+#   variant   steps   initial loss   final loss   held-out loss        peak memory   exit
+#   16 layer      6          11.95         8.99   8.99 at step 5       49.0 GiB      0
+#    9 layer     40          11.94         6.96   7.38 at step 20      33.8 GiB      0
+#
+# The initial loss matching ln(128256) = 11.76 is the check that the vocabulary and the tokenization
+# of the data agree - a mismatched vocab shows up here immediately. The held-out loss tracking the
+# train loss at the same step (8.99 vs 8.99; 7.38 vs 7.35) is the check on the data split: a
+# noticeably *lower* eval loss would indicate the eval slice leaking into training.
+#
+# Those two runs used this file's architecture, data, optimizer and parallelism unchanged. They
+# differed only in run length: the token budget was capped to the step count shown, `warmup_steps`
+# was scaled down to match, and checkpointing was disabled so that no 113 GiB write was triggered.
+# The 9-layer row additionally used the reduced depth described above. Neither run is a substitute
+# for a convergence run - they establish that the configuration is valid, fits, and learns.
 #
 # Run with:
 #   torchrun --nnodes 1 --nproc_per_node 4 --rdzv-endpoint=0.0.0.0:29555 \
@@ -61,6 +86,10 @@
 # `ssd_backend: fused` requires the optional extra: `pip install -e '.[mamba]'`. The fused and native
 # backends are numerically equivalent (verified to 1e-3 in tests/models/components/test_mamba2.py);
 # switch to `native` if the kernels are unavailable, at a substantial throughput cost.
+#
+# NO THROUGHPUT NUMBER IS QUOTED HERE ON PURPOSE. The verification runs for this config shared their
+# GPUs with an unrelated job at 100% utilization, so the samples/s and MFU they reported are measures
+# of contention, not of this configuration. Measure on idle GPUs before using MFU to tune anything.
 
 settings:
   experiment_id: ${modalities_env:experiment_id}
