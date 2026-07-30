@@ -8,7 +8,16 @@ from pydantic import BaseModel, Field
 
 from modalities.models.gpt2.gpt2_model import GPT2LLM
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
+from modalities.nn.model_initialization.initialization_routines import normalize_parameter_name
 from modalities.utils.logger_utils import get_logger
+
+# Truncation bounds for trunc_normal_, expressed in standard deviations. torch's trunc_normal_
+# takes `a`/`b` as *absolute* values, so they must be scaled by std. Using an absolute bound that
+# is far outside the distribution (e.g. +-2 with std=0.007, i.e. +-283 sigma) is not merely a no-op:
+# the erf limits of the inverse-transform sampler saturate, its singular edge is reachable, and the
+# final clamp pins the affected element to exactly the bound. That injected one weight of magnitude
+# 2.0 into roughly 0.3% of tensors - a 283 sigma outlier that dominated the tensor's variance.
+_TRUNCATION_IN_STDS = 3.0
 
 logger = get_logger(name="llama3 initialization")
 
@@ -47,8 +56,6 @@ class Llama3Initializer(ModelInitializationIF):
                 {
                     "mean": 0.0,
                     "std": 0.02,
-                    "a": -2,
-                    "b": 2,
                 },
             ),
             # final attention projection in attention block
@@ -61,8 +68,6 @@ class Llama3Initializer(ModelInitializationIF):
                         if self.depth_init
                         else 0.02 / math.sqrt(2 * self.num_layers)
                     ),
-                    "a": -2,
-                    "b": 2,
                 },
             ),
             # SwiGLU
@@ -71,8 +76,6 @@ class Llama3Initializer(ModelInitializationIF):
                 {
                     "mean": 0.0,
                     "std": 0.02,
-                    "a": -2,
-                    "b": 2,
                 },
             ),
             r"transformer\.h\.\d+\.mlp\.(V|W_2)\.weight": (
@@ -84,8 +87,6 @@ class Llama3Initializer(ModelInitializationIF):
                         if self.depth_init
                         else 0.02 / math.sqrt(2 * self.num_layers)
                     ),
-                    "a": -2,
-                    "b": 2,
                 },
             ),
         }
@@ -136,10 +137,11 @@ class Llama3Initializer(ModelInitializationIF):
                     f"Bias initialization is not allowed for Llama3Initializer. Found bias parameter: {parameter_name}"
                 )
             match_count = 0
+            # Strip FQN modifications introduced by torch.compile, activation checkpointing and
+            # FSDP1 so that the regexes can be written against the plain model. Done once, before
+            # the loop, rather than repeatedly inside it.
+            parameter_name = normalize_parameter_name(parameter_name)
             for weight_regex in regex_to_init.keys():
-                parameter_name = parameter_name.replace(
-                    "_orig_mod.", ""
-                )  # remove FQN modification from torch.compile if present
                 if re.fullmatch(weight_regex, parameter_name):
                     init_fn, arg_dict = regex_to_init[weight_regex]
                     if arg_dict["std"] is not None and callable(arg_dict["std"]):
@@ -154,6 +156,11 @@ class Llama3Initializer(ModelInitializationIF):
                                 f"Could not extract layer_id from parameter name {parameter_name} "
                                 "for dynamic std calculation"
                             )
+                    if init_fn is trunc_normal_ and "a" not in arg_dict:
+                        # Bounds are expressed relative to std; see _TRUNCATION_IN_STDS.
+                        arg_dict = arg_dict.copy()
+                        arg_dict["a"] = -_TRUNCATION_IN_STDS * arg_dict["std"]
+                        arg_dict["b"] = _TRUNCATION_IN_STDS * arg_dict["std"]
                     init_fn(p, **arg_dict)
                     match_count += 1
                     hits[weight_regex] += 1

@@ -41,29 +41,22 @@ class StagesGenerator(ABC):
         # The computational weight of the input and output modules are estimated
         # based on the number of layers they correspond to.
         potential_split_points = self._get_potential_split_points()
-        # Calculate the weight per stage based on the total weight and number of stages
-        weight_per_stage = math.ceil(sum(weight for _, weight in potential_split_points) / num_virtual_stages)
-        # pack the stages with the layers
-        next_split_point = 0
-        module_names_per_stage: list[list[str]] = []
-        for _ in range(num_virtual_stages):
-            stage_fqns = []
-            stage_weight = 0
-            while next_split_point < len(potential_split_points):
-                fqns, weight = potential_split_points[next_split_point]
-                if weight > weight_per_stage:
-                    raise ValueError(
-                        f"Weight of {weight} for {fqns} exceeds weight per stage {weight_per_stage}. "
-                        "Please adjust the number of stages or the weight distribution."
-                    )
-                if stage_weight + weight > weight_per_stage:
-                    break
-                stage_fqns.extend(fqns)
-                stage_weight += weight
-                next_split_point += 1
-            module_names_per_stage.append(stage_fqns)
-
-        return module_names_per_stage
+        if num_virtual_stages > len(potential_split_points):
+            raise ValueError(
+                f"Cannot build {num_virtual_stages} pipeline stages from only "
+                f"{len(potential_split_points)} split points. Increase num_layers_per_stage or "
+                f"reduce the pipeline degree."
+            )
+        # Pack the split points into contiguous stages, balancing computational weight.
+        #
+        # This used to pack greedily against a fixed per-stage weight cap, looping exactly
+        # num_virtual_stages times. When the packing did not happen to fit, whatever was left over
+        # was never assigned to any stage and was silently discarded - typically the output split
+        # point, producing a pipeline with no lm_head on any stage. Uniform per-layer weights (as
+        # in GPT2) always happen to fit, which is why this went unnoticed; any generator with
+        # non-uniform weights hits it.
+        groups = _partition_contiguous(potential_split_points, num_parts=num_virtual_stages)
+        return [[fqn for fqns, _ in group for fqn in fqns] for group in groups]
 
     @abstractmethod
     def _get_potential_split_points(self) -> list[tuple[list[str], int]]:
@@ -114,3 +107,103 @@ class GPT2LLMStagesGenerator(StagesGenerator):
         ]
 
         return potential_split_points
+
+
+def _greedy_pack(split_points: list[tuple[list[str], int]], weight_cap: int) -> list[list[tuple[list[str], int]]]:
+    """
+    Packs split points left to right into contiguous groups, each at most ``weight_cap`` heavy.
+
+    Unlike a fixed-stage-count loop, this consumes every split point: a group is closed and a new
+    one started whenever the cap would be exceeded.
+
+    Args:
+        split_points (list[tuple[list[str], int]]): The split points with their weights, in order.
+        weight_cap (int): Maximum weight per group. Must be at least the heaviest split point.
+
+    Returns:
+        list[list[tuple[list[str], int]]]: The resulting groups, covering every split point.
+    """
+    groups: list[list[tuple[list[str], int]]] = []
+    current: list[tuple[list[str], int]] = []
+    current_weight = 0
+    for split_point in split_points:
+        weight = split_point[1]
+        if current and current_weight + weight > weight_cap:
+            groups.append(current)
+            current, current_weight = [], 0
+        current.append(split_point)
+        current_weight += weight
+    if current:
+        groups.append(current)
+    return groups
+
+
+def _best_binary_split(group: list[tuple[list[str], int]]) -> int:
+    """
+    Finds the index at which splitting a group minimizes the weight of its heavier half.
+
+    Args:
+        group (list[tuple[list[str], int]]): The group to split, with at least two entries.
+
+    Returns:
+        int: The split index, in ``[1, len(group) - 1]``.
+    """
+    weights = [weight for _, weight in group]
+    total = sum(weights)
+    best_index, best_cost = 1, None
+    prefix = 0
+    for index in range(1, len(group)):
+        prefix += weights[index - 1]
+        cost = max(prefix, total - prefix)
+        if best_cost is None or cost < best_cost:
+            best_index, best_cost = index, cost
+    return best_index
+
+
+def _partition_contiguous(
+    split_points: list[tuple[list[str], int]], num_parts: int
+) -> list[list[tuple[list[str], int]]]:
+    """
+    Partitions split points into exactly ``num_parts`` contiguous, non-empty, balanced groups.
+
+    Finds the smallest per-group weight cap for which a left-to-right greedy pass fits within
+    ``num_parts`` groups (binary search over the cap), then splits the heaviest splittable group
+    until the requested count is reached. Every split point is assigned exactly once.
+
+    Args:
+        split_points (list[tuple[list[str], int]]): The split points with their weights, in order.
+        num_parts (int): The exact number of groups to produce.
+
+    Raises:
+        ValueError: If there are fewer split points than requested groups.
+
+    Returns:
+        list[list[tuple[list[str], int]]]: The groups, covering every split point exactly once.
+    """
+    if num_parts > len(split_points):
+        raise ValueError(f"Cannot partition {len(split_points)} split points into {num_parts} groups.")
+    if num_parts == 1:
+        return [list(split_points)]
+
+    weights = [weight for _, weight in split_points]
+    low, high = max(weights), sum(weights)
+    feasible_cap = high
+    while low <= high:
+        candidate = (low + high) // 2
+        if len(_greedy_pack(split_points, weight_cap=candidate)) <= num_parts:
+            feasible_cap = candidate
+            high = candidate - 1
+        else:
+            low = candidate + 1
+
+    groups = _greedy_pack(split_points, weight_cap=feasible_cap)
+    # The binary search only guarantees "at most num_parts" groups. Split the heaviest splittable
+    # group until the requested count is reached; pipeline parallelism needs exactly this many.
+    while len(groups) < num_parts:
+        splittable = [index for index, group in enumerate(groups) if len(group) > 1]
+        heaviest = max(splittable, key=lambda index: sum(weight for _, weight in groups[index]))
+        group = groups.pop(heaviest)
+        split_index = _best_binary_split(group)
+        groups.insert(heaviest, group[split_index:])
+        groups.insert(heaviest, group[:split_index])
+    return groups
