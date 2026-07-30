@@ -43,9 +43,23 @@ linting = ["pre-commit"]
 tests = ["pytest", "pytest-cov", "debugpy"]
 
 # Fused Mamba-2 kernels. Optional: the hybrid Mamba-Transformer models ship a pure-PyTorch
-# state space scan (ssd_backend="native") that runs everywhere. Install this extra and set
-# ssd_backend="fused" for large-scale training, where the Triton kernels are substantially
-# faster and use less activation memory. Requires a CUDA toolchain to build.
+# state space scan (ssd_backend="native") that runs everywhere. Install this extra to use
+# ssd_backend="fused", which is numerically verified against the native backend. Note that the
+# end-to-end throughput benefit is configuration dependent and was NOT observed at short sequence
+# lengths (see docs/components/nemotron.md). Requires a CUDA toolchain to build.
+#
+# Both packages compile CUDA extensions and must be built against the torch already installed in
+# the environment, so install them with --no-build-isolation --no-deps; letting the resolver see
+# them can otherwise replace torch. causal-conv1d is pinned to a git tag because its PyPI sdist
+# ships without its csrc/*.cpp sources and therefore cannot be built ("ninja: error: ... missing
+# and no known rule to make it"). Verified on Python 3.13 / torch 2.9.1+cu128 / CUDA 12.8:
+#
+#   uv pip install --no-build-isolation --no-deps mamba-ssm==2.2.5
+#   uv pip install --no-build-isolation --no-deps \
+#     "causal-conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@v1.5.0.post8"
+#
+# Setting TORCH_CUDA_ARCH_LIST to just your target architecture (e.g. "8.0" for A100) shortens the
+# causal-conv1d build considerably; mamba-ssm hardcodes its own architecture list and ignores it.
 mamba = [
   "mamba-ssm>=2.2.0; platform_system != 'Darwin'",
   "causal-conv1d>=1.4.0; platform_system != 'Darwin'",

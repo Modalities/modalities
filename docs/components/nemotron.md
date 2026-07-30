@@ -96,12 +96,38 @@ The Mamba-2 mixer has two interchangeable state space scan implementations, sele
 
 | Backend | Requirements | Use |
 |---------|--------------|-----|
-| `native` (default) | none | Pure PyTorch, runs on CPU and GPU, `torch.compile`-friendly. Correct but noticeably slower and more activation-memory hungry. |
-| `fused` | `pip install -e '.[mamba]'`, CUDA | The Triton kernels from `mamba-ssm` / `causal-conv1d`. Use this for real training runs. |
+| `native` (default) | none | Pure PyTorch, runs on CPU and GPU, `torch.compile`-friendly. Uses more activation memory than the fused kernels. |
+| `fused` | the `mamba` extra, CUDA | The Triton kernels from `mamba-ssm` / `causal-conv1d`. |
+
+**Measured throughput.** On 4x A100-80GB at sequence length 512 and micro batch 1, the 16-layer
+9.67B configuration runs at 5.5 samples/s with *either* backend (1-2% MFU). At that shape the
+bottleneck is the FSDP all-gather of a 9.67B model plus the MoE layers, not the state space scan, so
+swapping the scan changes nothing end to end. The fused kernels should matter at long sequence
+lengths and larger batches, where the scan's work and activation memory dominate - but that has not
+been measured here, so treat the fused backend as *numerically verified, throughput unproven*.
 
 The native backend implements the chunk-parallel block decomposition from the Mamba-2 paper and is
 validated against a step-by-step transcription of the recurrence, so it is the reference the fused
 path is checked against. A warning is emitted if `native` is used with `n_embd > 1024`.
+
+The two backends are verified to agree on forward outputs, causality and input gradients
+(`tests/models/nemotron/test_mamba2_mixer.py`, the `requires_fused_kernels` tests) on
+mamba-ssm 2.2.5 / causal-conv1d 1.5.0.post8 with torch 2.9.1+cu128. Those tests skip automatically
+when the extra is not installed.
+
+Installing the extra needs care, because both packages compile CUDA extensions against the torch
+already present:
+
+```bash
+uv pip install --no-build-isolation --no-deps mamba-ssm==2.2.5
+# causal-conv1d's PyPI sdist ships without its csrc/*.cpp sources, so install from the git tag.
+uv pip install --no-build-isolation --no-deps \
+  "causal-conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@v1.5.0.post8"
+```
+
+`--no-deps` keeps the resolver from replacing torch; `--no-build-isolation` makes torch importable
+at build time. Exporting `TORCH_CUDA_ARCH_LIST` (e.g. `"8.0"` for A100) shortens the causal-conv1d
+build; mamba-ssm hardcodes its own architecture list and ignores it.
 
 ## Mixture-of-experts load balancing
 
