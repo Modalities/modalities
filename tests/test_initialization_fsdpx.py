@@ -548,36 +548,32 @@ class TestLlama3LikeInitialization:
         layers = (gpt2_block.attn.q_attn, gpt2_block.attn.k_attn, gpt2_block.attn.v_attn)
         for layer in layers:
             assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
-            assert layer.weight.max().detach().cpu() <= 2
-            assert layer.weight.min().detach().cpu() >= -2
+            # trunc_normal_ bounds are 3 * std; a weight outside them means an out-of-distribution
+            # element slipped in (see _TRUNCATION_IN_STDS in llama3_like_initialization.py).
+            assert layer.weight.max().detach().cpu() <= 3 * 0.02
+            assert layer.weight.min().detach().cpu() >= -3 * 0.02
             assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
     def _test_c_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
         layer = gpt2_block.attn.c_proj
-        if depth_init:
-            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3)
-        else:
-            assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
-
-        assert layer.weight.max().detach().cpu() <= 2
-        assert layer.weight.min().detach().cpu() >= -2
+        expected_std = 0.02 / math.sqrt(2 * (layer_id + 1) if depth_init else 2 * n_layer)
+        assert layer.weight.std().detach().cpu() == pytest.approx(expected_std, abs=1e-3)
+        # Bounds are 3 * std; anything outside means an out-of-distribution element.
+        assert layer.weight.max().detach().cpu() <= 3 * expected_std
+        assert layer.weight.min().detach().cpu() >= -3 * expected_std
         assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
     def _test_swiglu_proj(self, gpt2_block: GPT2Block, depth_init: bool, n_layer: int, layer_id: int):
-        layers = (gpt2_block.mlp.V, gpt2_block.mlp.W_2)
-        for layer in layers:
-            if depth_init:
-                assert layer.weight.std().detach().cpu() == pytest.approx(
-                    0.02 / math.sqrt(2 * (layer_id + 1)), abs=1e-3
-                )
-            else:
-                assert layer.weight.std().detach().cpu() == pytest.approx(0.02 / math.sqrt(2 * n_layer), abs=1e-3)
-            assert layer.weight.max().detach().cpu() <= 2
-            assert layer.weight.min().detach().cpu() >= -2
+        expected_std = 0.02 / math.sqrt(2 * (layer_id + 1) if depth_init else 2 * n_layer)
+        for layer in (gpt2_block.mlp.V, gpt2_block.mlp.W_2):
+            assert layer.weight.std().detach().cpu() == pytest.approx(expected_std, abs=1e-3)
+            # Bounds are 3 * std; anything outside means an out-of-distribution element.
+            assert layer.weight.max().detach().cpu() <= 3 * expected_std
+            assert layer.weight.min().detach().cpu() >= -3 * expected_std
             assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)
 
         layer = gpt2_block.mlp.W
         assert layer.weight.std().detach().cpu() == pytest.approx(0.02, abs=1e-3)
-        assert layer.weight.max().detach().cpu() <= 2
-        assert layer.weight.min().detach().cpu() >= -2
+        assert layer.weight.max().detach().cpu() <= 3 * 0.02
+        assert layer.weight.min().detach().cpu() >= -3 * 0.02
         assert layer.weight.mean().detach().cpu() == pytest.approx(0, abs=1e-3)

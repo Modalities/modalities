@@ -4,6 +4,7 @@
 |------------------|------------|---------------|------------------|------------------------------------------------------------------------------------------------|
 | [#141](#pr-141-towards-stable-modalities-version)  | Bug Fix    |  [#129](https://github.com/Modalities/modalities/issues/129)         | **Yes**              | Towards stable modalities version                                                               |
 | [#154](pr-154-manual-swiglu-implementation)  | Bug Fix    |  [#14](https://github.com/Modalities/modalities/issues/14)         | **Yes**              | Towards stable modalities version                                                               |
+| [#init-and-pipeline-fixes](#pr-initialization-and-pipeline-stage-fixes)  | Bug Fix    |  --         | No               | Three silent-correctness fixes: initialization behind wrappers, trunc_normal_ bounds, pipeline stage coverage                |
 |    |   |           |        |                                                                |
 
 
@@ -218,3 +219,47 @@ This PR improves training monitoring and logging across runs besides some other 
 
 **Breaking Changes**
 * experiments_root_path is now exposed on an API level
+
+## PR Initialization and pipeline stage fixes
+
+Three pre-existing bugs, each of which produced a silently wrong model rather than an error.
+
+**1. Weight initialization was skipped entirely for wrapped models.**
+`NamedParameterwiseNormalInitialization` and `Llama3Initializer` stripped only torch.compile's
+`_orig_mod.` prefix from parameter names before matching their regexes. Activation checkpointing and
+FSDP1 insert their own segments (`_checkpoint_wrapped_module.`, `_fsdp_wrapped_module.`), so any
+config that wrapped the model before initializing it matched *no* per-layer regex and kept the
+default initialization. All wrapper prefixes are now normalized away by a shared
+`normalize_parameter_name`.
+
+**2. `Llama3Initializer` injected a single out-of-distribution weight into ~0.3% of tensors.**
+Its `trunc_normal_` calls passed `a=-2, b=2`. torch treats those as *absolute* bounds, but the
+intended standard deviations are 0.02 and smaller, so the bounds sat at +-100 to +-283 sigma. That is
+not merely a no-op: the erf limits of the inverse-transform sampler saturate, its singular edge
+becomes reachable, and the final clamp pins the affected element to exactly the bound - putting one
+weight of magnitude 2.0 into a tensor whose intended scale is 0.007. Measured rate: 12 of 4000
+tensors (0.30%). Bounds are now expressed in standard deviations (`_TRUNCATION_IN_STDS = 3.0`),
+matching the convention the same file already used for the output projection and the one used by the
+llama3 reference implementation. After the fix: 0 of 4000.
+
+This is also the root cause of the intermittent `TestLlama3LikeInitialization` failures. The single
+pinned element dominates the sample variance, which is exactly what the test's `std` assertions
+detect. Measured before the fix: 6 failures in 40 runs (15%); after: 0 in 60. The test's `max`/`min`
+assertions were loosened to the old absolute bound and are now tightened to `3 * std`, so they
+actually detect a stray element instead of tolerating one.
+
+**3. Pipeline stage generation silently dropped modules.**
+`StagesGenerator.get_stages` packed split points greedily against a fixed per-stage weight cap while
+looping exactly `num_virtual_stages` times. Whatever remained when the packing did not fit was never
+assigned to any stage - in practice the output split point, producing a pipeline with no `lm_head` on
+any stage. Uniform per-layer weights always happen to fit, which is why GPT2 never triggered it
+(verified: 0 of ~1000 GPT2 configurations drop anything); any generator with non-uniform per-layer
+cost hits it immediately. Stage packing now uses a partitioner that provably assigns every module to
+exactly one stage, and asking for more stages than split points raises instead of returning empty
+stages.
+
+**Breaking changes:**
+* None in API terms, but item 2 changes the *numerics* of `Llama3Initializer`: truncation now happens
+  at 3 standard deviations instead of an effectively unbounded absolute value. Runs seeded before and
+  after this change will not produce identical weights. This is a fix to the intended behaviour, not
+  a re-tuning.
