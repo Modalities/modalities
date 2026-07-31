@@ -20,9 +20,9 @@ from modalities.dataloader.create_instruction_tuning_data import (
     create_partitioned_instruction_tuning_index_and_pbin_files,
 )
 from modalities.dataloader.dataset_factory import DatasetFactory
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 from tests.conftest import _ROOT_DIR
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 @pytest.mark.skipif(

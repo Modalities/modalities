@@ -28,7 +28,7 @@ from modalities.config.pydantic_if_types import (
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2Block
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 
 
 @dataclass

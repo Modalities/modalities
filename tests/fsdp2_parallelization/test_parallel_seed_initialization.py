@@ -17,8 +17,8 @@ from torch.distributed.checkpoint.state_dict import StateDictOptions, get_state_
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.utility import monitor_child_processes
 
 working_dir = Path(os.path.dirname(__file__))

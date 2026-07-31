@@ -3,8 +3,8 @@ import torch
 import torch.multiprocessing as mp
 
 from modalities.config.config import ProcessGroupBackendType
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.utils.communication_test import run_communication_test
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 @pytest.mark.skipif(

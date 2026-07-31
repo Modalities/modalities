@@ -18,9 +18,9 @@ from modalities.config.pydantic_if_types import (
     PydanticFSDP2ModuleType,
     PydanticMFUCalculatorABCType,
 )
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings, PyTorchDtypes
 from modalities.utils.mfu import GPT2MFUCalculator, MFUCalculatorABC
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 @pytest.fixture

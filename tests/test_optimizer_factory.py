@@ -19,10 +19,10 @@ from modalities.optimizers import optimizer_factory as optimizer_factory_module
 from modalities.optimizers.optimizer_factory import OptimizerFactory, get_optimizer_groups
 from modalities.registry.components import COMPONENTS
 from modalities.registry.registry import Registry
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
+from modalities.utils.ports import find_free_port
 from tests.conftest import _ROOT_DIR
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
-from tests.utility import find_free_port
 
 # number of parameters for each optimizer group
 GPT2_LINEAR = 66130944
