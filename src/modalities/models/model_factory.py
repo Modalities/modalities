@@ -35,15 +35,21 @@ from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
     AttentionConfig,
     AttentionImplementation,
+    CausalSelfAttention,
     LayerNormWrapperConfig,
     PositionTypes,
     SwiGLU,
     TransformerMLP,
 )
 from modalities.models.model import ActivationType
+from modalities.models.parallelism.context_parallel import apply_cp_to_sdpa_attention_forward
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    has_parallelism_method,
+)
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
     ActivationCheckpointing,
@@ -594,6 +600,73 @@ class ModelFactory:
 
 class GPT2ModelFactory:
     @staticmethod
+    def _get_cp_mesh_if_enabled(device_mesh: DeviceMesh) -> DeviceMesh | None:
+        if not has_parallelism_method(device_mesh, ParallelismDegrees.CP):
+            return None
+        cp_mesh = get_mesh_for_parallelism_method(device_mesh=device_mesh, parallelism_method=ParallelismDegrees.CP)
+        return cp_mesh if cp_mesh.size() > 1 else None
+
+    @staticmethod
+    def _validate_context_parallel_seq_len(
+        model: GPT2LLM,
+        cp_degree: int,
+        tp_degree: int = 1,
+        load_balancer_type: str | None = "headtail",
+    ) -> None:
+        # The "headtail" balancer splits each rank's chunk into a head and tail piece,
+        # requiring an extra factor of 2. Other load balancers don't impose this constraint.
+        headtail_factor = 2 if load_balancer_type == "headtail" else 1
+        seq_len_divisor = tp_degree * cp_degree * headtail_factor
+        if model.sequence_length % seq_len_divisor != 0:
+            headtail_note = " * 2 (headtail)" if load_balancer_type == "headtail" else ""
+            raise ValueError(
+                f"For GPT2 CP runs, sequence_length must be divisible by tp_degree * cp_degree{headtail_note}. "
+                f"Got sequence_length={model.sequence_length}, tp_degree={tp_degree}, cp_degree={cp_degree}, "
+                f"load_balancer_type={load_balancer_type!r}."
+            )
+
+    @staticmethod
+    def _apply_context_parallel_to_gpt2_attention(
+        model: GPT2LLM,
+        cp_mesh: DeviceMesh | None,
+        context_parallel_load_balancer: str | None,
+    ) -> None:
+        if cp_mesh is None:
+            return
+
+        if context_parallel_load_balancer not in ("headtail", "ptrr", None):
+            raise ValueError(
+                "context_parallel_load_balancer must be one of: 'headtail', 'ptrr', or None. "
+                f"Got {context_parallel_load_balancer}."
+            )
+
+        GPT2ModelFactory._validate_context_parallel_seq_len(
+            model=model, cp_degree=cp_mesh.size(), load_balancer_type=context_parallel_load_balancer
+        )
+
+        attention_modules: list[nn.Module] = []
+        transformer_layers = getattr(model.transformer, "h", None)
+        if not isinstance(transformer_layers, nn.ModuleDict):
+            raise TypeError(
+                "Context parallelism requires model.transformer.h to be an nn.ModuleDict of GPT2 blocks. "
+                f"Got type {type(transformer_layers).__name__}."
+            )
+
+        for _, transformer_block in transformer_layers.named_children():
+            attn_module = getattr(transformer_block, "attn", None)
+            if not isinstance(attn_module, CausalSelfAttention):
+                continue
+            if attn_module.attention_impl != AttentionImplementation.PYTORCH_FLASH:
+                raise NotImplementedError(
+                    "Context parallelism currently supports only attention_implementation='pytorch_flash' "
+                    "for GPT2 in this codebase."
+                )
+            attention_modules.append(attn_module)
+
+        apply_cp_to_sdpa_attention_forward(attention_modules=attention_modules, cp_mesh=cp_mesh)
+        setattr(model, "_context_parallel_load_balancer", context_parallel_load_balancer)
+
+    @staticmethod
     def get_gpt2_model(
         sample_key: str,
         prediction_key: str,
@@ -653,8 +726,41 @@ class GPT2ModelFactory:
         return model
 
     @staticmethod
-    def get_gpt2_tensor_parallelized_model(model: GPT2LLM, device_mesh: DeviceMesh) -> nn.Module:
+    def get_gpt2_context_parallelized_model(
+        model: GPT2LLM,
+        device_mesh: DeviceMesh,
+        context_parallel_load_balancer: str | None = "headtail",
+    ) -> nn.Module:
+        cp_mesh = GPT2ModelFactory._get_cp_mesh_if_enabled(device_mesh=device_mesh)
+        GPT2ModelFactory._apply_context_parallel_to_gpt2_attention(
+            model=model,
+            cp_mesh=cp_mesh,
+            context_parallel_load_balancer=context_parallel_load_balancer,
+        )
+        return model
+
+    @staticmethod
+    def get_gpt2_tensor_parallelized_model(
+        model: GPT2LLM,
+        device_mesh: DeviceMesh,
+        context_parallel_load_balancer: str | None = "headtail",
+    ) -> nn.Module:
         tp_mesh = device_mesh[ParallelismDegrees.TP.value]
+        cp_mesh = GPT2ModelFactory._get_cp_mesh_if_enabled(device_mesh=device_mesh)
+
+        if cp_mesh is not None:
+            GPT2ModelFactory._validate_context_parallel_seq_len(
+                model=model,
+                cp_degree=cp_mesh.size(),
+                tp_degree=tp_mesh.size(),
+                load_balancer_type=context_parallel_load_balancer,
+            )
+            GPT2ModelFactory._apply_context_parallel_to_gpt2_attention(
+                model=model,
+                cp_mesh=cp_mesh,
+                context_parallel_load_balancer=context_parallel_load_balancer,
+            )
+
         model_tp_plan = {
             # Row-wise parallelism might seem counterintuitive here,
             # but the embedding layer has weight shape (vocab_size, n_embd).

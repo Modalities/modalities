@@ -46,6 +46,7 @@ from modalities.config.config import (
     FSDPWrappedModelConfig,
     GPT2LLMCollateFnConfig,
     GPT2MFUCalculatorConfig,
+    GPT2ModelCPConfig,
     GPT2ModelTPConfig,
     KeepEveryKStepsAndMMostRecentCheckpointingStrategyConfig,
     LinearLRSchedulerConfig,
@@ -189,6 +190,9 @@ class ComponentEntity:
 COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
+    ComponentEntity(
+        "model", "gpt2_cp", maybe_model_list(GPT2ModelFactory.get_gpt2_context_parallelized_model), GPT2ModelCPConfig
+    ),
     ComponentEntity(
         "model", "gpt2_tp", maybe_model_list(GPT2ModelFactory.get_gpt2_tensor_parallelized_model), GPT2ModelTPConfig
     ),

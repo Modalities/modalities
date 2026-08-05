@@ -15,9 +15,9 @@ settings:
     train_dataset_path: ./data/lorem_ipsum_long.pbin
     test_dataset_path: ./data/lorem_ipsum.pbin
   intervals:
-    training_log_interval_in_steps: 1
-    checkpointing_interval_in_steps: 32
-    evaluation_interval_in_steps: 32
+    training_log_interval_in_steps: 2
+    checkpointing_interval_in_steps: 100000
+    evaluation_interval_in_steps: 15
   consistency_enforcement:
     enforce_tokens_per_step_consistency: true
     enforce_last_step_logged: false
@@ -26,48 +26,28 @@ settings:
   step_profile:
     gradient_accumulation_steps: 1
     local_train_micro_batch_size: 4
-    sequence_length: 256
+    sequence_length: 16
     dp_degree:
       instance_key: dp_degree
       pass_type: BY_REFERENCE
   training_target:
     num_target_tokens:
       component_key: number_conversion
-      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+      variant_key: num_tokens_from_num_steps
       config:
-        dataset_path: ${settings.paths.train_dataset_path}
         sequence_length: ${settings.step_profile.sequence_length}
         dp_degree:
           instance_key: dp_degree
           pass_type: BY_REFERENCE
         local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
         gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
-    num_target_steps:  # for the batch progress subscriber
-      component_key: number_conversion
-      variant_key: num_steps_from_num_tokens
-      config:
-        dp_degree:
-          instance_key: dp_degree
-          pass_type: BY_REFERENCE
-        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
-        global_num_tokens: ${settings.training_target.num_target_tokens}
-        sequence_length: ${settings.step_profile.sequence_length}
-        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+        num_steps: ${settings.training_target.num_target_steps}
+    num_target_steps:  20
   training_progress:
     global_num_seen_tokens: 0
     num_seen_steps: 0
     num_seen_samples: 0
     last_step: -1
-  debugging:
-    component_key: debugging
-    variant_key: settings
-    config:
-      enable_determinism: false
-      forward_hooks:
-        - instance_key: error_on_nan
-          pass_type: BY_REFERENCE
-        - instance_key: print_forward_hook
-          pass_type: BY_REFERENCE
 
 collate_fn:
   component_key: collate_fn
@@ -195,7 +175,9 @@ device_mesh:
   config:
     device_type: cuda
     data_parallel_replicate_degree: 1
-    pipeline_parallel_degree: 4
+    pipeline_parallel_degree: 2
+    tensor_parallel_degree: 2
+    context_parallel_degree: 2
     data_parallel_shard_degree: -1
     world_size: ${settings.cuda_env.world_size}
 
@@ -222,7 +204,6 @@ app_state:
       instance_key: lr_scheduler
       pass_type: BY_REFERENCE
 
-
 initialized_model:
   component_key: model
   variant_key: model_initialized
@@ -244,6 +225,10 @@ initialized_model:
         mean: 0.0
         std: 0.02
         num_layers: ${model_raw.config.n_layer}
+        seed: 42
+        device_mesh:
+          instance_key: device_mesh
+          pass_type: BY_REFERENCE
 
 scheduled_pipeline:
   component_key: pipeline
@@ -252,7 +237,7 @@ scheduled_pipeline:
     loss_fn:
       instance_key: loss_fn
       pass_type: BY_REFERENCE
-    pp_schedule_name: Interleaved1F1B
+    pp_schedule_name: gpipe
     batch_size: ${settings.step_profile.local_train_micro_batch_size}
     microbatch_size: 2
     pp_degree: ${device_mesh.config.pipeline_parallel_degree}
@@ -281,7 +266,7 @@ fsdp_model:
   variant_key: fsdp2_wrapped
   config:
     model:
-      instance_key: model_part
+      instance_key: gpt2_tp_model
       pass_type: BY_REFERENCE
     device_mesh:
       instance_key: device_mesh
@@ -291,6 +276,18 @@ fsdp_model:
       reduce_dtype: BF_16
     block_names: [GPT2Block]
 
+gpt2_tp_model:
+  component_key: model
+  variant_key: gpt2_tp
+  config:
+    model:
+      instance_key: model_part
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    context_parallel_load_balancer: headtail
+
 model_part:
   component_key: pipeline
   variant_key: selector
@@ -299,7 +296,6 @@ model_part:
       instance_key: staged_pipeline
       pass_type: BY_REFERENCE
     selection_type: MODEL_PART
-
 
 staged_pipeline:
   component_key: pipeline
@@ -333,7 +329,7 @@ model_raw:
     sequence_length: ${settings.step_profile.sequence_length}
     prediction_key: ${loss_fn.config.prediction_key}
     vocab_size: 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: 6
+    n_layer: 2
     n_head_q: 8
     n_head_kv: 4
     ffn_hidden: 128
@@ -348,7 +344,7 @@ model_raw:
             n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
             base_freq: 10000
-    attention_implementation: manual
+    attention_implementation: pytorch_flash
     activation_type: swiglu
     attention_norm_config:
       norm_type: layer_norm
@@ -409,8 +405,6 @@ gradient_clipper:
 
 progress_subscriber:
   component_key: progress_subscriber
-  # variant_key: dummy
-  # config: {}
   variant_key: rich
   config:
     global_rank: ${settings.cuda_env.global_rank}
@@ -446,21 +440,3 @@ mfu_calculator:
     device_mesh:
       instance_key: device_mesh
       pass_type: BY_REFERENCE
-
-error_on_nan:
-  component_key: model_debugging_hook
-  variant_key: nan_hook
-  config:
-    model:
-      instance_key: initialized_model
-      pass_type: BY_REFERENCE
-    raise_exception: true
-
-print_forward_hook:
-  component_key: model_debugging_hook
-  variant_key: print_forward_hook
-  config:
-    model:
-      instance_key: initialized_model
-      pass_type: BY_REFERENCE
-    print_shape_only: true
