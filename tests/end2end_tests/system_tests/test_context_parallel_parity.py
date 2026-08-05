@@ -170,10 +170,12 @@ class TestContextParallelParity:
         )
 
         mp.spawn(
+        cp_port = find_free_port()
+        mp.spawn(
             TestContextParallelParity._run_training_and_write_losses,
             args=(
                 world_size,
-                24832,
+                cp_port,
                 base_config_path,
                 tmp_path,
                 "parity_cp",
