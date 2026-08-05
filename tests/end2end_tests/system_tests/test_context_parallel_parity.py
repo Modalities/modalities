@@ -152,9 +152,13 @@ class TestContextParallelParity:
 
         mp.spawn(
             TestContextParallelParity._run_training_and_write_losses,
+        from tests.utility import find_free_port
+        non_cp_port = find_free_port()
+        mp.spawn(
+            TestContextParallelParity._run_training_and_write_losses,
             args=(
                 world_size,
-                24831,
+                non_cp_port,
                 base_config_path,
                 tmp_path,
                 "parity_non_cp",
