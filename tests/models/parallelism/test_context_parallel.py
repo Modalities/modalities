@@ -32,11 +32,11 @@ class _DummyMesh:
 def cp_class_patch_isolated():
     """Restore CausalSelfAttention to its exact pre-test state after any test
     that touches (or simulates) the class-level CP patch."""
-    original_method = CausalSelfAttention.execute_attention
+    original_descriptor = CausalSelfAttention.__dict__["execute_attention"]
     saved_wrapped = getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", _UNSET)
     saved_mesh = getattr(CausalSelfAttention, "_cp_mesh", _UNSET)
     yield
-    CausalSelfAttention.execute_attention = original_method
+    setattr(CausalSelfAttention, "execute_attention", original_descriptor)
     for attr, saved in [("_cp_execute_attention_wrapped", saved_wrapped), ("_cp_mesh", saved_mesh)]:
         if saved is _UNSET:
             if hasattr(CausalSelfAttention, attr):
