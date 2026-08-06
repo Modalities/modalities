@@ -1,6 +1,6 @@
 import torch
 
-from modalities.models.moe.qwen_model import GroupedExperts, QwenModel
+from modalities.models.moe.qwen_model import GroupedExperts, MoEAuxLossAutoScaler, QwenModel
 
 
 def _build_tiny_qwen_model() -> QwenModel:
@@ -58,3 +58,83 @@ def test_transformer_block_exposes_aux_loss_after_forward():
 
     first_layer = next(iter(model.layers.values()))
     assert first_layer.aux_loss is not None
+    # The exposed aux loss is detached (it is for reporting only; the gradient is applied via the
+    # autograd side-path on the block output, see MoEAuxLossAutoScaler).
+    assert not first_layer.aux_loss.requires_grad
+
+
+def test_moe_aux_loss_auto_scaler_is_identity_forward_and_injects_aux_gradient():
+    """MoEAuxLossAutoScaler passes the output through unchanged and, on backward, forwards the
+    incoming gradient to the output while injecting `main_loss_backward_scale` into the aux loss --
+    equivalent to having added `scale * aux_loss` to the total loss."""
+    output = torch.randn(3, 4, requires_grad=True)
+    aux_loss = torch.tensor(7.0, requires_grad=True)
+
+    MoEAuxLossAutoScaler.set_loss_scale(1.0)
+    try:
+        scaled = MoEAuxLossAutoScaler.apply(output, aux_loss)
+        assert torch.equal(scaled, output)  # identity in the forward
+        scaled.sum().backward()
+    finally:
+        MoEAuxLossAutoScaler.set_loss_scale(1.0)
+
+    assert torch.equal(output.grad, torch.ones_like(output))  # grad_output passed straight through
+    assert torch.equal(aux_loss.grad, torch.ones_like(aux_loss))  # unit gradient injected into aux
+
+
+def test_moe_aux_loss_auto_scaler_scale_linearly_scales_injected_gradient():
+    def _aux_grad(scale: float) -> torch.Tensor:
+        aux_loss = torch.tensor(1.0, requires_grad=True)
+        output = torch.randn(2, requires_grad=True)
+        MoEAuxLossAutoScaler.set_loss_scale(scale)
+        try:
+            MoEAuxLossAutoScaler.apply(output, aux_loss).sum().backward()
+        finally:
+            MoEAuxLossAutoScaler.set_loss_scale(1.0)
+        return aux_loss.grad.clone()
+
+    assert torch.allclose(_aux_grad(0.5), torch.tensor(0.5))
+    assert torch.allclose(_aux_grad(2.0), torch.tensor(2.0))
+
+
+def _build_moe_block(aux_loss_coef: float):
+    from modalities.models.moe.qwen_model import MoEBlock
+
+    block = MoEBlock(
+        d_model=16,
+        moe_d_ff=24,
+        moe_num_experts=4,
+        moe_top_k=2,
+        moe_capacity_factor=1.25,
+        moe_min_capacity=1,
+        moe_overflow_policy="residual",
+        moe_router_noise_std=0.0,
+        moe_router_temperature=1.0,
+        moe_router_dropout=0.0,
+        moe_aux_loss_coef=aux_loss_coef,
+        moe_z_loss_coef=0.0,
+        ffn_dropout=0.0,
+    )
+    block.experts.reset_parameters()
+    return block
+
+
+def test_moe_block_wires_aux_loss_through_output_side_path():
+    """The MoE block routes its output through MoEAuxLossAutoScaler when an aux loss is active, so
+    that back-propagating through the block output (the only thing a pipeline stage backpropagates)
+    applies the aux-loss gradient. When the aux loss is disabled, the side-path is absent. The
+    exposed `last_aux_loss` is detached in both cases (reporting only)."""
+    torch.manual_seed(0)
+    block = _build_moe_block(aux_loss_coef=0.01)
+    out = block(torch.randn(2, 5, 16))
+
+    # The output's autograd node is the aux-loss side-path, i.e. it wraps the block output.
+    assert type(out.grad_fn).__name__ == "MoEAuxLossAutoScalerBackward"
+    assert block.last_aux_loss is not None
+    assert not block.last_aux_loss.requires_grad
+
+    torch.manual_seed(0)
+    block_no_aux = _build_moe_block(aux_loss_coef=0.0)
+    out_no_aux = block_no_aux(torch.randn(2, 5, 16))
+    assert type(out_no_aux.grad_fn).__name__ != "MoEAuxLossAutoScalerBackward"
+    assert block_no_aux.last_aux_loss is None

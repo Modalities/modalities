@@ -87,8 +87,22 @@ class CLMCrossEntropyLoss(Loss):
         return labels, lm_logits
 
 
-class MoECrossEntropyLoss(Loss):
-    """Cross entropy loss with optional MoE auxiliary losses from model layers."""
+class MoECrossEntropyLoss(CLMCrossEntropyLoss):
+    """Cross entropy loss that folds the MoE auxiliary (load-balancing) losses into the *reported*
+    loss value for observability.
+
+    Important: this only affects the reported/logged loss value, NOT the gradients. The MoE aux-loss
+    gradients are back-propagated inside each MoE block via an autograd side-path on the block output
+    (see `MoEAuxLossAutoScaler`), which is what makes them correct under pipeline parallelism. The
+    per-layer `aux_loss` read here is detached, so adding it does not affect the backward pass (and
+    does not double-count the aux gradient). Under pipeline parallelism this value only reflects the
+    layers local to the stage that computes the loss (the last stage); that is a reporting-only
+    limitation and does not affect training correctness.
+
+    Subclasses `CLMCrossEntropyLoss` to reuse its argument parsing, which (unlike a
+    single-InferenceResultBatch-only signature) also accepts the plain `(outputs, targets)` tensor
+    pair that pipeline-parallel schedules use internally for their own metadata-inference passes.
+    """
 
     def __init__(
         self,
@@ -97,25 +111,22 @@ class MoECrossEntropyLoss(Loss):
         model,
         tag: str = "MoECrossEntropyLoss",
     ):
-        super().__init__(tag)
-        self.target_key = target_key
-        self.prediction_key = prediction_key
+        super().__init__(target_key=target_key, prediction_key=prediction_key, tag=tag)
         self.model = model
-        self.loss_fun = CrossEntropyLoss(reduction="mean")
 
-    def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
-        labels = forward_batch.get_targets(self.target_key)
-        lm_logits = forward_batch.get_predictions(self.prediction_key)
+    def __call__(self, *args, **kwargs) -> torch.Tensor:
+        loss = super().__call__(*args, **kwargs)
 
-        labels = labels.to(lm_logits.device)
-        loss = self.loss_fun(
-            lm_logits.contiguous().view(-1, lm_logits.size(-1)),
-            labels.contiguous().long().view(-1),
-        )
-
-        for layer in self.model.layers.values():
-            if hasattr(layer, "aux_loss") and layer.aux_loss is not None:
-                loss = loss + layer.aux_loss.to(loss.dtype)
+        # Generic over the module tree so this works regardless of what `self.model` actually is
+        # (a single whole model, or e.g. a list of pipeline-parallel stages each holding only a
+        # subset of layers, as produced by the pipeline's MODEL_PART selector). `aux_loss` is
+        # detached, so this contributes to the reported value only, never to the gradient.
+        models = self.model if isinstance(self.model, list) else [self.model]
+        for model in models:
+            for module in model.modules():
+                aux_loss = getattr(module, "aux_loss", None)
+                if aux_loss is not None:
+                    loss = loss + aux_loss.detach().to(loss.dtype)
 
         return loss
 

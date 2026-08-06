@@ -16,6 +16,7 @@ from modalities.logging_broker.messages import ExperimentStatus, MessageTypes, P
 from modalities.logging_broker.publisher import MessagePublisher
 from modalities.loss_functions import Loss
 from modalities.models.model import model_predict_batch
+from modalities.models.moe.qwen_model import MoEAuxLossAutoScaler
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_degree
 from modalities.running_env.fsdp.reducer import Reducer
@@ -180,6 +181,11 @@ class Trainer:
             # else continue with loss calculation
             result_batch = model_predict_batch(model=model_parts[0], batch=batch)
             loss = loss_fun(result_batch)
+            # Keep any MoE auxiliary-loss gradient (injected via the block-output autograd side-path)
+            # on the same scale as the main loss, which is divided by gradient_acc_steps here. This is
+            # a no-op for models without MoE blocks. The pipeline-parallel branch leaves the default
+            # scale of 1.0, consistent with how it sums per-microbatch losses.
+            MoEAuxLossAutoScaler.set_loss_scale(1.0 / self.gradient_acc_steps)
             (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:

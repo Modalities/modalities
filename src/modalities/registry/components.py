@@ -98,7 +98,7 @@ from modalities.models.gpt2.collator import GPT2LLMCollateFn
 from modalities.models.gpt2.gpt2_model import GPT2LLMConfig
 from modalities.models.gpt2.llama3_like_initialization import Llama3Initializer, Llama3InitializerConfig
 from modalities.models.huggingface.huggingface_model import HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
-from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
+from modalities.models.model_factory import GPT2ModelFactory, ModelFactory, QwenModelFactory
 from modalities.models.moe.qwen_model import QwenModel, QwenModelConfig
 from modalities.models.parallelism.pipeline_parallelism import ComponentSelectorFromPipeline, PipelineFactory
 from modalities.models.parallelism.pipeline_parallelism_configs import (
@@ -107,8 +107,11 @@ from modalities.models.parallelism.pipeline_parallelism_configs import (
     ScheduledPipelineConfig,
     StagedPipelineConfig,
 )
-from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator
-from modalities.models.parallelism.stages_generator_configs import GPT2LLMStagesGeneratorConfig
+from modalities.models.parallelism.stages_generator import GPT2LLMStagesGenerator, QwenModelStagesGenerator
+from modalities.models.parallelism.stages_generator_configs import (
+    GPT2LLMStagesGeneratorConfig,
+    QwenModelStagesGeneratorConfig,
+)
 from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
@@ -194,9 +197,12 @@ COMPONENTS = [
     # models
     ComponentEntity("model", "gpt2", GPT2ModelFactory.get_gpt2_model, GPT2LLMConfig),
     ComponentEntity("model", "moe", QwenModel, QwenModelConfig),
-    ComponentEntity("model", "ep_wrapped", ModelFactory.get_ep_wrapped_model, EPWrappedModelConfig),
+    ComponentEntity("model", "ep_wrapped", maybe_model_list(ModelFactory.get_ep_wrapped_model), EPWrappedModelConfig),
     ComponentEntity(
         "model", "gpt2_tp", maybe_model_list(GPT2ModelFactory.get_gpt2_tensor_parallelized_model), GPT2ModelTPConfig
+    ),
+    ComponentEntity(
+        "model", "qwen_tp", maybe_model_list(QwenModelFactory.get_qwen_tensor_parallelized_model), GPT2ModelTPConfig
     ),
     ComponentEntity(
         "model", "huggingface_pretrained_model", HuggingFacePretrainedModel, HuggingFacePretrainedModelConfig
@@ -240,6 +246,9 @@ COMPONENTS = [
     ComponentEntity("pipeline", "builder", PipelineFactory.get_pipeline, PipelineConfig),
     # Pipeline Stages Generators
     ComponentEntity("stages_generator", "gpt2_stages_generator", GPT2LLMStagesGenerator, GPT2LLMStagesGeneratorConfig),
+    ComponentEntity(
+        "stages_generator", "qwen_stages_generator", QwenModelStagesGenerator, QwenModelStagesGeneratorConfig
+    ),
     # Device mesh
     ComponentEntity("device_mesh", "default", get_device_mesh, DeviceMeshConfig),
     ComponentEntity("number_conversion", "parallel_degree", get_parallel_degree, ParallelDegreeConfig),

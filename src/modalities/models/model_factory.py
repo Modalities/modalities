@@ -862,3 +862,81 @@ class GPT2ModelFactory:
             )
 
         return model
+
+
+class QwenModelFactory:
+    @staticmethod
+    def get_qwen_tensor_parallelized_model(model: nn.Module, device_mesh: DeviceMesh) -> nn.Module:
+        """Applies tensor parallelism to a QwenModel (MoE model).
+
+        Only the attention block, token embedding and LM head are tensor-parallelized
+        (classic Megatron-style column/row sharding, without sequence parallelism). All of these
+        styles default to `use_local_output=True`, meaning the residual stream is a plain local
+        tensor at every block boundary (exactly as without tensor parallelism) and only becomes a
+        `DTensor` transiently inside the Colwise/Rowwise-wrapped attention projections themselves.
+        Because of this, the MoE FFN (router + grouped experts) needs no special handling at all to
+        be excluded from tensor parallelism: it is simply left out of the parallelize plan, so it
+        keeps receiving and returning plain local tensors like it does without tensor parallelism
+        (redundantly recomputed on every TP rank), keeping expert sharding entirely owned by expert
+        parallelism (EP) and avoiding the added complexity of jointly sharding experts across both
+        the EP and TP dimensions.
+
+        Args:
+            model (nn.Module): The QwenModel to be tensor-parallelized.
+            device_mesh (DeviceMesh): The device mesh.
+
+        Returns:
+            nn.Module: The tensor-parallelized model.
+        """
+        tp_mesh = device_mesh[ParallelismDegrees.TP.value]
+
+        model_tp_plan = {
+            "token_emb": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Replicate(),
+            ),
+            "lm_head": ColwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Replicate(),
+                use_local_output=True,
+            ),
+        }
+        # only keep the relevant parts of the model parallel plan
+        # (e.g. when using pipeline parallelism and not all modules are present)
+        model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model, k.split(".")[0])}
+        if model_tp_plan:
+            parallelize_module(
+                module=model,
+                device_mesh=tp_mesh,
+                parallelize_plan=model_tp_plan,
+            )
+
+        transformer_block_tp_plan = {
+            "attn.q_proj": ColwiseParallel(),
+            "attn.k_proj": ColwiseParallel(),
+            "attn.v_proj": ColwiseParallel(),
+            "attn.o_proj": RowwiseParallel(output_layouts=Replicate()),
+        }
+
+        for transformer_block in model.layers.values():
+            if transformer_block.attn.n_heads % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of query heads {transformer_block.attn.n_heads} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            if transformer_block.attn.n_kv_heads % tp_mesh.size() != 0:
+                raise ValueError(
+                    f"Number of key-value heads {transformer_block.attn.n_kv_heads} must be divisible by "
+                    f"the number of tensor parallel devices {tp_mesh.size()}."
+                )
+            transformer_block.attn.n_heads = transformer_block.attn.n_heads // tp_mesh.size()
+            transformer_block.attn.n_kv_heads = transformer_block.attn.n_kv_heads // tp_mesh.size()
+            # `transformer_block.ffn` (the MoE FFN) is intentionally left out of the parallelize
+            # plan entirely (see docstring above).
+            parallelize_module(
+                module=transformer_block,
+                device_mesh=tp_mesh,
+                parallelize_plan=transformer_block_tp_plan,
+            )
+
+        return model

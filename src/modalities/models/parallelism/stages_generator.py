@@ -114,3 +114,30 @@ class GPT2LLMStagesGenerator(StagesGenerator):
         ]
 
         return potential_split_points
+
+
+class QwenModelStagesGenerator(StagesGenerator):
+    def __init__(self, num_model_layers: int, input_layer_equivalence: int = 1, output_layer_equivalence: int = 1):
+        super().__init__(num_model_layers, input_layer_equivalence, output_layer_equivalence)
+
+    def _get_potential_split_points(
+        self,
+    ) -> list[tuple[list[str], int]]:
+        """
+        Returns a list of potential split points for the QwenModel (MoE) model.
+
+        Args:
+            num_model_layers (int): Total number of layers in the model.
+            input_layer_equivalence (int): Number of layers corresponding to the input layer.
+            output_layer_equivalence (int): Number of layers corresponding to the output layer.
+
+        Returns:
+            list[tuple[list[str], int]]: A list containing tuples of FQNs and their computational weights.
+        """
+        potential_split_points = [
+            (["token_emb"], self._input_layer_equivalence),
+            *[([f"layers.{i}"], 1) for i in range(self._num_model_layers)],
+            (["final_norm", "lm_head"], self._output_layer_equivalence),
+        ]
+
+        return potential_split_points

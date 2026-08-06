@@ -1,18 +1,24 @@
 import torch
+import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
 from modalities.loss_functions import MoECrossEntropyLoss
 
 
-class DummyLayer:
+class DummyLayer(nn.Module):
     def __init__(self, aux_loss):
+        super().__init__()
         self.aux_loss = aux_loss
 
+    def forward(self, x):
+        return x
 
-class DummyModel:
+
+class DummyModel(nn.Module):
     def __init__(self, aux_losses: list[torch.Tensor | None]):
-        self.layers = {str(i): DummyLayer(aux) for i, aux in enumerate(aux_losses)}
+        super().__init__()
+        self.layers = nn.ModuleDict({str(i): DummyLayer(aux) for i, aux in enumerate(aux_losses)})
 
 
 def test_moe_cross_entropy_loss_adds_aux_losses():

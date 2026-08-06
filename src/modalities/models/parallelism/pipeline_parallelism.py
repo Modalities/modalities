@@ -105,7 +105,28 @@ class PipelineFactory:
         local_rank: int,
         pp_schedule_name: str,
         num_layers_per_stage: int,
+        static_io_microbatch_size: Optional[int] = None,
+        static_io_sequence_length: Optional[int] = None,
+        static_io_hidden_dim: Optional[int] = None,
+        static_io_vocab_size: Optional[int] = None,
     ) -> Pipeline:
+        """Builds the pipeline stages for the local PP rank.
+
+        Static pipeline metadata (opt-in): if all four ``static_io_*`` arguments are provided, each
+        PipelineStage is constructed with explicit example ``input_args``/``output_args`` so that
+        PyTorch runs the pipeline in STATIC metadata mode and SKIPS its live shape-inference pass
+        (a dummy forward+backward through every stage). That live pass is unsafe when a stage
+        contains its own internal collective -- e.g. expert-parallel (EP) all-to-all in the MoE
+        FFN -- because the dummy forward/backward and the pipeline's P2P metadata exchange interleave
+        across the EP and PP communicators and deadlock. Providing static metadata avoids running the
+        dummy pass at all, so real training starts with all ranks in lockstep. This is what makes EP
+        composable with PP; without it, EP+PP hangs during pipeline initialization. When the arguments
+        are omitted (e.g. the GPT2 path), the pipeline falls back to the default DYNAMIC inference.
+
+        Note: the inter-stage activations must be plain tensors (not DTensors) for STATIC mode to be
+        sufficient without also supplying gradient metadata. This holds here because tensor
+        parallelism keeps the residual stream as local tensors (use_local_output=True).
+        """
         device = torch.device("cuda", local_rank)
         pp_dims = device_mesh[ParallelismDegrees.PP.value].size()
 
@@ -117,16 +138,66 @@ class PipelineFactory:
         pp_mesh = device_mesh[ParallelismDegrees.PP.value]
         schedule_class: Type[PipelineScheduleSingle | PipelineScheduleMulti] = get_schedule_class(pp_schedule_name)
 
+        static_io_dims = (
+            static_io_microbatch_size,
+            static_io_sequence_length,
+            static_io_hidden_dim,
+            static_io_vocab_size,
+        )
+        static_io_dims = static_io_dims if all(dim is not None for dim in static_io_dims) else None
+
         pp_stages, model_parts = PipelineFactory._get_split_model(
             whole_model=whole_model,
             schedule_class=schedule_class,
             pp_mesh=pp_mesh,
             device=device,
             fqns_per_stage=fqns_per_stage,
+            static_io_dims=static_io_dims,
         )
 
         pipeline = Pipeline(pp_stages=pp_stages, model_parts=model_parts)
         return pipeline
+
+    @staticmethod
+    def _build_static_stage_io(
+        stage_idx: int,
+        num_stages: int,
+        static_io_dims: tuple[int, int, int, int],
+        device: torch.device,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Builds example (input_args, output_args) tensors describing a stage's I/O for STATIC
+        pipeline metadata. The first stage consumes token ids (int64), every inter-stage boundary
+        carries the hidden state, and the last stage emits logits. Activations are assumed to be
+        bf16 (the mixed-precision setting used with pipeline parallelism).
+
+        The float activation examples set requires_grad=True: in STATIC mode PyTorch derives the
+        backward gradient metadata (and thus whether to allocate the cross-stage gradient P2P
+        buffers) from the requires_grad flag of these forward examples. Without it, no gradient is
+        sent back and a non-first stage's backward receives a None output-gradient. Token ids are
+        integer and therefore always requires_grad=False."""
+        microbatch_size, sequence_length, hidden_dim, vocab_size = static_io_dims
+        activation_dtype = torch.bfloat16
+
+        is_first = stage_idx == 0
+        is_last = stage_idx == num_stages - 1
+
+        if is_first:
+            input_args = torch.zeros((microbatch_size, sequence_length), dtype=torch.long, device=device)
+        else:
+            input_args = torch.zeros(
+                (microbatch_size, sequence_length, hidden_dim), dtype=activation_dtype, device=device
+            ).requires_grad_(True)
+
+        if is_last:
+            output_args = torch.zeros(
+                (microbatch_size, sequence_length, vocab_size), dtype=activation_dtype, device=device
+            ).requires_grad_(True)
+        else:
+            output_args = torch.zeros(
+                (microbatch_size, sequence_length, hidden_dim), dtype=activation_dtype, device=device
+            ).requires_grad_(True)
+
+        return input_args, output_args
 
     @staticmethod
     def _get_split_model(
@@ -135,12 +206,15 @@ class PipelineFactory:
         pp_mesh: DeviceMesh,
         device: torch.device,
         fqns_per_stage: list[list[str]],
+        static_io_dims: Optional[tuple[int, int, int, int]] = None,
     ) -> tuple[list[PipelineStage], list[NNModel]]:
         num_stages = len(fqns_per_stage)
         stage_indices = PipelineFactory._get_stage_ids_of_pp_rank(pp_mesh, num_stages, schedule_class)
         stages, stage_modules = zip(
             *(
-                PipelineFactory._build_model_part_for_stage(whole_model, pp_mesh, device, fqns_per_stage, stage_idx)
+                PipelineFactory._build_model_part_for_stage(
+                    whole_model, pp_mesh, device, fqns_per_stage, stage_idx, static_io_dims
+                )
                 for stage_idx in stage_indices
             )
         )
@@ -168,19 +242,37 @@ class PipelineFactory:
 
     @staticmethod
     def _build_model_part_for_stage(
-        whole_model: NNModel, pp_mesh: DeviceMesh, device: torch.device, fqns_per_stage: list[list[str]], stage_idx: int
+        whole_model: NNModel,
+        pp_mesh: DeviceMesh,
+        device: torch.device,
+        fqns_per_stage: list[list[str]],
+        stage_idx: int,
+        static_io_dims: Optional[tuple[int, int, int, int]] = None,
     ) -> tuple[PipelineStage, NNModel]:
+        num_stages = len(fqns_per_stage)
         module_names = fqns_per_stage[stage_idx]
         whole_model = copy.deepcopy(whole_model)
         fqn_tree = PipelineFactory._get_fqn_tree(module_names)
         stage_modules = PipelineFactory._build_stage_from_modules(fqn_tree, whole_model)
         stage_modules = cast(NNModel, stage_modules)
         PipelineFactory._filter_weight_decay_groups_(stage_modules)
+
+        # When static I/O dims are provided, supply explicit example input/output tensors so the
+        # pipeline uses STATIC metadata mode and skips its live shape-inference pass (see
+        # get_staged_pipeline for why this is required for EP+PP). Otherwise fall back to DYNAMIC.
+        input_args, output_args = (
+            PipelineFactory._build_static_stage_io(stage_idx, num_stages, static_io_dims, device)
+            if static_io_dims is not None
+            else (None, None)
+        )
+
         stage = PipelineStage(
             submodule=stage_modules,
             stage_index=stage_idx,
-            num_stages=len(fqns_per_stage),
+            num_stages=num_stages,
             device=device,
+            input_args=input_args,
+            output_args=output_args,
             group=pp_mesh.get_group("pp"),
         )
 

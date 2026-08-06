@@ -230,6 +230,45 @@ class GroupedExperts(nn.Module):
         return self._forward_local(routed_input, num_tokens_per_expert)
 
 
+class MoEAuxLossAutoScaler(torch.autograd.Function):
+    """Back-propagates a MoE auxiliary (load-balancing) loss via an autograd side-path on the
+    block's output, instead of adding it to the model's main scalar loss.
+
+    The forward is the identity on ``output``; it only stashes ``aux_loss``. During backward, in
+    addition to passing the incoming ``grad_output`` straight through to ``output``, it injects a
+    gradient of ``main_loss_backward_scale`` into ``aux_loss``. This is equivalent to having added
+    ``main_loss_backward_scale * aux_loss`` to the total loss, but it happens wherever the backward
+    through this block's output runs -- i.e. on the block's own device/rank.
+
+    This is what makes MoE auxiliary losses correct under pipeline parallelism: each stage runs its
+    own backward, so a stage's router gets its load-balancing gradient during that stage's backward.
+    Aggregating all aux losses onto the last stage's scalar loss (the previous approach) cannot work,
+    because earlier stages' aux losses live in separate autograd graphs on other ranks and would
+    contribute no gradient to those stages' routers. Mirrors Megatron-LM's ``MoEAuxLossAutoScaler``.
+
+    ``main_loss_backward_scale`` (default 1.0) lets the trainer match the aux-loss gradient scale to
+    the main loss's; e.g. under gradient accumulation the main loss is divided by the number of
+    accumulation steps, so the scale is set to 1/gradient_acc_steps to keep the two consistent.
+    """
+
+    main_loss_backward_scale: float = 1.0
+
+    @staticmethod
+    def forward(ctx, output: torch.Tensor, aux_loss: torch.Tensor) -> torch.Tensor:
+        ctx.save_for_backward(aux_loss)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        (aux_loss,) = ctx.saved_tensors
+        aux_loss_grad = torch.ones_like(aux_loss) * MoEAuxLossAutoScaler.main_loss_backward_scale
+        return grad_output, aux_loss_grad
+
+    @classmethod
+    def set_loss_scale(cls, scale: float) -> None:
+        cls.main_loss_backward_scale = scale
+
+
 class MoEBlock(nn.Module):
     def __init__(
         self,
@@ -296,22 +335,31 @@ class MoEBlock(nn.Module):
         flat_expert_ids = topk_idx.reshape(-1)[flat_valid]
         flat_weights = topk_w.reshape(-1)[flat_valid]
 
-        if flat_expert_ids.numel() > 0:
-            sort_idx = torch.argsort(flat_expert_ids)
-            token_ids_sorted = flat_token_ids[sort_idx]
-            expert_ids_sorted = flat_expert_ids[sort_idx]
-            weights_sorted = flat_weights[sort_idx]
+        # NOTE: self.experts(...) is where expert-parallel (EP) dispatch/combine all-to-all
+        # collectives fire (installed as forward pre/post hooks by ExpertParallel). It must therefore
+        # be called on EVERY EP rank on EVERY forward, unconditionally -- even when this rank happens
+        # to route none of its own tokens. Two reasons:
+        #   1. A rank that routes zero local tokens still HOSTS experts that other EP ranks dispatch
+        #      tokens to; it must run the collective to receive, process, and return those tokens.
+        #   2. All EP ranks must invoke the all-to-all the same number of times or it deadlocks.
+        # Guarding this call behind `flat_expert_ids.numel() > 0` is therefore incorrect under EP: it
+        # both drops other ranks' tokens and causes a collective-count mismatch (an NCCL hang). This
+        # is easy to trigger under pipeline parallelism, whose shape-inference pass runs this forward
+        # on uninitialized tensors, but is a latent hazard in any EP run. Empty inputs flow through
+        # correctly: bincount -> zeros, gathers -> (0, D), and index_add_ with an empty index is a
+        # no-op, while the collectives still exchange whatever the peers send.
+        sort_idx = torch.argsort(flat_expert_ids)
+        token_ids_sorted = flat_token_ids[sort_idx]
+        expert_ids_sorted = flat_expert_ids[sort_idx]
+        weights_sorted = flat_weights[sort_idx]
 
-            routed_output = self.experts(x_flat[token_ids_sorted], torch.bincount(expert_ids_sorted, minlength=E))
-            weighted_output = routed_output * weights_sorted.unsqueeze(-1)
+        routed_output = self.experts(x_flat[token_ids_sorted], torch.bincount(expert_ids_sorted, minlength=E))
+        weighted_output = routed_output * weights_sorted.unsqueeze(-1)
 
-            out = x_flat.new_zeros((N, D))
-            out.index_add_(0, token_ids_sorted, weighted_output)
-            assigned = x_flat.new_zeros((N,))
-            assigned.index_add_(0, token_ids_sorted, weights_sorted)
-        else:
-            out = x_flat.new_zeros((N, D))
-            assigned = x_flat.new_zeros((N,))
+        out = x_flat.new_zeros((N, D))
+        out.index_add_(0, token_ids_sorted, weighted_output)
+        assigned = x_flat.new_zeros((N,))
+        assigned.index_add_(0, token_ids_sorted, weights_sorted)
 
         not_assigned = assigned < 1e-6
         if not_assigned.any() and self.overflow_policy == "residual":
@@ -326,8 +374,18 @@ class MoEBlock(nn.Module):
             z_loss = torch.mean(torch.logsumexp(logits, dim=-1) ** 2)
             aux = (aux if aux is not None else torch.tensor(0.0, device=x.device)) + self.z_loss_coef * z_loss
 
-        self.last_aux_loss = aux
-        return out.view(B, T, D)
+        out = out.view(B, T, D)
+        if aux is not None:
+            # Back-propagate the auxiliary (load-balancing) loss through this block's own output so
+            # its gradient is applied during this block's backward -- on this block's device/rank.
+            # This is required for correctness under pipeline parallelism, where each stage runs a
+            # separate backward and the aux loss cannot be aggregated onto the last stage's loss.
+            out = MoEAuxLossAutoScaler.apply(out, aux)
+        # Detached: exposed only for logging/aggregation of the reported loss value. The gradient is
+        # handled by the autograd side-path above, so this must not be added back into the loss with
+        # a live graph (that would double-count the aux gradient).
+        self.last_aux_loss = aux.detach() if aux is not None else None
+        return out
 
 
 class TransformerBlock(nn.Module):
@@ -480,7 +538,14 @@ class QwenModel(NNModel):
         return self.forward_impl(inputs)
 
     def forward_impl(self, input_ids: torch.Tensor) -> torch.Tensor:
-        x = self.token_emb(input_ids)
+        # `token_emb`/`final_norm`/`lm_head` are set to None (rather than removed) on pipeline-parallel
+        # stages that don't own them, since they are plain top-level attributes rather than being held
+        # in an nn.ModuleDict/ModuleList (which pipeline splitting prunes by omission instead).
+        x = self.token_emb(input_ids) if self.token_emb is not None else input_ids
         for layer in self.layers.values():
             x = layer(x)
-        return self.lm_head(self.final_norm(x))
+        if self.final_norm is not None:
+            x = self.final_norm(x)
+        if self.lm_head is not None:
+            x = self.lm_head(x)
+        return x

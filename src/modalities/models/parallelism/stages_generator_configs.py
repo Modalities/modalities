@@ -11,3 +11,9 @@ class GPT2LLMStagesGeneratorConfig(BaseModel):
     num_model_layers: Annotated[int, Field(strict=True, ge=1)]
     input_layer_equivalence: Annotated[int, Field(strict=True, ge=1)] = 1
     output_layer_equivalence: Annotated[int, Field(strict=True, ge=1)] = 1
+
+
+class QwenModelStagesGeneratorConfig(BaseModel):
+    num_model_layers: Annotated[int, Field(strict=True, ge=1)]
+    input_layer_equivalence: Annotated[int, Field(strict=True, ge=1)] = 1
+    output_layer_equivalence: Annotated[int, Field(strict=True, ge=1)] = 1
