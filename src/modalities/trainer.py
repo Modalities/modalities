@@ -267,7 +267,12 @@ class Trainer:
             )
 
             if scheduled_pipeline.has_first_pp_stage:
-                pp_schedule.step(batch.samples[model_parts[0].sample_key].contiguous(), target=targets, losses=losses)
+                pp_schedule.step(
+                    batch.samples[model_parts[0].sample_key].contiguous(),
+                    batch.samples.get("position_ids"),
+                    target=targets,
+                    losses=losses,
+                )
             else:
                 pp_schedule.step(target=targets, losses=losses)
             loss = (

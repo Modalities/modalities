@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from types import MethodType
 
 import torch
 import torch.nn as nn
@@ -11,27 +12,8 @@ from modalities.models.gpt2.gpt2_model import AttentionImplementation, CausalSel
 # from Meta's open-source project TorchTitan,
 # licensed under the BSD 3-Clause License.
 def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], cp_mesh: DeviceMesh) -> None:
-    """Patch CausalSelfAttention.execute_attention to route SDPA through DTensor CP dispatch.
-
-    The patch is class-level (not per-instance). `attention_modules` is used only as a
-    guard: if the list is empty no patching happens, since the model has no SDPA layers to
-    wrap. The individual module objects are not modified.
-
-    It must run before tensor-parallel wrappers so CP logic executes inside local
-    tensor regions.
-    """
+    """Route SDPA through DTensor CP dispatch for the supplied attention instances."""
     if len(attention_modules) == 0:
-        return
-
-    # Detect re-entry. A second call with the same mesh is a no-op; a different mesh
-    # would silently use the wrong mesh because cp_mesh is captured by closure.
-    existing_mesh = getattr(CausalSelfAttention, "_cp_mesh", None)
-    if getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", False):
-        if existing_mesh is not cp_mesh:
-            raise RuntimeError(
-                "apply_cp_to_sdpa_attention_forward has already patched CausalSelfAttention "
-                "with a different cp_mesh. Re-patching with a new mesh is not supported."
-            )
         return
 
     try:
@@ -46,26 +28,37 @@ def apply_cp_to_sdpa_attention_forward(attention_modules: Sequence[nn.Module], c
 
     _enable_context_parallel_dispatcher()
 
-    original_execute_attention = CausalSelfAttention.execute_attention
+    for attention_module in attention_modules:
+        if not isinstance(attention_module, CausalSelfAttention):
+            raise TypeError(
+                "Context parallel attention wrapping requires CausalSelfAttention instances. "
+                f"Got {type(attention_module).__name__}."
+            )
+        if getattr(attention_module, "_cp_execute_attention_wrapped", False):
+            if getattr(attention_module, "_cp_mesh", None) is not cp_mesh:
+                raise RuntimeError("Attention instance is already configured with a different cp_mesh.")
+            continue
 
-    def cp_execute_attention(cls, q, k, v, dropout, attention_impl):
-        if attention_impl != AttentionImplementation.PYTORCH_FLASH:
-            return original_execute_attention(q, k, v, dropout, attention_impl)
+        original_execute_attention = attention_module.execute_attention
 
-        placement = [Shard(2)]
-        if not isinstance(q, DTensor):
-            q = DTensor.from_local(q, cp_mesh, placement, run_check=False)
-        if not isinstance(k, DTensor):
-            k = DTensor.from_local(k, cp_mesh, placement, run_check=False)
-        if not isinstance(v, DTensor):
-            v = DTensor.from_local(v, cp_mesh, placement, run_check=False)
+        def cp_execute_attention(self, q, k, v, dropout, attention_impl, original=original_execute_attention):
+            if attention_impl != AttentionImplementation.PYTORCH_FLASH:
+                return original(q, k, v, dropout, attention_impl)
 
-        output = original_execute_attention(q, k, v, dropout, attention_impl)
-        return output.to_local() if isinstance(output, DTensor) else output
+            placement = [Shard(2)]
+            if not isinstance(q, DTensor):
+                q = DTensor.from_local(q, cp_mesh, placement, run_check=False)
+            if not isinstance(k, DTensor):
+                k = DTensor.from_local(k, cp_mesh, placement, run_check=False)
+            if not isinstance(v, DTensor):
+                v = DTensor.from_local(v, cp_mesh, placement, run_check=False)
 
-    CausalSelfAttention.execute_attention = classmethod(cp_execute_attention)
-    setattr(CausalSelfAttention, "_cp_execute_attention_wrapped", True)
-    setattr(CausalSelfAttention, "_cp_mesh", cp_mesh)
+            output = original(q, k, v, dropout, attention_impl)
+            return output.to_local() if isinstance(output, DTensor) else output
+
+        attention_module.execute_attention = MethodType(cp_execute_attention, attention_module)
+        setattr(attention_module, "_cp_execute_attention_wrapped", True)
+        setattr(attention_module, "_cp_mesh", cp_mesh)
 
 
 def shard_tensor_buffers_for_context_parallel(

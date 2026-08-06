@@ -68,6 +68,17 @@ class ModelFactory:
     """Model factory class to create models."""
 
     @staticmethod
+    def _get_fsdp2_mesh_degrees(device_mesh: DeviceMesh) -> tuple[str, ...]:
+        if device_mesh.mesh_dim_names is None:
+            raise ValueError("FSDP2 requires a device mesh with named dimensions.")
+        replicate_degrees = [
+            degree.value
+            for degree in (ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.CP)
+            if degree.value in device_mesh.mesh_dim_names
+        ]
+        return tuple([*replicate_degrees, ParallelismDegrees.DP_SHARD.value])
+
+    @staticmethod
     def _is_model_on_meta_device(model: nn.Module) -> bool:
         """
         Checks if all parameters and buffers of the model are on the meta device.
@@ -208,12 +219,7 @@ class ModelFactory:
             param_dtype=mixed_precision_settings.param_dtype.value,
             reduce_dtype=mixed_precision_settings.reduce_dtype.value,
         )
-        # if DP_REPLICATE is not in the mesh, we apply full sharding and hybrid sharding otherwise
-        fsdp2_degrees = (
-            (ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.DP_SHARD.value)
-            if ParallelismDegrees.DP_REPLICATE.value in device_mesh.mesh_dim_names
-            else (ParallelismDegrees.DP_SHARD.value,)
-        )
+        fsdp2_degrees = ModelFactory._get_fsdp2_mesh_degrees(device_mesh)
         fsdp_config = {"mesh": device_mesh[fsdp2_degrees], "mp_policy": mp_policy}
 
         modules = list(model.modules())
@@ -634,9 +640,9 @@ class GPT2ModelFactory:
         if cp_mesh is None:
             return
 
-        if context_parallel_load_balancer not in ("headtail", "ptrr", None):
+        if context_parallel_load_balancer not in ("headtail", None):
             raise ValueError(
-                "context_parallel_load_balancer must be one of: 'headtail', 'ptrr', or None. "
+                "context_parallel_load_balancer must be one of: 'headtail' or None. "
                 f"Got {context_parallel_load_balancer}."
             )
 

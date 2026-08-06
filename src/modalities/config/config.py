@@ -327,7 +327,7 @@ class DebuggingEnrichedModelConfig(BaseModel):
 class GPT2ModelTPConfig(BaseModel):
     model: PydanticPytorchModuleOrListType  # TODO set proper type
     device_mesh: PydanticDeviceMeshIFType
-    context_parallel_load_balancer: Literal["headtail", "ptrr"] | None = "headtail"
+    context_parallel_load_balancer: Literal["headtail"] | None = "headtail"
 
     @model_validator(mode="after")
     def validate_tp_mesh_existence(self) -> "GPT2ModelTPConfig":
@@ -354,7 +354,7 @@ class GPT2ModelTPConfig(BaseModel):
 class GPT2ModelCPConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     device_mesh: PydanticDeviceMeshIFType
-    context_parallel_load_balancer: Literal["headtail", "ptrr"] | None = "headtail"
+    context_parallel_load_balancer: Literal["headtail"] | None = "headtail"
 
     @model_validator(mode="after")
     def validate_cp_mesh_existence(self) -> "GPT2ModelCPConfig":

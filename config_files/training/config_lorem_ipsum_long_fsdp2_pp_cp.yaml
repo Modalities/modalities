@@ -348,7 +348,7 @@ model_raw:
             n_head: ${model_raw.config.n_head_q} #it has to be head_q here
             seq_length_dim: -2
             base_freq: 10000
-    attention_implementation: manual
+    attention_implementation: pytorch_flash
     activation_type: swiglu
     attention_norm_config:
       norm_type: layer_norm

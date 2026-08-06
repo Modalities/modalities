@@ -7,15 +7,11 @@ import torch
 import torch.nn as nn
 
 from modalities.models.gpt2.gpt2_model import CausalSelfAttention
-from modalities.models.model_factory import GPT2ModelFactory
+from modalities.models.model_factory import GPT2ModelFactory, ModelFactory
 from modalities.models.parallelism.context_parallel import (
     apply_cp_to_sdpa_attention_forward,
     shard_tensor_buffers_for_context_parallel,
 )
-
-# ── helpers ──────────────────────────────────────────────────────────────────
-
-_UNSET = object()
 
 
 class _DummyMesh:
@@ -23,26 +19,6 @@ class _DummyMesh:
 
     def size(self) -> int:
         return 2
-
-
-# ── fixture: isolate class-level CP patch across tests ───────────────────────
-
-
-@pytest.fixture()
-def cp_class_patch_isolated():
-    """Restore CausalSelfAttention to its exact pre-test state after any test
-    that touches (or simulates) the class-level CP patch."""
-    original_descriptor = CausalSelfAttention.__dict__["execute_attention"]
-    saved_wrapped = getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", _UNSET)
-    saved_mesh = getattr(CausalSelfAttention, "_cp_mesh", _UNSET)
-    yield
-    setattr(CausalSelfAttention, "execute_attention", original_descriptor)
-    for attr, saved in [("_cp_execute_attention_wrapped", saved_wrapped), ("_cp_mesh", saved_mesh)]:
-        if saved is _UNSET:
-            if hasattr(CausalSelfAttention, attr):
-                delattr(CausalSelfAttention, attr)
-        else:
-            setattr(CausalSelfAttention, attr, saved)
 
 
 # ── shard_tensor_buffers_for_context_parallel ────────────────────────────────
@@ -109,41 +85,45 @@ def _get_execute_attention_fn() -> object:
     return getattr(descriptor, "__func__", descriptor)
 
 
-def test_apply_cp_empty_modules_does_not_patch(cp_class_patch_isolated) -> None:
-    """An empty attention_modules list must leave the class untouched."""
+def _attention_module() -> CausalSelfAttention:
+    module = object.__new__(CausalSelfAttention)
+    nn.Module.__init__(module)
+    return module
+
+
+def test_apply_cp_empty_modules_does_not_patch() -> None:
     original_fn = _get_execute_attention_fn()
     apply_cp_to_sdpa_attention_forward(attention_modules=[], cp_mesh=object())
     assert _get_execute_attention_fn() is original_fn
-    assert not getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", False)
 
 
-def test_apply_cp_reentry_same_mesh_is_noop(cp_class_patch_isolated) -> None:
-    """A second call with the same mesh object must return silently."""
+def test_apply_cp_reentry_same_mesh_is_noop() -> None:
     mesh = object()
-    setattr(CausalSelfAttention, "_cp_execute_attention_wrapped", True)
-    setattr(CausalSelfAttention, "_cp_mesh", mesh)
-    original_fn = _get_execute_attention_fn()
+    module = _attention_module()
+    setattr(module, "_cp_execute_attention_wrapped", True)
+    setattr(module, "_cp_mesh", mesh)
 
-    apply_cp_to_sdpa_attention_forward(attention_modules=[MagicMock(spec=nn.Module)], cp_mesh=mesh)
+    apply_cp_to_sdpa_attention_forward(attention_modules=[module], cp_mesh=mesh)
 
-    assert _get_execute_attention_fn() is original_fn
+    assert "execute_attention" not in module.__dict__
 
 
-def test_apply_cp_reentry_different_mesh_raises(cp_class_patch_isolated) -> None:
-    """A second call with a different mesh must raise RuntimeError."""
+def test_apply_cp_reentry_different_mesh_raises() -> None:
     mesh_a = object()
     mesh_b = object()
-    setattr(CausalSelfAttention, "_cp_execute_attention_wrapped", True)
-    setattr(CausalSelfAttention, "_cp_mesh", mesh_a)
+    module = _attention_module()
+    setattr(module, "_cp_execute_attention_wrapped", True)
+    setattr(module, "_cp_mesh", mesh_a)
 
-    with pytest.raises(RuntimeError, match="already patched.*different cp_mesh"):
-        apply_cp_to_sdpa_attention_forward(attention_modules=[MagicMock(spec=nn.Module)], cp_mesh=mesh_b)
+    with pytest.raises(RuntimeError, match="already configured with a different cp_mesh"):
+        apply_cp_to_sdpa_attention_forward(attention_modules=[module], cp_mesh=mesh_b)
 
 
-def test_apply_cp_patches_classmethod_and_sets_flags(cp_class_patch_isolated) -> None:
-    """First call must replace execute_attention and set both guard flags."""
+def test_apply_cp_patches_only_supplied_instance() -> None:
     mock_dtensor_module = MagicMock()
     mock_attn_module = MagicMock()
+    cp_module = _attention_module()
+    non_cp_module = _attention_module()
 
     with patch.dict(
         sys.modules,
@@ -155,11 +135,13 @@ def test_apply_cp_patches_classmethod_and_sets_flags(cp_class_patch_isolated) ->
     ):
         original_fn = _get_execute_attention_fn()
         mesh = object()
-        apply_cp_to_sdpa_attention_forward(attention_modules=[MagicMock(spec=nn.Module)], cp_mesh=mesh)
+        apply_cp_to_sdpa_attention_forward(attention_modules=[cp_module], cp_mesh=mesh)
 
-    assert getattr(CausalSelfAttention, "_cp_execute_attention_wrapped", False) is True
-    assert getattr(CausalSelfAttention, "_cp_mesh", None) is mesh
-    assert _get_execute_attention_fn() is not original_fn
+    assert getattr(cp_module, "_cp_execute_attention_wrapped", False) is True
+    assert getattr(cp_module, "_cp_mesh", None) is mesh
+    assert "execute_attention" in cp_module.__dict__
+    assert "execute_attention" not in non_cp_module.__dict__
+    assert _get_execute_attention_fn() is original_fn
     mock_attn_module._enable_context_parallel_dispatcher.assert_called_once()
 
 
@@ -173,6 +155,19 @@ def _model(seq_len: int) -> SimpleNamespace:
 def test_validate_seq_len_headtail_valid() -> None:
     # 256 divisible by cp=2 * tp=1 * 2 = 4 ✓
     GPT2ModelFactory._validate_context_parallel_seq_len(_model(256), cp_degree=2, load_balancer_type="headtail")
+
+
+def test_fsdp2_mesh_includes_cp_as_replication_dimension() -> None:
+    mesh = SimpleNamespace(mesh_dim_names=("dp_shard", "cp"))
+
+    assert ModelFactory._get_fsdp2_mesh_degrees(mesh) == ("cp", "dp_shard")
+
+
+def test_ptrr_is_rejected_during_cp_model_construction() -> None:
+    with pytest.raises(ValueError, match="must be one of"):
+        GPT2ModelFactory._apply_context_parallel_to_gpt2_attention(
+            model=_model(256), cp_mesh=_DummyMesh(), context_parallel_load_balancer="ptrr"
+        )
 
 
 def test_validate_seq_len_headtail_invalid() -> None:

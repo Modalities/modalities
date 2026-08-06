@@ -84,7 +84,12 @@ class Evaluator:
                 )
 
                 if scheduled_pipeline.has_first_pp_stage:
-                    pp_schedule.eval(batch.samples[model[0].sample_key].contiguous(), target=targets, losses=losses)
+                    pp_schedule.eval(
+                        batch.samples[model[0].sample_key].contiguous(),
+                        batch.samples.get("position_ids"),
+                        target=targets,
+                        losses=losses,
+                    )
                 else:
                     pp_schedule.eval(target=targets, losses=losses)
                 loss = (

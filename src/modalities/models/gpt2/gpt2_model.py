@@ -713,7 +713,8 @@ class CausalSelfAttention(nn.Module):
         if self.q_norm is not None and self.k_norm is not None:
             q = self.q_norm(q)
             k = self.k_norm(k)
-        y = CausalSelfAttention.execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
+        execute_attention = self.__dict__.get("execute_attention", CausalSelfAttention.execute_attention)
+        y = execute_attention(q, k, v, self.dropout, self.attention_impl)  # (B, T, nh_q, hd)
         y = y.reshape(B, T, -1)  # (B, T, n_embd), re-assemble all head outputs side by side
         return self.resid_dropout(self.c_proj(y))  # (B, T, n_embd), output projection
 
@@ -1051,7 +1052,9 @@ class GPT2LLM(NNModel):
         )  # token embeddings of shape (b, seq_len, n_embd)
 
         if self.poe_type is PositionTypes.ABSOLUTE and hasattr(self.transformer, "wpe"):
-            pos = torch.arange(0, seq_len, dtype=torch.long, device=device)  # shape (seq_len)
+            pos = (
+                position_ids if position_ids is not None else torch.arange(0, seq_len, dtype=torch.long, device=device)
+            )
             pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (seq_len, n_embd)
             h = h + pos_emb
 
@@ -1061,8 +1064,9 @@ class GPT2LLM(NNModel):
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h, position_ids=position_ids)
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
-        h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
-        return h
+        if hasattr(self.transformer, "lm_head"):
+            return self.transformer.lm_head(h)
+        return (h, position_ids) if position_ids is not None else h
 
 
 def manual_scaled_dot_product_attention(

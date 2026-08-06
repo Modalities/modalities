@@ -1,4 +1,5 @@
 import pytest
+import torch
 import torch.nn as nn
 
 from modalities.models.components.layer_norms import LayerNormConfig
@@ -90,6 +91,38 @@ def test_weight_tying_behavior(use_weight_tying):
         assert (
             model.transformer.wte.weight is not model.transformer.lm_head.weight
         ), "Weight tying failed: Embedding and LM head weights should be different."
+
+
+def test_absolute_embeddings_use_explicit_global_position_ids():
+    model = create_gpt2_model(use_weight_tying=False)
+    model.poe_type = PositionTypes.ABSOLUTE
+    model.transformer.wte = nn.Embedding(1, EMBEDDING_DIM)
+    model.transformer.wpe = nn.Embedding(8, EMBEDDING_DIM)
+    model.transformer.drop = nn.Identity()
+    model.transformer.h = nn.ModuleDict()
+    model.transformer.lm_head_norm = nn.Identity()
+    model.transformer.lm_head = nn.Identity()
+    nn.init.zeros_(model.transformer.wte.weight)
+    with torch.no_grad():
+        model.transformer.wpe.weight.copy_(torch.arange(8).unsqueeze(1).expand(-1, EMBEDDING_DIM))
+
+    output = model.forward_impl(torch.zeros(1, 2, dtype=torch.long), position_ids=torch.tensor([[5, 7]]))
+
+    torch.testing.assert_close(output[0, :, 0], torch.tensor([5.0, 7.0]))
+
+
+def test_pipeline_stage_forwards_position_ids_with_hidden_states():
+    model = create_gpt2_model(use_weight_tying=False)
+    model.transformer.h = nn.ModuleDict()
+    del model.transformer["lm_head"]
+    position_ids = torch.tensor([[4, 5]])
+
+    hidden_states, forwarded_position_ids = model.forward_impl(
+        torch.zeros(1, 2, dtype=torch.long), position_ids=position_ids
+    )
+
+    assert hidden_states.shape == (1, 2, EMBEDDING_DIM)
+    assert forwarded_position_ids is position_ids
 
 
 def test_weight_tying_parameter_count():

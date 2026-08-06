@@ -1,5 +1,8 @@
 import pytest
 import torch
+import torch.nn as nn
+from torch.optim import SGD
+from torch.optim.lr_scheduler import LambdaLR
 
 from modalities.batch import DatasetBatch
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
@@ -244,3 +247,32 @@ def test_cp_sharding_skipped_when_no_cp_in_mesh(monkeypatch):
     )
 
     assert called["count"] == 0
+
+
+def test_pipeline_first_stage_receives_position_ids():
+    trainer = _make_trainer(device_mesh=_DummyDeviceMeshNoCP())
+    batch = DatasetBatch(
+        samples={"input_ids": torch.ones(1, 4, dtype=torch.long), "position_ids": torch.arange(4).unsqueeze(0)},
+        targets={"target_ids": torch.ones(1, 4, dtype=torch.long)},
+    )
+    model = nn.Linear(1, 1)
+    model.sample_key = "input_ids"
+    optimizer = SGD(model.parameters(), lr=0.1)
+    scheduler = LambdaLR(optimizer, lambda _: 1.0)
+
+    class _Schedule:
+        def step(self, *args, **kwargs):
+            self.args = args
+
+    schedule = _Schedule()
+    pipeline = type(
+        "PipelineStub",
+        (),
+        {"pp_schedule": schedule, "has_first_pp_stage": True, "has_last_pp_stage": False},
+    )()
+    loss = type("LossStub", (), {"target_key": "target_ids"})()
+
+    trainer._train_batch(batch, [model], optimizer, scheduler, loss, micro_batch_id=0, scheduled_pipeline=pipeline)
+
+    assert schedule.args[0] is batch.samples["input_ids"]
+    assert schedule.args[1] is batch.samples["position_ids"]
