@@ -1009,23 +1009,27 @@ class GPT2LLM(NNModel):
         """
         ...
 
-    def forward(self, inputs: dict[str, torch.Tensor] | torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+    def forward(
+        self, inputs: dict[str, torch.Tensor] | torch.Tensor, position_ids: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor] | torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass of the GPT2LLM module.
 
         Args:
-            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data.  When a dict, an optional
+            inputs (dict[str, torch.Tensor] | torch.Tensor): Input data. When a dict, an optional
                 ``"position_ids"`` key (shape ``(B, T)`` or ``(1, T)``) may be present to supply
                 explicit global token positions for CP-aware RoPE.
+            position_ids (torch.Tensor | None): Explicit global positions supplied as a separate
+                pipeline input or propagated between pipeline stages.
 
         Returns:
             dict[str, torch.Tensor] | torch.Tensor: Model output.
         """
         if isinstance(inputs, dict):
-            position_ids = inputs.get("position_ids", None)
+            position_ids = inputs.get("position_ids", position_ids)
             return {self.prediction_key: self.forward_impl(inputs[self.sample_key], position_ids=position_ids)}
         else:
-            return self.forward_impl(inputs)
+            return self.forward_impl(inputs, position_ids=position_ids)
 
     def forward_impl(self, inputs: torch.Tensor, position_ids: torch.Tensor | None = None) -> torch.Tensor:
         """

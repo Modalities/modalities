@@ -237,6 +237,16 @@ def _run_cp_pp_loss_match_impl(
 
         chunk = seq_len // (2 * cp_degree)
         input_cp, head_start, tail_start = _headtail_input(inp, cp_rank, cp_degree)
+        position_ids = (
+            torch.cat(
+                [
+                    torch.arange(head_start, head_start + chunk, device=device),
+                    torch.arange(tail_start, tail_start + chunk, device=device),
+                ]
+            )
+            .unsqueeze(0)
+            .expand(batch_size, -1)
+        )
         targets_cp = torch.cat(
             [
                 target[:, head_start : head_start + chunk],
@@ -264,7 +274,7 @@ def _run_cp_pp_loss_match_impl(
         targets_pp, losses = (targets_cp.contiguous(), []) if scheduled_pipeline.has_last_pp_stage else (None, None)
         with torch.no_grad():
             if scheduled_pipeline.has_first_pp_stage:
-                pp_schedule.eval(input_cp.contiguous(), target=targets_pp, losses=losses)
+                pp_schedule.eval(input_cp.contiguous(), position_ids, target=targets_pp, losses=losses)
             else:
                 pp_schedule.eval(target=targets_pp, losses=losses)
 

@@ -90,7 +90,8 @@ def apply_context_parallel_sharding_to_batch(
         full_seq_len = batch.samples[sample_key].shape[1]
         position_ids = torch.arange(full_seq_len, device=batch.samples[sample_key].device, dtype=torch.long).unsqueeze(
             0
-        )  # (1, T)
+        )
+        position_ids = position_ids.expand(batch.samples[sample_key].shape[0], -1)
         buffer_keys.append(("sample", "position_ids"))
         buffers.append(position_ids)
         seq_dims.append(1)
