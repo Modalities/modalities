@@ -473,6 +473,8 @@ class PackedMemMapDatasetMegatronConfig(BaseModel):
 
 class CombinedDatasetConfig(BaseModel):
     datasets: list[PydanticDatasetIFType]
+    log_chunk_switch: bool = False
+    log_initial_pos: bool = False
 
 
 class BatchSamplerConfig(BaseModel):

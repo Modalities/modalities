@@ -116,13 +116,18 @@ class DatasetFactory:
         return dataset
 
     @staticmethod
-    def get_combined_dataset(datasets: list[Dataset]) -> Dataset:
+    def get_combined_dataset(
+        datasets: list[Dataset], log_chunk_switch: bool = False, log_initial_pos: bool = False
+    ) -> Dataset:
         """Factory method for creating a combined datset .
 
         Args:
             datasets (list[Dataset]): List of datasets to combine.
+            log_chunk_switch (bool, optional): Whether to log when switching between dataset chunks. Defaults to False.
+            log_initial_pos (bool, optional): Whether to log the initial position of at the beginning of a
+                training or warmstart. Defaults to False.
 
         Returns:
             Dataset: CombinedDataset object.
         """
-        return CombinedDataset(datasets=datasets)
+        return CombinedDataset(datasets=datasets, log_chunk_switch=log_chunk_switch, log_initial_pos=log_initial_pos)
