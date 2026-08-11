@@ -336,10 +336,10 @@ class Trainer:
             m.train()
 
         local_num_seen_samples = 0
-        cumulated_losses = torch.zeros(3).cuda()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        cumulated_losses = torch.zeros(3, device=device)
 
         # throughput
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # batch loop
         batch: DatasetBatch
