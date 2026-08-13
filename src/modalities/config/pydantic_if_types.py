@@ -23,6 +23,7 @@ from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
 from modalities.models.parallelism.pipeline_parallelism import Pipeline, StagesGenerator
+from modalities.evaluator import DownstreamEvaluator
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.tokenization.tokenizer_wrapper import TokenizerWrapper
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
@@ -98,3 +99,4 @@ PydanticRemovableHandleType = Annotated[
     torch.utils.hooks.RemovableHandle, PydanticThirdPartyTypeIF(torch.utils.hooks.RemovableHandle)
 ]
 PydanticDebuggingType = Annotated[Debugging, PydanticThirdPartyTypeIF(Debugging)]
+PydanticDownstreamEvaluatorType = Annotated[DownstreamEvaluator, PydanticThirdPartyTypeIF(DownstreamEvaluator)]
