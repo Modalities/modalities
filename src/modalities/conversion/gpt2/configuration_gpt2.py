@@ -181,10 +181,12 @@ class GPT2Config(PretrainedConfig):
         attention_dropout=0.0,
         mlp_bias=False,
         head_dim=None,
+        norm_type="layer_norm",
+        use_qk_norm=False,
+        qk_norm_dim=None,
         **kwargs,
     ):
-        if rms_norm_eps is not None:
-            raise ValueError("RMSNorm is not supported in GPT2 model.")
+        self.norm_type = norm_type
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
         self.hidden_size = hidden_size
@@ -211,6 +213,8 @@ class GPT2Config(PretrainedConfig):
         self.attention_dropout = attention_dropout
         self.mlp_bias = mlp_bias
         self.head_dim = head_dim if head_dim is not None else self.hidden_size // self.num_attention_heads
+        self.use_qk_norm = use_qk_norm
+        self.qk_norm_dim = qk_norm_dim
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, copy it it to 'rope_type'.
         if self.rope_scaling is not None and "type" in self.rope_scaling:

@@ -33,7 +33,9 @@ from modalities.config.config import (
     DCPCheckpointSavingConfig,
     DebuggingEnrichedModelConfig,
     DistributedSamplerConfig,
+    DownstreamEvaluatorConfig,
     DummyLRSchedulerConfig,
+    ModelConverterConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     EvaluationResultToDiscSubscriberConfig,
@@ -84,6 +86,8 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
+from modalities.evaluator import DownstreamEvaluator
+from modalities.conversion.model_converter import ModelConverter
 from modalities.loss_functions import CLMCrossEntropyLoss
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
@@ -539,4 +543,6 @@ COMPONENTS = [
         maybe_model_list(HookRegistration.register_print_forward_hooks),
         PrintForwardHookConfig,
     ),
+    ComponentEntity("downstream_evaluator", "default", DownstreamEvaluator, DownstreamEvaluatorConfig),
+    ComponentEntity("model_converter", "default", ModelConverter, ModelConverterConfig),
 ]

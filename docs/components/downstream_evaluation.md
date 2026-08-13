@@ -1,0 +1,158 @@
+# Downstream Evaluation Pipeline
+
+## Overview
+
+The downstream evaluation pipeline in Modalities is a decoupled, three-stage callback system that executes at configurable step intervals during the training loop.
+
+The order of execution inside `Trainer.train` is:
+1. `checkpointing_callback`: Saves the PyTorch/FSDP checkpoint to disk.
+2. `conversion_callback`: (Optional) Converts the PyTorch checkpoint to a Hugging Face (HF) checkpoint.
+3. `downstream_evaluation_callback`: (Optional) Runs external evaluation tools (like OLMES) on the newly created HF checkpoint.
+
+By keeping conversion and evaluation decoupled, you can configure just the converter, just the evaluator (if HF checkpoints are generated elsewhere), or both.
+
+---
+
+## 1. Conversion Callback (`ModelConverter`)
+
+**Location:** `src/modalities/conversion/model_converter.py` (Lines 10-67)
+
+The `ModelConverter` is a thin wrapper that executes a shell command template via a subprocess.
+
+### Behavior
+- Triggered if `num_train_steps_done % eval_interval == 0`.
+- Only executes on `global_rank == 0`. You can prefix the command with `CUDA_VISIBLE_DEVICES=X` to manually specify which GPU the evaluation script should run on.
+- Reads `last_checkpoint_info.json` from the checkpoint directory to determine the latest checkpoint path.
+- Checks if the `{checkpoint_path}/hf_checkpoint` directory already exists. If it does, conversion is skipped.
+- If it does not exist, it formats the `command_template` and runs it using `subprocess.run(cmd, shell=True, check=True)`.
+
+### Placeholders
+The `command_template` string can use the following placeholders:
+- `{checkpoint_path}`: The path to the latest checkpoint directory (resolved at runtime).
+- `{output_dir}`: Evaluates to `{checkpoint_path}/hf_checkpoint`.
+- `{modalities_config}`: Path to the YAML config file found inside or next to the checkpoint directory.
+
+### YAML Configuration
+```yaml
+model_converter:
+  component_key: model_converter
+  variant_key: default
+  config:
+    command_template: "python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path}"
+    checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
+    global_rank: ${settings.cuda_env.global_rank}
+    eval_interval: 1000
+```
+
+---
+
+## 2. Downstream Evaluation Callback (`DownstreamEvaluator`)
+
+**Location:** `src/modalities/evaluator.py` (Lines 210-335)
+
+The `DownstreamEvaluator` checks for the existence of an HF checkpoint, launches an evaluation script via a subprocess, tracks active processes, and syncs OLMES metrics to the active W&B run.
+
+### Behavior
+- Triggered if `num_train_steps_done % eval_interval == 0`.
+- Only executes on `global_rank == 0`.
+- Reads `last_checkpoint_info.json` to find the latest checkpoint.
+- Checks if `{checkpoint_path}/hf_checkpoint` exists. If it does NOT exist, evaluation is skipped with a warning (assuming conversion failed or was disabled).
+- If the HF checkpoint exists, it formats the `olmes_command_template` and launches it asynchronously using `subprocess.Popen(cmd, shell=True)`.
+- **Process Tracking**: Stores `(Popen, step, hf_model_dir)` tuples in `self.active_processes` (Lines 233, 258).
+- **Graceful Exit**: `wait_for_evaluations()` (Lines 264-275) iterates over `active_processes`, calls `.wait()`, and syncs metrics after each evaluation completes.
+- **W&B Metric Sync**: `_sync_metrics_to_wandb()` (Lines 277-315) parses `metrics-all.jsonl` from the OLMES output directory, extracts `primary_score` for each task alias, and logs them to the active `wandb.run` as `eval/{alias}` at the correct training step. Gracefully skips if W&B is disabled or not installed.
+
+### Placeholders
+The `olmes_command_template` string can use the following placeholders:
+- `{hf_model_dir}`: The path to the `{checkpoint_path}/hf_checkpoint` directory.
+- `{tasks}`: A space-separated string of the tasks provided in the config (Line 248).
+- `{step}`: The current `num_train_steps_done`.
+
+### HPC / SLURM Integration
+For HPC environments (like Leonardo Booster), running OLMES directly from the trainer process can cause GPU Out-of-Memory (OOM) errors. You can decouple evaluation by creating a wrapper script (`scripts/evaluation/run_olmes_sbatch.sh`) that submits an independent SLURM job using `sbatch --wait`. Because `DownstreamEvaluator` uses `subprocess.Popen` asynchronously, the wrapper script will wait in the background on the training node without blocking the training loop!
+
+> [!IMPORTANT]
+> **Nested SLURM Job Environment Isolation (`--export=NONE`)**
+> When submitting the nested evaluation job using `sbatch` from within a running SLURM training job, the nested job inherits the parent job's environment variables (such as CUDA variables, `RANK`, `WORLD_SIZE`, `MASTER_ADDR`, etc.) by default. This will cause the evaluation job to fail or behave incorrectly.
+>
+> To prevent environment leakage, you **must** include `#SBATCH --export=NONE` in the nested `sbatch` script header. This ensures the evaluation job starts with a clean, isolated environment.
+
+### YAML Configuration
+```yaml
+downstream_evaluator:
+  component_key: downstream_evaluator
+  variant_key: default
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+    tasks:
+      - "arc_challenge::olmes"
+      - "hellaswag::olmes"
+    eval_interval: 100
+    checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
+    global_rank: ${settings.cuda_env.global_rank}
+    olmes_command_template: "bash scripts/evaluation/run_olmes_sbatch.sh {hf_model_dir} '{tasks}' {step} 1024 1"
+```
+
+---
+
+## System Integration Summary
+
+For context on how these components are wired into the system, the following files handle the integration:
+
+1. **`src/modalities/trainer.py`**
+   - `conversion_callback` was added to `train()` signature.
+   - Pre-loop and in-loop execution order was explicitly set to: `checkpointing_callback` -> `conversion_callback` -> `downstream_evaluation_callback`.
+
+2. **`src/modalities/gym.py`**
+   - Threads `conversion_callback` through `Gym.run()` and passes it down to `self.trainer.train()`.
+
+3. **`src/modalities/main.py` (Lines 227-249)**
+   - Resolves `components.model_converter.convert` and `components.downstream_evaluator.evaluate`.
+   - Passes them into `gym.run()`.
+   - **Post-Training Wait** (Lines 244-249): At the very end of `run()`, explicitly calls `components.downstream_evaluator.wait_for_evaluations()` with prominent `print_rank_0` logging to ensure training does not exit until evaluations complete.
+
+4. **`src/modalities/config/config.py`**
+   - Defines Pydantic models `ModelConverterConfig` and `DownstreamEvaluatorConfig`.
+
+5. **`src/modalities/config/instantiation_models.py`**
+   - Adds `model_converter` and `downstream_evaluator` fields to `TrainingComponentsInstantiationModel`.
+
+6. **`src/modalities/registry/components.py`**
+   - Registers both classes to the `"default"` component registry.
+
+7. **`src/modalities/conversion/gpt2/convert_gpt2.py` (Lines 105-112)**
+   - Updated to support Hugging Face tokenizers (`pretrained_hf_tokenizer`) alongside SentencePiece. Detects tokenizer configs and saves `vocab.json` / `tokenizer.json` directly to the `hf_checkpoint` directory.
+
+8. **`tests/test_downstream_evaluator.py`**
+   - Contains comprehensive tests mocking the `subprocess` calls and verifying interval gating, rank gating, and directory existence logic.
+
+---
+
+## 3. Precaching Datasets (Offline Environments)
+
+If your compute cluster nodes do not have internet access, you must precache the Hugging Face datasets that OLMES requires. We provide a generalized script `scripts/evaluation/precache_tasks.py` that you can run on a login node (or any environment with internet access).
+
+### Usage
+
+Activate your evaluation environment (virtualenv, conda, or your Singularity container shell) and set the `HF_DATASETS_CACHE` and `HF_HOME` variables to a location accessible by your compute nodes.
+
+```bash
+# 1. Activate your python environment (e.g. venv where olmes is installed)
+source /path/to/olmes/venv/bin/activate
+export PYTHONPATH=/path/to/olmes/venv/lib/python3.12/site-packages:$PYTHONPATH
+
+# 2. Point Hugging Face to a shared scratch space or cache directory
+export HF_DATASETS_CACHE="/path/to/shared/hf_cache"
+export HF_HOME="/path/to/shared/hf_cache"
+export HF_TOKEN="your_hf_access_token"  # If needed for gated models/datasets
+
+# 3. Define the tasks you need
+export OLMES_TASKS="arc_challenge:rc::olmes:full hellaswag:rc::olmes:full gsm8k::olmes"
+
+# 4. Run the precache script
+python scripts/evaluation/precache_tasks.py --tasks $OLMES_TASKS
+```
+
+This script will resolve the tasks via OLMES and download all required datasets to your cache directory. When you run your training job via `sbatch`, ensure the compute nodes also set `HF_DATASETS_CACHE` and `HF_HOME` to the exact same shared directory.

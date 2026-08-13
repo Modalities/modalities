@@ -93,12 +93,18 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
         """Consumes a message from a message broker."""
         eval_result = message.payload
 
+        def _wandb_key(tag: str, key: str) -> str:
+            """Route layer-specific metrics into a top-level layers/ panel."""
+            if "layer" in key:
+                return f"layers/{key}"
+            return f"{tag}/{key}"
+
         losses = {
-            f"{eval_result.dataloader_tag} {loss_key}": loss_values.value
+            _wandb_key(eval_result.dataloader_tag, loss_key): loss_values.value
             for loss_key, loss_values in eval_result.losses.items()
         }
         metrics = {
-            f"{eval_result.dataloader_tag} {metric_key}": metric_values.value
+            _wandb_key(eval_result.dataloader_tag, metric_key): metric_values.value
             for metric_key, metric_values in eval_result.metrics.items()
         }
         # TODO step is not semantically correct here. Need to check if we can rename step to num_samples
@@ -109,7 +115,7 @@ class WandBEvaluationResultSubscriber(MessageSubscriberIF[EvaluationResultBatch]
             data=metrics, step=eval_result.num_train_steps_done
         )  # (eval_result.train_local_sample_id + 1) * self.num_ranks)
         throughput_metrics = {
-            f"{eval_result.dataloader_tag} {metric_key}": metric_values.value
+            _wandb_key(eval_result.dataloader_tag, metric_key): metric_values.value
             for metric_key, metric_values in eval_result.throughput_metrics.items()
         }
 

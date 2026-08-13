@@ -1,0 +1,2732 @@
+# =============================================================================
+# ~210M NON-EMBEDDING baseline (adapted from your 124M-class config)
+# Architecture changes vs. original:  n_layer 12->16, n_embd 768->1024, n_head 12->16, ffn_hidden 3072->4096
+#   -> 205.6M non-embedding params, 308.6M total, head_dim=64, aspect ratio d/L=64 (canonical scaled-GPT-2)
+# All widths kept multiple of 128 and head_dim fixed at 64 (Flash fast path + qk_norm stays 64).
+# See accompanying notes for LR/batch/token-budget rationale and ablation knobs.
+# =============================================================================
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpoint_saving_path: /raid/s3/opengptx/mfrey/tests/checkpoints
+    experiments_root_path: /raid/s3/opengptx/mfrey/tests/checkpoints
+  intervals:
+    training_log_interval_in_steps: 1
+    checkpointing_interval_in_steps: 25
+    evaluation_interval_in_steps: 25
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: false
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile:
+    gradient_accumulation_steps: 16
+    local_train_micro_batch_size: 8
+    sequence_length: 4096
+    #     16 GPUs -> mbs=4, gas=2
+    #     32 GPUs -> mbs=4, gas=1
+    #     64 GPUs -> mbs=2, gas=1
+    #      1 GPU  -> mbs=2, gas=64
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
+  training_target:
+    # 20B tokens (~65x total params / ~97x non-embedding).
+    num_target_tokens: 20971520000 # 40000 steps * 524288 tokens/step
+    num_target_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training_target.num_target_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  training_progress:
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    num_seen_samples: 0
+    last_step: -1
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
+
+train_dataset:
+  component_key: dataset
+  variant_key: combined
+  config:
+    datasets:
+    # --- score4.5+: 128 shards ---
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00000.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00001.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00002.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00003.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00004.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00005.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00006.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00007.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00008.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00009.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00010.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00011.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00012.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00013.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00014.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00015.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00016.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00017.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00018.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00019.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00020.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00021.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00022.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00023.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00024.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00025.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00026.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00027.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00028.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00029.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00030.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00031.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00032.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00033.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00034.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00035.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00036.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00037.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00038.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00039.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00040.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00041.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00042.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00043.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00044.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00045.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00046.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00047.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00048.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00049.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00050.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00051.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00052.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00053.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00054.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00055.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00056.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00057.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00058.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00059.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00060.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00061.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00062.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00063.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00064.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00065.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00066.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00067.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00068.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00069.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00070.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00071.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00072.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00073.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00074.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00075.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00076.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00077.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00078.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00079.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00080.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00081.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00082.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00083.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00084.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00085.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00086.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00087.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00088.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00089.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00090.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00091.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00092.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00093.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00094.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00095.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00096.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00097.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00098.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00099.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00100.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00101.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00102.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00103.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00104.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00105.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00106.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00107.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00108.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00109.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00110.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00111.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00112.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00113.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00114.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00115.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00116.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00117.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00118.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00119.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00120.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00121.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00122.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00123.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00124.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00125.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00126.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.5+/part-00127.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    # --- score4.0-4.5: 128 shards ---
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00000.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00001.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00002.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00003.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00004.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00005.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00006.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00007.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00008.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00009.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00010.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00011.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00012.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00013.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00014.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00015.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00016.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00017.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00018.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00019.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00020.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00021.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00022.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00023.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00024.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00025.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00026.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00027.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00028.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00029.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00030.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00031.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00032.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00033.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00034.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00035.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00036.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00037.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00038.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00039.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00040.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00041.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00042.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00043.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00044.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00045.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00046.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00047.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00048.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00049.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00050.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00051.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00052.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00053.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00054.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00055.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00056.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00057.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00058.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00059.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00060.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00061.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00062.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00063.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00064.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00065.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00066.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00067.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00068.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00069.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00070.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00071.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00072.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00073.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00074.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00075.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00076.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00077.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00078.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00079.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00080.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00081.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00082.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00083.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00084.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00085.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00086.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00087.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00088.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00089.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00090.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00091.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00092.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00093.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00094.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00095.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00096.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00097.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00098.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00099.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00100.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00101.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00102.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00103.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00104.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00105.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00106.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00107.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00108.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00109.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00110.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00111.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00112.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00113.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00114.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00115.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00116.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00117.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00118.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00119.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00120.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00121.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00122.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00123.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00124.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00125.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00126.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score4.0-4.5/part-00127.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    # --- score3.5-4.0: 128 shards ---
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00000.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00001.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00002.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00003.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00004.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00005.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00006.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00007.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00008.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00009.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00010.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00011.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00012.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00013.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00014.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00015.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00016.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00017.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00018.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00019.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00020.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00021.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00022.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00023.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00024.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00025.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00026.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00027.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00028.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00029.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00030.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00031.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00032.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00033.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00034.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00035.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00036.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00037.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00038.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00039.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00040.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00041.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00042.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00043.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00044.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00045.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00046.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00047.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00048.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00049.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00050.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00051.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00052.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00053.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00054.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00055.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00056.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00057.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00058.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00059.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00060.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00061.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00062.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00063.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00064.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00065.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00066.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00067.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00068.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00069.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00070.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00071.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00072.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00073.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00074.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00075.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00076.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00077.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00078.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00079.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00080.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00081.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00082.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00083.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00084.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00085.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00086.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00087.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00088.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00089.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00090.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00091.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00092.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00093.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00094.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00095.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00096.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00097.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00098.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00099.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00100.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00101.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00102.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00103.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00104.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00105.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00106.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00107.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00108.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00109.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00110.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00111.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00112.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00113.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00114.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00115.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00116.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00117.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00118.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00119.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00120.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00121.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00122.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00123.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00124.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00125.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00126.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+    - component_key: dataset
+      variant_key: packed_mem_map_dataset_continuous
+      config:
+        raw_data_path: /raid/s3/opengptx/mehdi-ali/data/smollm-corpus-fw-edu-dedup-jsonl-buckets-raw/tokenized/score3.5-4.0/part-00127.pbin
+        sequence_length: ${settings.step_profile.sequence_length}
+        sample_key: ${settings.referencing_keys.sample_key}
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: resumable_distributed_sampler
+          config:
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+eval_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: /raid/s3/opengptx/mehdi-ali/git_repos/experimentation/data/eval_data/validation.pbin
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+eval_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: eval
+    dataset:
+      instance_key: eval_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: 2
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            drop_last: true
+            dataset:
+              instance_key: eval_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+eval_dataloaders:
+- instance_key: eval_dataloader
+  pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        k: -1
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: dcp
+      config:
+        checkpoint_path: ${settings.paths.experiments_root_path}/${settings.experiment_id}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+loss_fn:
+  component_key: loss
+  variant_key: clm_cross_entropy_loss
+  config:
+    target_key: ${settings.referencing_keys.target_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: gpt2
+        weight_init_type: scaled
+        mean: 0.0
+        std: 0.02
+        num_layers: ${model_raw.config.n_layer}
+        multi_device_generator_policy: error
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: compiled_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: BF_16
+    block_names: [GPT2Block]
+
+compiled_model:
+  component_key: model
+  variant_key: compiled
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    block_names: [GPT2Block]
+
+model_raw:
+  component_key: model
+  variant_key: gpt2
+  config:
+    use_meta_device: false
+    use_weight_tying: false
+    sample_key: ${settings.referencing_keys.sample_key}
+    poe_type: NOPE
+    sequence_length: ${settings.step_profile.sequence_length}
+    prediction_key: ${loss_fn.config.prediction_key}
+    vocab_size: 50304
+    # ---- ~210M NON-EMBEDDING shape ----
+    n_layer: 16
+    n_head_q: 16
+    n_head_kv: 16
+    ffn_hidden: 4096
+    n_embd: 1024
+    # ----------------------------------------------
+    dropout: 0.0
+    bias: false
+    attention_config:
+      qkv_transforms:
+        - type_hint: RotaryTransform
+          config:
+            n_embd: ${model_raw.config.n_embd}
+            n_head: ${model_raw.config.n_head_q}
+            seq_length_dim: -2
+            base_freq: 10000
+      qk_norm_config:
+        norm_type: pytorch_rms_norm
+        config:
+          normalized_shape: 64
+          eps: 1.0e-05
+    attention_implementation: pytorch_flash
+    activation_type: swiglu
+    attention_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: 1024
+        eps: 1.0e-05
+    ffn_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: 1024
+        eps: 1.0e-05
+    lm_head_norm_config:
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: 1024
+        eps: 1.0e-05
+
+lr_scheduler:
+  component_key: scheduler
+  variant_key: onecycle_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    max_lr: 0.003
+    div_factor: 10          # initial LR = max_lr/10 = 3.0e-4
+    final_div_factor: 1     # final LR = initial = max_lr/10
+    total_steps: ${settings.training_target.num_target_steps}
+    pct_start: 0.01
+    anneal_strategy: cos
+    last_epoch: ${settings.training_progress.last_step}
+
+optimizer:
+  component_key: optimizer
+  variant_key: adam_w
+  config:
+    lr: 0.0003             # overridden by OneCycle; set to max_lr/div_factor for consistency
+    betas: [0.9, 0.95]
+    eps: 1e-8
+    weight_decay: 1e-1     # decoupled WD=0.1, standard (GPT-3/Llama/OLMo); also aids LR transfer across width
+    weight_decay_groups_excluded: [embedding, pytorch_rms_norm]
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp2
+  config:
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+
+progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: tests
+    mode: ONLINE
+    experiment_id: base_toadapt
+    directory: wandb_storage
+    config_file_path: ${settings.config_file_path}
+
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: gpt2
+  config:
+    n_layer: ${model_raw.config.n_layer}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    world_size: ${settings.cuda_env.world_size}
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: gpt2
+
+model_converter:
+  component_key: model_converter
+  variant_key: default
+  config:
+    command_template: "CUDA_VISIBLE_DEVICES=7 python src/modalities/conversion/gpt2/convert_gpt2.py {modalities_config} {output_dir} --checkpoint_path {checkpoint_path} > {checkpoint_path}/conversion.log 2>&1"
+    checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
+    global_rank: ${settings.cuda_env.global_rank}
+    eval_interval: ${settings.intervals.checkpointing_interval_in_steps}
+
+downstream_evaluator:
+  component_key: downstream_evaluator
+  variant_key: default
+  config:
+    tokenizer:
+      instance_key: tokenizer
+      pass_type: BY_REFERENCE
+    tasks:
+      - "minerva_math_algebra:bpb::olmes"
+      - "minerva_math_counting_and_probability:bpb::olmes"
+      - "minerva_math_geometry:bpb::olmes"
+      - "minerva_math_intermediate_algebra:bpb::olmes"
+      - "minerva_math_number_theory:bpb::olmes"
+      - "minerva_math_prealgebra:bpb::olmes"
+      - "minerva_math_precalculus:bpb::olmes"
+      - "arc_challenge:rc::olmes:full"
+      - "arc_easy:rc::olmes:full"
+      - "hellaswag:rc::olmes:full"
+      - "winogrande:rc::olmes:full"
+      - "socialiqa:rc::olmes:full"
+      - "piqa:rc::olmes:full"
+      - "qasper_yesno:rc::olmes"
+      - "lambada"
+      - "arc_challenge:rc:bpb::olmes:full"
+      - "arc_easy:rc:bpb::olmes:full"
+      - "hellaswag:rc:bpb::olmes:full"
+      - "winogrande:rc:bpb::olmes:full"
+      - "socialiqa:rc:bpb::olmes:full"
+      - "piqa:rc:bpb::olmes:full"
+      - "qasper_yesno:rc:bpb::olmes"
+      - "lambada:bpb"
+      - "gsm8k::olmes"
+    eval_interval: ${settings.intervals.evaluation_interval_in_steps}
+    checkpoint_dir: ${settings.paths.experiments_root_path}/${settings.experiment_id}
+    global_rank: ${settings.cuda_env.global_rank}
+    olmes_command_template: "CUDA_VISIBLE_DEVICES=7 . /home/markus_frey/Github/olmes/.venv/bin/activate && olmes --model {hf_model_dir} --model-args '{{\"trust_remote_code\": true}}' --task {tasks} --limit 8 --output-dir {hf_model_dir}/olmes_eval_{step} > {hf_model_dir}/olmes_eval_{step}.log 2>&1"

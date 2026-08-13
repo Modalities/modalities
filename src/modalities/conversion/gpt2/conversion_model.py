@@ -23,7 +23,43 @@ def convert_model_checkpoint(modalities_config: dict) -> tuple[GPT2ForCausalLM, 
     """
     gpt2_config = convert_model_config(modalities_config)
     hf_model = GPT2ForCausalLM(gpt2_config).to(dtype=torch.bfloat16)
-    modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
+    model_config = modalities_config["model_raw" if "model_raw" in modalities_config else "model"]
+    checkpoint_path = None
+    if "checkpointed_model" in modalities_config:
+        checkpoint_path = modalities_config["checkpointed_model"].get("config", {}).get("checkpoint_path")
+
+    if checkpoint_path and not ("variant_key" in modalities_config.get("checkpointed_model", {})):
+        # Load state dict manually if variant_key is missing
+        if "model" not in modalities_config and "model_raw" in modalities_config:
+            modalities_config["model"] = modalities_config["model_raw"]
+        modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.MODEL)
+        from pathlib import Path
+        if Path(checkpoint_path).is_dir():
+            from torch.distributed.checkpoint.default_planner import _EmptyStateDictLoadPlanner
+            from torch.distributed.checkpoint.filesystem import FileSystemReader
+            from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
+            sd = {}
+            planner = _EmptyStateDictLoadPlanner(keys=["app.model"], allow_partial_load=True)
+            _load_state_dict(sd, storage_reader=FileSystemReader(checkpoint_path), planner=planner, no_dist=True)
+            model_sd = sd.get("app", {}).get("model", sd)
+        else:
+            ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+            model_sd = ckpt
+            for key in ("model_state_dict", "state_dict", "model"):
+                if key in ckpt and isinstance(ckpt[key], dict):
+                    model_sd = ckpt[key]
+                    break
+        
+        out = {}
+        for k, v in model_sd.items():
+            if k.startswith("module."):
+                k = k[len("module."):]
+            out[k] = v
+        missing, unexpected = modalities_model.load_state_dict(out, strict=False)
+        print("Missing keys:", missing)
+        print("Unexpected keys:", unexpected)
+    else:
+        modalities_model = get_model_from_config(modalities_config, model_type=ModelTypeEnum.CHECKPOINTED_MODEL)
     _copy_weights_model(hf_model, modalities_model)
     return hf_model, modalities_model
 
@@ -43,6 +79,14 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
     _check_conversion_criteria(config)
 
     ffn_norm_key = "ffn_norm_config"
+    norm_type = config[ffn_norm_key].get("norm_type", "layer_norm")
+
+    qk_norm_cfg = config.get("attention_config", {}).get("qk_norm_config")
+    use_qk_norm = qk_norm_cfg is not None
+    qk_norm_dim = None
+    if use_qk_norm:
+        qk_cfg = qk_norm_cfg.get("config", {})
+        qk_norm_dim = qk_cfg.get("ndim", qk_cfg.get("normalized_shape"))
 
     return GPT2Config(
         vocab_size=config["vocab_size"],
@@ -57,12 +101,15 @@ def convert_model_config(modalities_config: dict) -> GPT2Config:
         attention_bias=config["bias"],
         mlp_bias=config["bias"],
         hidden_act="silu",
+        norm_type=norm_type,
         layer_norm_eps=_get_layer_norm_value(config[ffn_norm_key]["config"], "eps"),
         layer_norm_elementwise_affine=_get_layer_norm_value(config[ffn_norm_key]["config"], "elementwise_affine"),
         layer_norm_bias=_get_layer_norm_value(config[ffn_norm_key]["config"], "bias"),
         max_position_embeddings=config["sequence_length"],
         rope_theta=config["attention_config"]["qkv_transforms"][0]["config"]["base_freq"],
         _attn_implementation=_map_attention_type(config),
+        use_qk_norm=use_qk_norm,
+        qk_norm_dim=qk_norm_dim,
         output_attentions=False,
     )
 
@@ -80,6 +127,7 @@ def check_converted_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM, 
         input_ids = torch.randint(0, vocab_size, (1, modalities_model.sequence_length), device=hf_model.device)
         inputs = {modalities_model.sample_key: input_ids.to(modalities_model.transformer.wte.weight.device)}
 
+        modalities_model.to(dtype=hf_model.dtype, device=hf_model.device)
         with torch.no_grad():
             llama_logits = hf_model(input_ids=input_ids).logits.to("cpu")
             modalities_logits = modalities_model(inputs)[modalities_model.prediction_key].to("cpu")
@@ -103,7 +151,7 @@ def _check_conversion_criteria(model_config: dict) -> None:
 
     norms = ["attention_norm_config", "ffn_norm_config", "lm_head_norm_config"]
     for norm in norms:
-        assert model_config[norm]["norm_type"] == "layer_norm"
+        assert model_config[norm]["norm_type"] in ["layer_norm", "rms_norm", "pytorch_rms_norm"]
 
     assert (
         len(set(_get_layer_norm_value(model_config[norm]["config"], "bias") for norm in norms)) == 1
@@ -122,13 +170,13 @@ def _get_layer_norm_value(config: dict, field: str) -> bool | float | int:
 
 
 def _map_attention_type(config: dict):
-    if config["attention_implementation"] == "pytorch_flash":
-        attention_impl = "sdpa"
-    elif config["attention_implementation"] == "manual":
-        attention_impl = "eager"
+    impl = config.get("attention_implementation", "default")
+    if impl in ("pytorch_flash", "default"):
+        return "sdpa"
+    elif impl == "manual":
+        return "eager"
     else:
-        raise ValueError(f"Unknown or unsupported attention implementation {config['attention_implementation']}.")
-    return attention_impl
+        raise ValueError(f"Unknown attention_implementation: {impl}")
 
 
 def _copy_weights_model(hf_model: GPT2ForCausalLM, modalities_model: GPT2LLM):
@@ -164,11 +212,16 @@ def _copy_weights_mlp(hf_layer: GPT2DecoderLayer, modalities_layer: GPT2Block):
 def _copy_weights_layer_norms(hf_layer: GPT2DecoderLayer, modalities_layer: GPT2Block):
     _copy_weights_base_modules(hf_layer.input_layernorm, modalities_layer.attention_norm)
     _copy_weights_base_modules(hf_layer.post_attention_layernorm, modalities_layer.ffn_norm)
+    if getattr(hf_layer.self_attn, "q_norm", None) is not None:
+        _copy_weights_base_modules(hf_layer.self_attn.q_norm, modalities_layer.attn.q_norm)
+        _copy_weights_base_modules(hf_layer.self_attn.k_norm, modalities_layer.attn.k_norm)
 
 
-def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm, m2: nn.Linear | nn.LayerNorm):
+def _copy_weights_base_modules(m1: nn.Linear | nn.LayerNorm | nn.Module, m2: nn.Linear | nn.LayerNorm | nn.Module):
     assert m1.weight.shape == m2.weight.shape
-    assert (m1.bias is None and m2.bias is None) or m1.bias.shape == m2.bias.shape
+    m1_bias = getattr(m1, "bias", None)
+    m2_bias = getattr(m2, "bias", None)
+    assert (m1_bias is None and m2_bias is None) or m1_bias.shape == m2_bias.shape
     m1.weight.data.copy_(m2.weight.data)
-    if m1.bias is not None:
-        m1.bias.data.copy_(m2.bias.data)
+    if m1_bias is not None:
+        m1_bias.data.copy_(m2_bias.data)

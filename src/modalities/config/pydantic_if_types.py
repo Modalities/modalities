@@ -19,6 +19,8 @@ from modalities.checkpointing.checkpoint_saving_strategies import CheckpointSavi
 from modalities.checkpointing.stateful.app_state import AppState
 from modalities.dataloader.collate_fns.collate_if import CollateFnIF
 from modalities.dataloader.dataloader import LLMDataLoader
+from modalities.conversion.model_converter import ModelConverter
+from modalities.evaluator import DownstreamEvaluator
 from modalities.inference.text.inference_component import TextInferenceComponent
 from modalities.logging_broker.subscriber import MessageSubscriberIF
 from modalities.loss_functions import Loss
@@ -98,3 +100,5 @@ PydanticRemovableHandleType = Annotated[
     torch.utils.hooks.RemovableHandle, PydanticThirdPartyTypeIF(torch.utils.hooks.RemovableHandle)
 ]
 PydanticDebuggingType = Annotated[Debugging, PydanticThirdPartyTypeIF(Debugging)]
+PydanticDownstreamEvaluatorType = Annotated[DownstreamEvaluator, PydanticThirdPartyTypeIF(DownstreamEvaluator)]
+PydanticModelConverterType = Annotated[ModelConverter, PydanticThirdPartyTypeIF(ModelConverter)]

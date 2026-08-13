@@ -88,6 +88,23 @@ class LlamaRotaryEmbedding(nn.Module):
         return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
 
 
+class GPT2RMSNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6):
+        """
+        GPT2RMSNorm is equivalent to T5LayerNorm
+        """
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, hidden_states):
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * hidden_states.to(input_dtype)
+
+
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -203,6 +220,17 @@ class LlamaAttention(nn.Module):
         self.o_proj = nn.Linear(
             config.num_attention_heads * self.head_dim, config.hidden_size, bias=config.attention_bias
         )
+        if getattr(config, "use_qk_norm", False):
+            qk_norm_dim = getattr(config, "qk_norm_dim", None) or self.head_dim
+            if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+                self.q_norm = nn.RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+                self.k_norm = nn.RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+            else:
+                self.q_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+                self.k_norm = GPT2RMSNorm(qk_norm_dim, eps=config.layer_norm_eps)
+        else:
+            self.q_norm = None
+            self.k_norm = None
 
     def forward(
         self,
@@ -222,6 +250,10 @@ class LlamaAttention(nn.Module):
 
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+
+        if getattr(self, "q_norm", None) is not None:
+            query_states = self.q_norm(query_states)
+            key_states = self.k_norm(key_states)
 
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
@@ -256,18 +288,25 @@ class GPT2DecoderLayer(GradientCheckpointingLayer):
         self.self_attn = LlamaAttention(config=config, layer_idx=layer_idx)
 
         self.mlp = LlamaMLP(config)
-        self.input_layernorm = nn.LayerNorm(
-            config.hidden_size,
-            eps=config.layer_norm_eps,
-            elementwise_affine=config.layer_norm_elementwise_affine,
-            bias=config.layer_norm_bias,
-        )
-        self.post_attention_layernorm = nn.LayerNorm(
-            config.hidden_size,
-            eps=config.layer_norm_eps,
-            elementwise_affine=config.layer_norm_elementwise_affine,
-            bias=config.layer_norm_bias,
-        )
+        if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+            self.input_layernorm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.post_attention_layernorm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        elif getattr(config, "norm_type", "layer_norm") == "rms_norm":
+            self.input_layernorm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.post_attention_layernorm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        else:
+            self.input_layernorm = nn.LayerNorm(
+                config.hidden_size,
+                eps=config.layer_norm_eps,
+                elementwise_affine=config.layer_norm_elementwise_affine,
+                bias=config.layer_norm_bias,
+            )
+            self.post_attention_layernorm = nn.LayerNorm(
+                config.hidden_size,
+                eps=config.layer_norm_eps,
+                elementwise_affine=config.layer_norm_elementwise_affine,
+                bias=config.layer_norm_bias,
+            )
 
     def forward(
         self,
@@ -333,19 +372,23 @@ class GPT2Model(GPT2PreTrainedModel):
         self.layers = nn.ModuleList(
             [GPT2DecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
-        self.norm = nn.LayerNorm(
-            config.hidden_size,
-            eps=config.layer_norm_eps,
-            elementwise_affine=config.layer_norm_elementwise_affine,
-            bias=config.layer_norm_bias,
-        )
+        if getattr(config, "norm_type", "layer_norm") == "pytorch_rms_norm":
+            self.norm = nn.RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        elif getattr(config, "norm_type", "layer_norm") == "rms_norm":
+            self.norm = GPT2RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        else:
+            self.norm = nn.LayerNorm(
+                config.hidden_size,
+                eps=config.layer_norm_eps,
+                elementwise_affine=config.layer_norm_elementwise_affine,
+                bias=config.layer_norm_bias,
+            )
         self.rotary_emb = LlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
 
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs
     @auto_docstring
     def forward(
         self,
