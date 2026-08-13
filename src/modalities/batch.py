@@ -54,6 +54,26 @@ class DatasetBatch(Batch, TorchDeviceMixin):
         return self.samples[key].shape[self.batch_dim]
 
 
+def _apply_to(val, device):
+    if isinstance(val, torch.Tensor):
+        return val.to(device)
+    elif isinstance(val, dict):
+        return {k: _apply_to(v, device) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_apply_to(v, device) for v in val]
+    return val
+
+
+def _apply_detach(val):
+    if isinstance(val, torch.Tensor):
+        return val.detach()
+    elif isinstance(val, dict):
+        return {k: _apply_detach(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_apply_detach(v) for v in val]
+    return val
+
+
 @dataclass
 class InferenceResultBatch(Batch, TorchDeviceMixin):
     """Stores targets and predictions of an entire batch."""
@@ -71,12 +91,12 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
         return self.targets[key].device
 
     def to(self, device: torch.device):
-        self.predictions = {k: v.to(device) for k, v in self.predictions.items()}
-        self.targets = {k: v.to(device) for k, v in self.targets.items()}
+        self.predictions = {k: _apply_to(v, device) for k, v in self.predictions.items()}
+        self.targets = {k: _apply_to(v, device) for k, v in self.targets.items()}
 
     def detach(self):
-        self.targets = {k: v.detach() for k, v in self.targets.items()}
-        self.predictions = {k: v.detach() for k, v in self.predictions.items()}
+        self.targets = {k: _apply_detach(v) for k, v in self.targets.items()}
+        self.predictions = {k: _apply_detach(v) for k, v in self.predictions.items()}
 
     def get_predictions(self, key: str) -> torch.Tensor:
         if key not in self.predictions:
@@ -89,8 +109,13 @@ class InferenceResultBatch(Batch, TorchDeviceMixin):
         return self.targets[key]
 
     def __len__(self) -> int:
-        key = list(self.predictions.keys())[0]
-        return self.predictions[key].shape[self.batch_dim]
+        for v in self.predictions.values():
+            if isinstance(v, torch.Tensor):
+                return v.shape[self.batch_dim]
+        for v in self.targets.values():
+            if isinstance(v, torch.Tensor):
+                return v.shape[self.batch_dim]
+        raise ValueError("No tensor found in predictions or targets to determine batch length")
 
 
 @dataclass
