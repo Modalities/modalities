@@ -1,0 +1,412 @@
+"""Whole-blend orchestration of the quality selection stages.
+
+Each function here drives one stage across every dataset of a registry and leaves its
+output in a fixed place under a working directory, so the stages can be run
+independently, re-run for a single dataset, and resumed after a failure:
+
+``<work_dir>/calibration.yaml``   token estimator constants, one entry per dataset
+``<work_dir>/sidecar/<dataset>/`` per-document parquet parts
+``<work_dir>/buckets/<split>/``   annotation shards partitioned for joining
+``<work_dir>/cube/<dataset>.parquet``  aggregated counts, read by the preview
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Optional
+
+import yaml
+
+from modalities.dataloader.preprocessing.quality.annotation_join import JoinReport, bucket_annotations, join_annotations
+from modalities.dataloader.preprocessing.quality.cube import Cube, build_cube
+from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry, KeyKind
+from modalities.dataloader.preprocessing.quality.selection import (
+    BlendResult,
+    SelectionConfig,
+    evaluate_blend,
+    format_blend_report,
+)
+from modalities.dataloader.preprocessing.quality.sidecar import SidecarBuilder, resolve_source_pointers
+from modalities.dataloader.preprocessing.quality.tokens import CalibrationSet, calibrate_dataset
+from modalities.utils.logger_utils import get_logger
+
+
+def calibration_path(work_dir: Path) -> Path:
+    """Location of the calibration file within a working directory.
+
+    Args:
+        work_dir (Path): The working directory.
+
+    Returns:
+        Path: Path to ``calibration.yaml``.
+    """
+    return Path(work_dir) / "calibration.yaml"
+
+
+def sidecar_dir(work_dir: Path, dataset_name: str) -> Path:
+    """Location of one dataset's sidecar parts.
+
+    Args:
+        work_dir (Path): The working directory.
+        dataset_name (str): The dataset name.
+
+    Returns:
+        Path: Directory holding that dataset's parquet parts.
+    """
+    return Path(work_dir) / "sidecar" / dataset_name
+
+
+def cube_path(work_dir: Path, dataset_name: str) -> Path:
+    """Location of one dataset's cube.
+
+    Args:
+        work_dir (Path): The working directory.
+        dataset_name (str): The dataset name.
+
+    Returns:
+        Path: Path to that dataset's cube parquet.
+    """
+    return Path(work_dir) / "cube" / f"{dataset_name}.parquet"
+
+
+def bucket_dir(work_dir: Path, split: str) -> Path:
+    """Location of one annotation split's buckets.
+
+    Args:
+        work_dir (Path): The working directory.
+        split (str): The annotation split path.
+
+    Returns:
+        Path: Directory holding that split's bucket files.
+    """
+    return Path(work_dir) / "buckets" / split.replace("/", "__")
+
+
+def calibrate_blend(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    tokenizer,
+    tokenizer_name: str,
+    sample_size: int = 2000,
+    only: Optional[list[str]] = None,
+) -> CalibrationSet:
+    """Measures token-estimation constants for every dataset.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory receiving ``calibration.yaml``.
+        tokenizer: The tokenizer training will use.
+        tokenizer_name (str): Identifier recorded with each measurement.
+        sample_size (int): Documents to tokenize per dataset.
+        only (Optional[list[str]]): Restrict to these dataset names, merging the result
+            into any existing calibration file.
+
+    Returns:
+        CalibrationSet: The calibrations, also written to ``calibration.yaml``.
+    """
+    path = calibration_path(work_dir)
+    existing = CalibrationSet.from_yaml(path) if path.is_file() else CalibrationSet(tokenizer=tokenizer_name)
+    if existing.tokenizer != tokenizer_name:
+        get_logger(name="main").warning(
+            f"existing calibration was measured with {existing.tokenizer!r}, now measuring with "
+            f"{tokenizer_name!r}; entries for other datasets are stale and should be re-measured"
+        )
+        existing.tokenizer = tokenizer_name
+
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        calibration = calibrate_dataset(
+            dataset_name=dataset.name,
+            file_paths=dataset.iter_files(),
+            tokenizer=tokenizer,
+            tokenizer_name=tokenizer_name,
+            text_field=dataset.text_field,
+            sample_size=sample_size,
+        )
+        existing.calibrations[dataset.name] = calibration
+        get_logger(name="main").info(
+            f"{dataset.name}: {calibration.bytes_per_token:.3f} bytes/token"
+            + (
+                f", using native field {calibration.native_field!r} scaled by {calibration.native_scale:.4f}"
+                if calibration.uses_native_field()
+                else ""
+            )
+        )
+    existing.to_yaml(path)
+    return existing
+
+
+def build_sidecars(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    only: Optional[list[str]] = None,
+    index_root: Optional[Path] = None,
+    file_ids: Optional[list[int]] = None,
+    show_progress: bool = True,
+) -> dict[str, int]:
+    """Builds the per-document table for every dataset.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory receiving ``sidecar/<dataset>/``.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        index_root (Optional[Path]): Where JSONL index files live or should be created,
+            for source trees that cannot be written to.
+        file_ids (Optional[list[int]]): Restrict to these file ids, for sharding one
+            dataset's build across tasks.
+        show_progress (bool): Whether to show progress bars.
+
+    Returns:
+        dict[str, int]: Documents written per dataset.
+    """
+    calibrations = CalibrationSet.from_yaml(calibration_path(work_dir))
+    written: dict[str, int] = {}
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        builder = SidecarBuilder(
+            dataset=dataset,
+            calibration=calibrations.get(dataset.name),
+            index_root=Path(index_root) / dataset.name if index_root else None,
+        )
+        parts = builder.build(sidecar_dir(work_dir, dataset.name), file_ids=file_ids, show_progress=show_progress)
+        written[dataset.name] = sum(parts.values())
+
+        if dataset.key is not None and dataset.key.kind == KeyKind.SOURCE_POINTER:
+            n_resolved = resolve_source_pointers(sidecar_dir(work_dir, dataset.name), dataset)
+            get_logger(name="main").info(
+                f"{dataset.name}: resolved {n_resolved:,} of {written[dataset.name]:,} pointers "
+                "into source-corpus keys"
+            )
+    return written
+
+
+def join_blend_annotations(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    only: Optional[list[str]] = None,
+    n_buckets: int = 256,
+    reuse_buckets: bool = True,
+    show_progress: bool = True,
+) -> list[JoinReport]:
+    """Attaches annotations to every annotated dataset's sidecar.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory holding the sidecars and receiving buckets.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        n_buckets (int): Partitions per annotation split. Splits of billions of rows
+            want at least 1024 so each partition fits comfortably in memory.
+        reuse_buckets (bool): Skip re-partitioning a split whose buckets already exist.
+            Several datasets share a split, so this avoids repeating the expensive part.
+        show_progress (bool): Whether to show progress bars.
+
+    Returns:
+        list[JoinReport]: One report per joined dataset.
+    """
+    reports: list[JoinReport] = []
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        if not dataset.annotation_split:
+            continue
+
+        shards = registry.annotation_shards(dataset.annotation_split)
+        if not shards:
+            get_logger(name="main").warning(
+                f"{dataset.name}: no annotation shards found for split {dataset.annotation_split!r}; "
+                "its documents stay unannotated and any predicate on them will fall back to the "
+                "missing-annotation policy"
+            )
+            continue
+
+        buckets = bucket_dir(work_dir, dataset.annotation_split)
+        if not (reuse_buckets and (buckets / "_meta.json").is_file()):
+            normalize = "urn_uuid" if dataset.key.kind == KeyKind.URN_UUID_FIELD else None
+            n_rows, columns = bucket_annotations(
+                shard_paths=shards,
+                out_dir=buckets,
+                n_buckets=n_buckets,
+                normalize_key=normalize,
+                show_progress=show_progress,
+            )
+            get_logger(name="main").info(
+                f"split {dataset.annotation_split}: bucketed {n_rows:,} rows over {len(shards)} shard(s), "
+                f"columns {columns}"
+            )
+
+        reports.append(
+            join_annotations(
+                sidecar_dir=sidecar_dir(work_dir, dataset.name),
+                annotation_bucket_dir=buckets,
+                dataset_name=dataset.name,
+                split_name=dataset.annotation_split,
+                show_progress=show_progress,
+            )
+        )
+
+    report_path = Path(work_dir) / "join_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps([r.to_dict() for r in reports], indent=1))
+    return reports
+
+
+def build_cubes(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    only: Optional[list[str]] = None,
+    n_score_bins: int = 10,
+) -> dict[str, Cube]:
+    """Aggregates every dataset's sidecar into a cube.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory holding sidecars and receiving cubes.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        n_score_bins (int): Quantile bins per native metric.
+
+    Returns:
+        dict[str, Cube]: The cubes, also written under ``cube/``.
+    """
+    cubes: dict[str, Cube] = {}
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        directory = sidecar_dir(work_dir, dataset.name)
+        if not directory.is_dir():
+            get_logger(name="main").warning(f"{dataset.name}: no sidecar at {directory}, skipping cube")
+            continue
+        cube = build_cube(directory, dataset.name, n_score_bins=n_score_bins)
+        cube.write(cube_path(work_dir, dataset.name))
+        cubes[dataset.name] = cube
+        get_logger(name="main").info(
+            f"{dataset.name}: cube has {cube.table.num_rows:,} cells over {cube.n_documents:,} documents "
+            f"({cube.n_tokens / 1e9:.2f}B estimated tokens); dimensions {cube.dimensions}"
+        )
+    return cubes
+
+
+def load_cubes(work_dir: Path, names: Optional[list[str]] = None) -> dict[str, Cube]:
+    """Loads previously built cubes.
+
+    Args:
+        work_dir (Path): Working directory holding ``cube/``.
+        names (Optional[list[str]]): Restrict to these dataset names.
+
+    Returns:
+        dict[str, Cube]: Cubes by dataset name; datasets without a cube are absent.
+    """
+    cubes: dict[str, Cube] = {}
+    directory = Path(work_dir) / "cube"
+    if not directory.is_dir():
+        return cubes
+    for path in sorted(directory.glob("*.parquet")):
+        if names and path.stem not in names:
+            continue
+        cubes[path.stem] = Cube.read(path)
+    return cubes
+
+
+def preview_selection(
+    selection_path: Path,
+    work_dir: Path,
+    force_exact: bool = False,
+) -> tuple[BlendResult, str]:
+    """Costs a selection in documents and tokens.
+
+    Args:
+        selection_path (Path): The selection YAML.
+        work_dir (Path): Working directory holding the cubes and sidecars.
+        force_exact (bool): Scan the per-document sidecars instead of the cubes.
+
+    Returns:
+        tuple[BlendResult, str]: The evaluated blend and its rendered table.
+    """
+    config = SelectionConfig.from_yaml(selection_path)
+    names = [d.name for d in config.enabled_datasets()]
+    cubes = load_cubes(work_dir, names)
+    sidecars = {name: sidecar_dir(work_dir, name) for name in names}
+    result = evaluate_blend(config, cubes, sidecar_dirs=sidecars, force_exact=force_exact)
+    return result, format_blend_report(result, datasets_in_order=names)
+
+
+def apply_selection(
+    selection_path: Path,
+    registry_path: Path,
+    work_dir: Path,
+    output_dir: Path,
+    show_progress: bool = True,
+) -> Path:
+    """Writes a selection out as filtered index files plus a manifest.
+
+    Args:
+        selection_path (Path): The selection YAML.
+        registry_path (Path): The corpus registry YAML.
+        work_dir (Path): Working directory holding the sidecars.
+        output_dir (Path): Directory receiving the index trees and manifest.
+        show_progress (bool): Whether to show progress bars.
+
+    Returns:
+        Path: Path to the written manifest.
+    """
+    config = SelectionConfig.from_yaml(selection_path)
+    registry = CorpusRegistry.from_yaml(registry_path)
+    return materialize_blend(
+        config=config,
+        registry=registry,
+        sidecar_root=Path(work_dir) / "sidecar",
+        output_root=output_dir,
+        show_progress=show_progress,
+    )
+
+
+def write_packing_configs(
+    manifest_path: Path,
+    registry_path: Path,
+    template_path: Path,
+    output_dir: Path,
+) -> list[Path]:
+    """Renders one packing config per source file of a materialised selection.
+
+    The written configs point ``pack_encoded_data`` at a filtered index, so packing
+    tokenizes only the selected documents. Everything else -- tokenizer, jq pattern,
+    queue sizes -- is copied from the template.
+
+    Args:
+        manifest_path (Path): The ``mix_manifest.yaml`` written by the apply stage.
+        registry_path (Path): The corpus registry YAML.
+        template_path (Path): A packing config to use as the template.
+        output_dir (Path): Directory receiving the rendered configs.
+
+    Returns:
+        list[Path]: The written config paths.
+    """
+    with Path(manifest_path).open() as f:
+        manifest = yaml.safe_load(f)
+    with Path(template_path).open() as f:
+        template = yaml.safe_load(f)
+    registry = CorpusRegistry.from_yaml(registry_path)
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for dataset in manifest["datasets"]:
+        entry = registry.get(dataset["name"])
+        for source_path, index_path in dataset["index_files"].items():
+            relative = Path(source_path).relative_to(entry.jsonl_root)
+            config = dict(template)
+            config["settings"] = {
+                **template.get("settings", {}),
+                "src_path": source_path,
+                "index_path": index_path,
+                "dst_path": str(output_dir / dataset["name"] / relative.with_suffix(".pbin")),
+            }
+            config_path = output_dir / dataset["name"] / relative.with_suffix(".yaml")
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with config_path.open("w") as f:
+                yaml.safe_dump(config, f, sort_keys=False)
+            written.append(config_path)
+    return written

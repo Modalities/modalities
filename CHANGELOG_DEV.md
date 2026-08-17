@@ -218,3 +218,61 @@ This PR improves training monitoring and logging across runs besides some other 
 
 **Breaking Changes**
 * experiments_root_path is now exposed on an API level
+
+## PR #XXX Quality-based document selection and up/downsampling
+
+This PR adds a way to build a training blend by filtering documents on quality signals
+and choosing how heavily each dataset is sampled, plus a fast way to see the token
+budget a given selection yields before committing to a tokenization run.
+
+**Motivation**
+
+Two kinds of quality signal exist in practice: metrics a corpus already carries in its
+own records (`fw_edu_scores`, `proxy_score`, `finemath_scores`, `perplexity`, ...), and
+external per-document annotations that have to be joined on. Neither could be used to
+shape a blend, and the only way to change a dataset's share was to duplicate it on disk
+-- which is what the `_epoch_1` / `_epoch_2` directory convention did.
+
+**General changes**
+
+* New `modalities quality` command group with one subcommand per stage:
+  `calibrate`, `build-sidecar`, `join-annotations`, `build-cube`, `preview`, `apply`
+  and `write-packing-configs`.
+* New `src/modalities/dataloader/preprocessing/quality/` package:
+  * `registry` declares each dataset's source and how it joins to annotations. Four key
+    kinds are supported, covering corpora that store a plain id, an id wrapped in
+    `<urn:uuid:...>`, no id at all (keyed by a hash of the text), and a `<file>/<line>`
+    pointer into a separate source corpus.
+  * `tokens` measures per-dataset token estimators. Estimates are per document and
+    based on the text rather than the stored line, because quality correlates with
+    length and several corpora keep multiple renderings of a document in one record.
+  * `sidecar` streams each JSONL once and records one row per document: position,
+    length, estimated tokens, join key and native metrics.
+  * `annotation_join` joins annotations by bucketing both sides on a hash of the key,
+    so a split of billions of rows never needs a single hash table. Coverage,
+    duplicate keys and unmatched documents are reported rather than hidden.
+  * `cube` aggregates a sidecar into grouped document and token counts, which is what
+    makes `preview` return in microseconds. Thresholds landing on a bin edge are exact;
+    one landing inside a bin is reported as interpolated instead of silently guessed.
+  * `selection` evaluates a YAML selection over both annotation labels and native
+    metrics, with ordinal scales declared explicitly.
+  * `materialize` writes the selection out as filtered `.idx` files.
+* New `WeightedCombinedDataset` (component `dataset`/`weighted_combined`), which takes a
+  float repeat factor per dataset. A ratio of 2.5 draws a dataset two and a half times
+  per epoch and 0.3 draws three tenths of it, without duplicating anything on disk. The
+  partial pass is chosen by a seeded affine permutation, so it is deterministic across
+  ranks and restarts and spreads across the whole dataset rather than taking a prefix.
+* New `TokenizerInstantiationModel`, so a tool can reuse a packing config for its
+  tokenizer without also having to satisfy that config's `settings`.
+
+**Notes**
+
+Selection produces a filtered index rather than a filtered copy of the corpus:
+`PackedDataGenerator` already tokenizes exactly the documents its index lists, so
+`pack_encoded_data` consumes the output unchanged and no packing code was touched. An
+ablation therefore costs megabytes of index rather than a second copy of the data, and
+the source tree is never written to.
+
+**Breaking Changes**
+
+None. `CombinedDataset` and every existing config keep working as before.

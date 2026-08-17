@@ -1,0 +1,114 @@
+# Example selection for the annealing blend.
+#
+# Each dataset states which documents to keep and how heavily to sample what survives.
+# `modalities quality preview` costs this in documents and tokens in seconds; nothing
+# is read or written until `modalities quality apply`.
+#
+# Predicates within a dataset are combined with AND. Ordinal levels come from the
+# declared scales in `selection.py`; note that `information_density` orders
+# `moderate` *below* `adequate`, which is easy to get backwards.
+
+# What to do with documents that carry no annotation. `keep` treats a propella
+# predicate as satisfied for them, which is the safe default while FinePDFs is only
+# partly downloaded -- `drop` there would silently discard two thirds of the corpus for
+# having no label rather than for failing the filter.
+missing_annotation: keep
+
+# Only used to report the gap; it does not adjust any ratio.
+target_tokens: 400_000_000_000
+
+datasets:
+  # Web text carries the most junk, so it gets the strictest filter and is downsampled.
+  - name: hplt-de
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+      - {field: content_safety, op: at_least, value: mild_concerns}
+  - name: hplt-fr
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+      - {field: content_safety, op: at_least, value: mild_concerns}
+  - name: hplt-it
+    ratio: 0.8
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+  - name: hplt-es
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+
+  # Already filtered upstream to a high-quality subset, so a light touch and a mild
+  # upsample.
+  - name: nemotron-cc
+    ratio: 1.2
+    predicates:
+      - {field: content_quality, op: at_least, value: adequate}
+      - {field: commercial_bias, op: at_least, value: minimal}
+
+  - name: climbmix-en
+    ratio: 1.0
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: information_density, op: at_least, value: moderate}
+
+  # The German pool is small relative to the English one, so what survives is upsampled.
+  # Combines a propella predicate with the corpus's own proxy score.
+  - name: klettermix-de
+    ratio: 2.0
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: proxy_score, op: gte, value: 0.65}
+
+  # Reference text: keep all of it, upsample the smaller languages.
+  - name: finewiki-en
+    ratio: 1.0
+  - name: finewiki-de
+    ratio: 2.0
+  - name: finewiki-fr
+    ratio: 2.0
+  - name: finewiki-it
+    ratio: 3.0
+  - name: finewiki-es
+    ratio: 3.0
+
+  # Only 10-34% annotated. `missing_annotation: keep` above means the propella
+  # predicate applies to the annotated minority and the rest passes on the native
+  # score alone -- deliberate, and worth revisiting once the fetch is finished.
+  - name: finepdfs-en
+    ratio: 1.0
+    predicates:
+      - {field: fw_edu, op: gte, value: 2.0}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+  - name: finepdfs-de
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+  - name: finepdfs-fr
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+  - name: finepdfs-es
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+
+  # No propella corpus exists for these, so they are shaped by native metrics only.
+  - name: finephrase
+    ratio: 0.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 2.5}
+      - {field: language_score, op: gte, value: 0.9}
+  - name: dolmino
+    ratio: 1.0
+    predicates:
+      - {field: dclm_plus2, op: gte, value: 0.5}
+
+  # Declared but excluded, so the reason is recorded rather than implied by absence.
+  - name: nemotron-cc-v2
+    ratio: 1.0
+    enabled: false

@@ -1,0 +1,174 @@
+# Corpus registry for the annealing blend.
+#
+# Every join key below was verified by sampling real keys out of the JSONL and scanning
+# the propella `id` columns for them. Coverage measured 2026-08-17 against the caches
+# named in `annotation_root`:
+#
+#   finewiki (all 5 languages)                100%
+#   hplt-4-unfiltered (de/fr/it/es)           100%
+#   nemotron-cc/high-actual                   100%  (also covers the synthetic
+#                                                    high_diverse_qa_pairs subdirectory,
+#                                                    which shares warc_record_id)
+#   nemotron-climbmix                         100%  (English, and German via the source)
+#   finepdfs (eng/deu/fra/spa)                10-34%  only 1-5 shards fetched per split
+#
+# Datasets with no `annotation_split` have no propella corpus at all and can only be
+# shaped by their native metrics.
+
+annotation_root: /data/michael.fromm/hf-cache/datasets--openeurollm--propella-annotations/snapshots/e80fc1407801a15b956f40c642d3709b528abbc9/data/propella-1-4b
+extra_annotation_roots:
+  # The HPLT shards were fetched into a second cache; both are searched.
+  - /data/alex.jude/.cache/huggingface/datasets--openeurollm--propella-annotations/snapshots/9e9c5083f81dc4bbd2708b65816a4dc41f59b911/data/propella-1-4b
+
+datasets:
+  # ---------------------------------------------------------------- FineWiki
+  # Ids look like `dewiki/6851323` and are used verbatim on both sides.
+  - name: finewiki-en
+    jsonl_root: /data/annealing/english/Finewiki
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+    native_metrics:
+      - {name: bytes_html, jq_pattern: .bytes_html}
+  - name: finewiki-de
+    jsonl_root: /data/annealing/german/Finewiki
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+  - name: finewiki-fr
+    jsonl_root: /data/annealing/french/Finewiki
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+  - name: finewiki-it
+    jsonl_root: /data/annealing/italian/Finewiki
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+  - name: finewiki-es
+    jsonl_root: /data/annealing/spanish/Finewiki
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+
+  # ---------------------------------------------------------------- HPLT v4
+  # 32-hex ids, used verbatim. No quality score of any kind in the records, so propella
+  # is the only quality signal available for these 14 TB.
+  - name: hplt-de
+    jsonl_root: /data/annealing/german/HPLTv4
+    annotation_split: hplt-4-unfiltered/deu_Latn
+    key: {kind: field, field: id}
+    native_metrics:
+      - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
+      - {name: cluster_size, jq_pattern: .cluster_size}
+  - name: hplt-fr
+    jsonl_root: /data/annealing/french/HPLTv4
+    annotation_split: hplt-4-unfiltered/fra_Latn
+    key: {kind: field, field: id}
+    native_metrics:
+      - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
+      - {name: cluster_size, jq_pattern: .cluster_size}
+  - name: hplt-it
+    jsonl_root: /data/annealing/italian/HPLTv4
+    annotation_split: hplt-4-unfiltered/ita_Latn
+    key: {kind: field, field: id}
+    native_metrics:
+      - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
+      - {name: cluster_size, jq_pattern: .cluster_size}
+  - name: hplt-es
+    jsonl_root: /data/annealing/spanish/HPLTv4
+    annotation_split: hplt-4-unfiltered/spa_Latn
+    key: {kind: field, field: id}
+    native_metrics:
+      - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
+      - {name: cluster_size, jq_pattern: .cluster_size}
+
+  # ---------------------------------------------------------------- Nemotron-CC
+  # No `id` field at all; `warc_record_id` is the annotation key. Note the annotation
+  # ids are not unique -- roughly 4% recur -- so the join keeps the first occurrence.
+  - name: nemotron-cc
+    jsonl_root: /data/annealing/english/Nemotron-CC
+    annotation_split: nemotron-cc/high-actual
+    key: {kind: field, field: warc_record_id}
+
+  # ---------------------------------------------------------------- ClimbMix
+  # No identifier of any kind; the annotation key is the SHA-256 of the exact text.
+  - name: climbmix-en
+    jsonl_root: /data/annealing/english/Climbmix
+    annotation_split: nemotron-climbmix
+    key: {kind: sha256_text}
+
+  # German KletterMix is a translation of ClimbMix. Its own text is German, so hashing
+  # it matches nothing -- the annotation belongs to the English original, which the id
+  # points at as `<file>/<line>`, zero-indexed.
+  - name: klettermix-de
+    jsonl_root: /data/annealing/german/AIML-TUDA-KletterMix-filtered
+    glob: "*.jsonl"
+    annotation_split: nemotron-climbmix
+    key:
+      kind: source_pointer
+      field: id
+      source_root: /data/annealing/Nemotron-ClimbMix
+      source_line_offset: 0
+    native_metrics:
+      - {name: proxy_score, jq_pattern: .proxy_score}
+      - {name: token_count, jq_pattern: .token_count}
+
+  # ---------------------------------------------------------------- FinePDFs
+  # Ids are UUIDs stored in two forms -- `<urn:uuid:...>` and bare -- mixed within
+  # single files on both sides, so both sides are normalised before comparing.
+  - name: finepdfs-en
+    jsonl_root: /data/annealing/english/Finepdfs
+    annotation_split: finepdfs/eng_Latn
+    key: {kind: urn_uuid_field, field: id}
+    note: "annotation coverage was 34% on 2026-08-17; finish the fetch before relying on a propella predicate"
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .fw_edu_scores, aggregation: max}
+      - {name: dclm, jq_pattern: .dclm_scores, aggregation: max}
+      - {name: ocr_quality, jq_pattern: .ocr_quality_scores, aggregation: min}
+      - {name: full_doc_lid_score, jq_pattern: .full_doc_lid_score}
+      - {name: duplicate_count, jq_pattern: .duplicate_count}
+  - name: finepdfs-de
+    jsonl_root: /data/annealing/german/Finepdfs
+    annotation_split: finepdfs/deu_Latn
+    key: {kind: urn_uuid_field, field: id}
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .fw_edu_scores, aggregation: max}
+      - {name: full_doc_lid_score, jq_pattern: .full_doc_lid_score}
+  - name: finepdfs-fr
+    jsonl_root: /data/annealing/french/Finepdfs
+    annotation_split: finepdfs/fra_Latn
+    key: {kind: urn_uuid_field, field: id}
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .fw_edu_scores, aggregation: max}
+      - {name: full_doc_lid_score, jq_pattern: .full_doc_lid_score}
+  - name: finepdfs-es
+    jsonl_root: /data/annealing/spanish/Finepdfs
+    annotation_split: finepdfs/spa_Latn
+    key: {kind: urn_uuid_field, field: id}
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .fw_edu_scores, aggregation: max}
+      - {name: full_doc_lid_score, jq_pattern: .full_doc_lid_score}
+
+  # `italian/Finepdfs` holds English data, byte-identical to `english/Finepdfs` in 578
+  # of its 580 files. Enabling it would count the same 5.4 TB of English documents
+  # twice, so it stays declared and disabled until that is resolved.
+  - name: finepdfs-it
+    jsonl_root: /data/annealing/italian/Finepdfs
+    annotation_split: finepdfs/eng_Latn
+    key: {kind: urn_uuid_field, field: id}
+    enabled: false
+    note: "English data in the Italian folder; duplicates finepdfs-en"
+
+  # -------------------------------------------- no propella corpus, native only
+  # The largest subset of the blend. Every candidate annotation key returns 0%, so it
+  # can only be shaped by its category directory and native fields.
+  - name: nemotron-cc-v2
+    jsonl_root: /data/annealing/english/Nemotron-CC-v2
+    native_metrics: []
+  - name: finephrase
+    jsonl_root: /data/annealing/english/Finephrase
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .score}
+      - {name: language_score, jq_pattern: .language_score}
+      - {name: token_count, jq_pattern: .token_count}
+  - name: dolmino
+    jsonl_root: /data/annealing/english/Dolmino
+    native_metrics:
+      - {name: dclm_plus2, jq_pattern: '.metadata.dclm_plus2."__label__1"'}
+      - {name: len_cl100k_base, jq_pattern: .metadata.len_cl100k_base}

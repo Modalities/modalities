@@ -28,6 +28,8 @@ from modalities.api import (
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
+from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry
 from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
@@ -721,6 +723,310 @@ def CMD_entry_point_run_train_step_profiler(
         config_file_path=config_file_path,
         experiment_root_path=experiment_root_path,
     )
+
+
+@main.group(name="quality")
+def quality() -> None:
+    """
+    Quality-based document selection and up/downsampling of a training blend.
+
+    The stages are meant to be run in order: `calibrate` measures how records map to
+    token counts, `build-sidecar` records one row per document, `join-annotations`
+    attaches external labels, and `build-cube` aggregates the result. After that,
+    `preview` costs a selection in seconds and `apply` writes filtered index files that
+    `modalities data pack_encoded_data` consumes unchanged.
+    """
+    pass
+
+
+@quality.command(name="calibrate")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option(
+    "--tokenizer_config",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a packing config whose tokenizer section is used for calibration.",
+)
+@click.option(
+    "--sample_size",
+    type=int,
+    default=2000,
+    show_default=True,
+    help="Documents tokenized per dataset to measure the estimator.",
+)
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+def CMD_quality_calibrate(
+    registry_path: Path, work_dir: Path, tokenizer_config: Path, sample_size: int, only: tuple[str, ...]
+) -> None:
+    """Measures how each dataset's records relate to the training tokenizer's counts.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        tokenizer_config (Path): Packing config supplying the tokenizer.
+        sample_size (int): Documents tokenized per dataset.
+        only (tuple[str, ...]): Restrict to these dataset names.
+    """
+    from modalities.config.component_factory import ComponentFactory
+    from modalities.config.instantiation_models import TokenizerInstantiationModel
+    from modalities.registry.components import COMPONENTS
+    from modalities.registry.registry import Registry
+
+    config_dict = load_app_config_dict(tokenizer_config)
+    factory = ComponentFactory(registry=Registry(COMPONENTS))
+    tokenizer = factory.build_components(
+        config_dict=config_dict, components_model_type=TokenizerInstantiationModel
+    ).tokenizer
+    tokenizer_name = str(config_dict["tokenizer"]["config"].get("pretrained_model_name_or_path", "unknown"))
+
+    quality_pipeline.calibrate_blend(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        tokenizer=tokenizer,
+        tokenizer_name=tokenizer_name,
+        sample_size=sample_size,
+        only=list(only) or None,
+    )
+
+
+@quality.command(name="build-sidecar")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--index_root",
+    type=Path,
+    default=None,
+    help="Where JSONL index files live or should be created. Use this when the source tree is read-only.",
+)
+@click.option(
+    "--file_id",
+    "file_ids",
+    multiple=True,
+    type=int,
+    help="Restrict to these file ids, to shard one dataset's build across tasks (repeatable).",
+)
+def CMD_quality_build_sidecar(
+    registry_path: Path, work_dir: Path, only: tuple[str, ...], index_root: Optional[Path], file_ids: tuple[int, ...]
+) -> None:
+    """Records one row per document: position, estimated tokens, key and native metrics.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        index_root (Optional[Path]): Where JSONL index files live or should be created.
+        file_ids (tuple[int, ...]): Restrict to these file ids.
+    """
+    written = quality_pipeline.build_sidecars(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        index_root=index_root,
+        file_ids=list(file_ids) or None,
+    )
+    for name, n_documents in written.items():
+        print_rank_0(f"{name}: {n_documents:,} documents")
+
+
+@quality.command(name="join-annotations")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--num_buckets",
+    type=int,
+    default=256,
+    show_default=True,
+    help="Partitions per annotation split. Use 1024+ for splits of billions of rows.",
+)
+@click.option(
+    "--rebuild_buckets", is_flag=True, default=False, help="Re-partition a split even if its buckets already exist."
+)
+def CMD_quality_join_annotations(
+    registry_path: Path, work_dir: Path, only: tuple[str, ...], num_buckets: int, rebuild_buckets: bool
+) -> None:
+    """Attaches external annotations to each dataset's sidecar and reports coverage.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        num_buckets (int): Partitions per annotation split.
+        rebuild_buckets (bool): Re-partition even if buckets exist.
+    """
+    reports = quality_pipeline.join_blend_annotations(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_buckets=num_buckets,
+        reuse_buckets=not rebuild_buckets,
+    )
+    for report in reports:
+        print_rank_0(report.summary())
+
+
+@quality.command(name="build-cube")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--num_score_bins",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Quantile bins per native metric. A threshold on a bin edge stays exact.",
+)
+def CMD_quality_build_cube(registry_path: Path, work_dir: Path, only: tuple[str, ...], num_score_bins: int) -> None:
+    """Aggregates the sidecars so a selection can be costed without reading them again.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        num_score_bins (int): Quantile bins per native metric.
+    """
+    quality_pipeline.build_cubes(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_score_bins=num_score_bins,
+    )
+
+
+@quality.command(name="preview")
+@click.option(
+    "--selection",
+    "selection_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the selection YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the cubes and sidecars.")
+@click.option(
+    "--exact",
+    is_flag=True,
+    default=False,
+    help="Scan the per-document sidecars instead of the cubes. Slower, but exact for any threshold.",
+)
+def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool) -> None:
+    """Reports how many documents and tokens a selection yields, per dataset and in total.
+
+    Args:
+        selection_path (Path): Path to the selection YAML.
+        work_dir (Path): Working directory holding the cubes and sidecars.
+        exact (bool): Scan the sidecars instead of the cubes.
+    """
+    _, report = quality_pipeline.preview_selection(selection_path=selection_path, work_dir=work_dir, force_exact=exact)
+    print_rank_0(report)
+
+
+@quality.command(name="apply")
+@click.option(
+    "--selection",
+    "selection_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the selection YAML.",
+)
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the sidecars.")
+@click.option(
+    "--output_dir", type=Path, required=True, help="Directory receiving the filtered index files and the mix manifest."
+)
+def CMD_quality_apply(selection_path: Path, registry_path: Path, work_dir: Path, output_dir: Path) -> None:
+    """Writes a selection out as filtered index files plus a manifest.
+
+    The source data is not copied or modified. Point `pack_encoded_data` at a written
+    index to tokenize only the selected documents.
+
+    Args:
+        selection_path (Path): Path to the selection YAML.
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory holding the sidecars.
+        output_dir (Path): Directory receiving the index files and manifest.
+    """
+    manifest_path = quality_pipeline.apply_selection(
+        selection_path=selection_path,
+        registry_path=registry_path,
+        work_dir=work_dir,
+        output_dir=output_dir,
+    )
+    print_rank_0(f"Manifest written to {manifest_path}")
+
+
+@quality.command(name="write-packing-configs")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the mix_manifest.yaml written by 'apply'.",
+)
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option(
+    "--template",
+    "template_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Packing config to use as the template for tokenizer and jq settings.",
+)
+@click.option("--output_dir", type=Path, required=True, help="Directory receiving the rendered packing configs.")
+def CMD_quality_write_packing_configs(
+    manifest_path: Path, registry_path: Path, template_path: Path, output_dir: Path
+) -> None:
+    """Renders one packing config per source file, each pointing at its filtered index.
+
+    Args:
+        manifest_path (Path): Path to the mix manifest.
+        registry_path (Path): Path to the corpus registry YAML.
+        template_path (Path): Packing config used as the template.
+        output_dir (Path): Directory receiving the rendered configs.
+    """
+    written = quality_pipeline.write_packing_configs(
+        manifest_path=manifest_path,
+        registry_path=registry_path,
+        template_path=template_path,
+        output_dir=output_dir,
+    )
+    print_rank_0(f"Wrote {len(written)} packing config(s) to {output_dir}")
 
 
 def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:
