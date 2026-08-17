@@ -22,10 +22,10 @@ unset SLURM_MEM_PER_GPU || true
 echo "START $(date)"
 
 srun "$MQ" -m modalities quality join-annotations \
-  --registry "$QDIR/annealing_registry.yaml" --work_dir "$WORK"
+  --registry "${REGISTRY:-$QDIR/annealing_registry.yaml}" --work_dir "$WORK"
 
 srun "$MQ" -m modalities quality build-cube \
-  --registry "$QDIR/annealing_registry.yaml" --work_dir "$WORK"
+  --registry "${REGISTRY:-$QDIR/annealing_registry.yaml}" --work_dir "$WORK"
 
 echo "Coverage per dataset is in $WORK/join_report.json -- read it before trusting a selection."
 echo "END $(date)"

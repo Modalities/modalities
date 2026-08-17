@@ -29,7 +29,7 @@ echo "START $(date) shard ${SLURM_ARRAY_TASK_ID}/${NUM_SHARDS}"
 # incomplete bucketing run rather than silently dropping a missing task's annotations,
 # so a failed task is a hard stop, not a quiet gap. Re-run just that shard id.
 srun "$MQ" -m modalities quality bucket-annotations \
-  --registry "$QDIR/annealing_registry.yaml" \
+  --registry "${REGISTRY:-$QDIR/annealing_registry.yaml}" \
   --work_dir "$WORK" \
   --num_buckets "$NUM_BUCKETS" \
   --shard_id "$SLURM_ARRAY_TASK_ID" \

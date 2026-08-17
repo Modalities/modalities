@@ -46,6 +46,24 @@ Two registry entries are deliberately disabled or worth a second look:
 `nemotron-cc-v2` is enabled at 9.86 TB but has no annotations at all. Drop it from the
 registry if the blend does not need it -- it is ~16 h of sidecar work.
 
+## Running everything with timings
+
+`run_all_timed.sh` runs the steps in order and prints how long each took, plus a summary.
+Array jobs go through `sbatch --wait`, so the timing is the job's real duration rather
+than how long submission took.
+
+```bash
+bash $QDIR/slurm/run_all_timed.sh            # all steps
+bash $QDIR/slurm/run_all_timed.sh 1 2 3 4    # only the once-per-blend stages
+bash $QDIR/slurm/run_all_timed.sh 5          # just re-preview
+```
+
+It stops at the first failing step and still prints the summary, and it honours
+`REGISTRY`, `SELECTION`, `TOKENIZER_CONFIG`, `WORK`, `SIDECAR_TASKS`, `BUCKET_TASKS`,
+`NUM_BUCKETS`, `PACK_TASKS`, `SAMPLE_SIZE` and `BLEND_NAME` as environment overrides.
+
+The individual commands are below if you would rather drive them by hand.
+
 ## Steps 1-4: once per blend
 
 Nothing is written into `/data/annealing`. Indexes go to `$WORK/idx`.

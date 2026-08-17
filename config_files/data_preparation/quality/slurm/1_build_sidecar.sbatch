@@ -28,7 +28,7 @@ NUM_SHARDS="${SLURM_ARRAY_TASK_COUNT:-64}"
 echo "START $(date) shard ${SLURM_ARRAY_TASK_ID}/${NUM_SHARDS}"
 
 srun "$MQ" -m modalities quality build-sidecar \
-  --registry "$QDIR/annealing_registry.yaml" \
+  --registry "${REGISTRY:-$QDIR/annealing_registry.yaml}" \
   --work_dir "$WORK" \
   --index_root "$WORK/idx" \
   --shard_id "$SLURM_ARRAY_TASK_ID" \
