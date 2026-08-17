@@ -159,3 +159,27 @@ $WORK/packcfg/                  generated packing configs and the resulting .pbi
 Only `$WORK` is written. `/data/annealing` is read-only throughout -- verified on a real
 run of `finewiki-it`, which produced 452,714 sidecar rows and added no file to the source
 tree.
+
+## Measured on a real run of finewiki-it
+
+| Stage | Measured |
+|---|---|
+| calibrate | 14 s (200 documents sampled) |
+| build-sidecar, 1 of 4 files | 55 s for 6 GB / 452,714 documents, incl. index creation |
+| bucket-annotations, finewiki split | 6 m 36 s for 43,097,138 rows (108.8k rows/s) |
+| join-annotations | 1 m 47 s, **100 % coverage**, 868,586 duplicate annotation keys (2.0 %) |
+| build-cube | 12 s -> 456 cells over 452,714 documents, 1.20 B estimated tokens |
+| preview | 8 s, of which ~6 s is interpreter startup |
+
+Two things worth carrying forward from that run:
+
+* **Duplicate annotation keys are normal, not a Nemotron-CC quirk.** finewiki reported
+  868,586 of them. The join keeps the first occurrence and reports the count; check it in
+  `join_report.json` rather than assuming a clean one-to-one join.
+* **`preview` pays ~6 s of import overhead** before it does any work, because the CLI
+  imports the component registry and therefore torch. The cube evaluation itself is
+  milliseconds to a couple of seconds, so budget roughly 15-20 s for a full-blend preview
+  rather than the 10 s the cube maths alone suggests.
+
+On that run token retention (62.6 %) exceeded row retention (51.5 %) on real data, which
+is the length correlation the design exists to account for.

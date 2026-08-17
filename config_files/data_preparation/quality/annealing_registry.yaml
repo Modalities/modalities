@@ -79,8 +79,10 @@ datasets:
       - {name: cluster_size, jq_pattern: .cluster_size}
 
   # ---------------------------------------------------------------- Nemotron-CC
-  # No `id` field at all; `warc_record_id` is the annotation key. Note the annotation
-  # ids are not unique -- roughly 4% recur -- so the join keeps the first occurrence.
+  # No `id` field at all; `warc_record_id` is the annotation key. The annotation ids are
+  # not unique -- roughly 4% recur -- so the join keeps the first occurrence. This is not
+  # specific to this split: finewiki measured 868,586 duplicate keys in 43.1 M rows (2.0%)
+  # on a real run, so expect the join to report duplicates for most splits.
   - name: nemotron-cc
     jsonl_root: /data/annealing/english/Nemotron-CC
     annotation_split: nemotron-cc/high-actual
