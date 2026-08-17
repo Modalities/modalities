@@ -71,7 +71,7 @@ Measured on `/data/annealing` (43 TB across 19 datasets, ~7.6 bn documents):
 | Stage | Cost | How often |
 |---|---|---|
 | calibrate | minutes | once per blend |
-| build-sidecar | ~3 h on 64 tasks (2 nodes) | once per blend |
+| build-sidecar | ~7 h on 64 tasks (first run; ~3.5 h after) | once per blend |
 | bucket + join annotations | ~0.5 h on 64 tasks | once per blend |
 | build-cube | ~50 min, single task | once per blend |
 | **preview** | **~10 s for the whole blend** | **every threshold you try** |
@@ -92,6 +92,15 @@ Two things dominate if you get them wrong, both measured:
 * **Sequential read from `/data` runs at ~282 MB/s per stream and ~3.8 GB/s aggregate.**
   With plain paths the sidecar pass reaches ~374 MB/s per core, so it is I/O-bound and
   more than ~16 concurrent tasks buys little.
+* **`build-sidecar` reads every file twice on its first run**: once for `IndexGenerator`
+  to write the `.idx`, then once to build the sidecar. The floor is therefore
+  `2 x 43 TB / 3.8 GB/s`, about 6.3 h -- not the 3.2 h a single pass suggests. Measured
+  on the real run: 51.3 % of the blend's bytes in 3.77 h, i.e. 3.28 GB/s of actual
+  reads, 86 % of the ceiling, projecting ~7 h. More tasks will not help.
+
+  The index pass is not throwaway work: `pack_encoded_data` needs those `.idx` files and
+  every later run reuses them, so a second `build-sidecar` over the same data -- after
+  adding a native metric, say -- is roughly twice as fast.
 
 ## What the preview reports
 
