@@ -197,6 +197,20 @@ def _quantile_edges(values: np.ndarray, n_bins: int) -> Optional[tuple[float, ..
     return tuple(float(e) for e in edges)
 
 
+def _aggregate_cells(table: pa.Table, dimension_names: list[str]) -> pa.Table:
+    # Sums the two count columns per distinct combination of dimension values. Arrow
+    # suffixes aggregated columns, and does not promise where it puts them relative to
+    # the group keys, so the result is reassembled by name.
+    aggregated = table.group_by(dimension_names).aggregate([("n_documents", "sum"), ("n_tokens", "sum")])
+    return pa.table(
+        {
+            **{name: aggregated.column(name) for name in dimension_names},
+            "n_documents": aggregated.column("n_documents_sum"),
+            "n_tokens": aggregated.column("n_tokens_sum"),
+        }
+    )
+
+
 def _sidecar_parts(sidecar_dir: Path) -> list[Path]:
     parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
     if not parts:
@@ -230,6 +244,7 @@ def build_cube(
     score_columns: Optional[Iterable[str]] = None,
     n_score_bins: int = N_SCORE_BINS,
     binning_sample_rows: int = 2_000_000,
+    aggregate_batch_rows: int = 8_000_000,
 ) -> Cube:
     """Groups a sidecar into a cube.
 
@@ -244,6 +259,9 @@ def build_cube(
             present.
         n_score_bins (int): Quantile bins per native metric.
         binning_sample_rows (int): Rows sampled to compute bin edges.
+        aggregate_batch_rows (int): How many rows to accumulate before running a
+            grouping pass. Larger batches group more efficiently but hold more rows in
+            memory; 8 million costs roughly a gigabyte for a typical dimension set.
 
     Returns:
         Cube: The aggregated cube.
@@ -267,52 +285,61 @@ def build_cube(
             binnings[name] = ScoreBinning(column=f"native_{name}", edges=edges)
 
     columns = used_labels + [f"native_{n}" for n in binnings] + ["est_tokens"]
-    counts: dict[tuple, list[int]] = {}
+    dimension_names = used_labels + [f"native_{n}" for n in binnings]
+    schema = pa.schema(
+        [pa.field(c, pa.large_string()) for c in used_labels]
+        + [pa.field(f"native_{n}", pa.int16()) for n in binnings]
+        + [pa.field("n_documents", pa.int64()), pa.field("n_tokens", pa.int64())]
+    )
+
+    # Grouping stays inside Arrow's C++ kernels rather than a Python loop over documents,
+    # which is what makes this feasible over a whole blend.
+    #
+    # Row groups are batched before being aggregated. Aggregating each one alone barely
+    # compresses -- at these cardinalities a row group of a million rows yields nearly a
+    # million cells -- so the work would be done twice for no gain. Batching lets the
+    # cardinality saturate first, which is the whole reason a cube is small.
+    aggregates: list[pa.Table] = []
+    pending: list[pa.Table] = []
+    pending_rows = 0
     n_documents = 0
     n_tokens = 0
+
+    def flush() -> None:
+        nonlocal pending, pending_rows
+        if pending:
+            aggregates.append(_aggregate_cells(pa.concat_tables(pending), dimension_names))
+            pending, pending_rows = [], 0
 
     for part in parts:
         parquet_file = pq.ParquetFile(part)
         for group_idx in range(parquet_file.metadata.num_row_groups):
             table = parquet_file.read_row_group(group_idx, columns=columns)
-            n_rows = table.num_rows
-            if n_rows == 0:
+            if table.num_rows == 0:
                 continue
             tokens = table.column("est_tokens").to_numpy(zero_copy_only=False).astype(np.int64)
 
-            label_values = [pc.fill_null(table.column(c), MISSING).to_pylist() for c in used_labels]
-            score_bins = [
-                binnings[name].bin_index(
+            grouped: dict[str, Any] = {c: pc.fill_null(table.column(c), MISSING) for c in used_labels}
+            for name, binning in binnings.items():
+                bins = binning.bin_index(
                     table.column(f"native_{name}").to_numpy(zero_copy_only=False).astype(np.float64)
                 )
-                for name in binnings
-            ]
+                grouped[f"native_{name}"] = pa.array(bins, type=pa.int16())
+            grouped["n_documents"] = pa.array(np.ones(table.num_rows, dtype=np.int64))
+            grouped["n_tokens"] = pa.array(tokens)
 
-            for row in range(n_rows):
-                key = tuple(values[row] for values in label_values) + tuple(int(bins[row]) for bins in score_bins)
-                cell = counts.get(key)
-                if cell is None:
-                    counts[key] = [1, int(tokens[row])]
-                else:
-                    cell[0] += 1
-                    cell[1] += int(tokens[row])
-            n_documents += n_rows
+            pending.append(pa.table(grouped))
+            pending_rows += table.num_rows
+            n_documents += table.num_rows
             n_tokens += int(tokens.sum())
+            if pending_rows >= aggregate_batch_rows:
+                flush()
+    flush()
 
-    dimension_names = used_labels + [f"native_{n}" for n in binnings]
-    rows: dict[str, list[Any]] = {name: [] for name in dimension_names}
-    rows["n_documents"] = []
-    rows["n_tokens"] = []
-    for key, (n_docs, n_toks) in counts.items():
-        for name, value in zip(dimension_names, key):
-            rows[name].append(value)
-        rows["n_documents"].append(n_docs)
-        rows["n_tokens"].append(n_toks)
-
-    fields = [pa.field(c, pa.large_string()) for c in used_labels]
-    fields += [pa.field(f"native_{n}", pa.int16()) for n in binnings]
-    fields += [pa.field("n_documents", pa.int64()), pa.field("n_tokens", pa.int64())]
-    table = pa.Table.from_pydict(rows, schema=pa.schema(fields))
+    if aggregates:
+        table = _aggregate_cells(pa.concat_tables(aggregates), dimension_names).cast(schema)
+    else:
+        table = schema.empty_table()
 
     return Cube(
         dataset=dataset_name,

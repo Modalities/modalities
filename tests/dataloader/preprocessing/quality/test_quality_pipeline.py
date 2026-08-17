@@ -319,3 +319,258 @@ def test_registry_rejects_duplicate_dataset_names(tmp_path: Path):
         CorpusRegistry(
             datasets=[DatasetEntry(name="x", jsonl_root=tmp_path), DatasetEntry(name="x", jsonl_root=tmp_path)]
         )
+
+
+# --------------------------------------------------------------- fast path extraction
+
+
+@pytest.mark.parametrize(
+    "pattern,expected",
+    [
+        (".score", ["score"]),
+        (".metadata.len_cl100k_base", ["metadata", "len_cl100k_base"]),
+        ('."openlid-v3".prob', ["openlid-v3", "prob"]),
+        ('.metadata.dclm_plus2."__label__1"', ["metadata", "dclm_plus2", "__label__1"]),
+    ],
+)
+def test_simple_paths_are_recognised(pattern, expected):
+    from modalities.dataloader.preprocessing.quality.sidecar import parse_simple_path
+
+    assert parse_simple_path(pattern) == expected
+
+
+@pytest.mark.parametrize("pattern", [".scores | max", ".a[0]", "select(.x)", ".a | length", "."])
+def test_non_path_patterns_fall_back_to_jq(pattern):
+    from modalities.dataloader.preprocessing.quality.sidecar import build_metric_extractor, parse_simple_path
+
+    assert parse_simple_path(pattern) is None
+    _, is_fast = build_metric_extractor(pattern)
+    assert is_fast is False
+
+
+def test_an_invalid_pattern_fails_when_the_builder_is_created(tmp_path: Path, corpus: Path):
+    # Better to fail here than to hand back an extractor that yields None for every
+    # document and look like a corpus with no metrics.
+    entry = DatasetEntry(
+        name="bad",
+        jsonl_root=corpus,
+        glob="*.jsonl",
+        native_metrics=[NativeMetric(name="broken", jq_pattern="score")],
+    )
+    calibration = TokenCalibration(dataset="bad", tokenizer="w", bytes_per_token=4.0)
+
+    with pytest.raises(ValueError, match="compile error"):
+        SidecarBuilder(entry, calibration, index_root=tmp_path / "bad_idx")
+
+
+def test_fast_extractor_agrees_with_jq_on_real_shapes():
+    import jq
+
+    from modalities.dataloader.preprocessing.quality.sidecar import build_metric_extractor
+
+    record = {
+        "score": 2.5,
+        "zero": 0,
+        "flag": False,
+        "openlid-v3": {"prob": [0.99, 0.01]},
+        "metadata": {"dclm_plus2": {"__label__1": 0.94}, "nested": None},
+    }
+    for pattern in (
+        ".score",
+        ".zero",
+        ".flag",
+        '."openlid-v3".prob',
+        '.metadata.dclm_plus2."__label__1"',
+        ".missing",
+        ".metadata.nested.deeper",
+        ".score.deeper",
+    ):
+        fast, is_fast = build_metric_extractor(pattern)
+        assert is_fast, pattern
+        try:
+            expected = jq.compile(pattern).input_value(record).first()
+        except (ValueError, StopIteration):
+            expected = None
+        assert fast(record) == expected, f"{pattern}: {fast(record)!r} != {expected!r}"
+
+
+def test_jq_fallback_still_extracts(tmp_path: Path):
+    from modalities.dataloader.preprocessing.quality.sidecar import build_metric_extractor
+
+    extract, is_fast = build_metric_extractor('."openlid-v3".prob | max')
+    assert not is_fast
+    assert extract({"openlid-v3": {"prob": [0.1, 0.9]}}) == 0.9
+
+
+def test_sidecar_uses_the_fast_path_and_still_records_metrics(tmp_path: Path, corpus: Path):
+    # A dataset whose metrics are all plain paths must produce the same values it would
+    # have produced through jq.
+    entry = DatasetEntry(
+        name="fast",
+        jsonl_root=corpus,
+        glob="*.jsonl",
+        native_metrics=[NativeMetric(name="score", jq_pattern=".score")],
+    )
+    calibration = TokenCalibration(dataset="fast", tokenizer="w", bytes_per_token=4.0)
+    out = tmp_path / "fast_sidecar"
+    SidecarBuilder(entry, calibration, index_root=tmp_path / "fast_idx").build(out, show_progress=False)
+
+    table = pq.read_table(sorted(out.glob("part-*.parquet"))[0])
+    values = table.column("native_score").to_pylist()
+    assert len(values) == 100
+    assert all(v is not None for v in values)
+
+
+# --------------------------------------------------------------------- cube vectorising
+
+
+def test_cube_is_independent_of_the_aggregation_batch_size(built_sidecar: Path):
+    # Batching row groups is a performance detail and must not change the result.
+    big = build_cube(built_sidecar, "toy", aggregate_batch_rows=10_000_000)
+    small = build_cube(built_sidecar, "toy", aggregate_batch_rows=1)
+
+    assert big.n_documents == small.n_documents
+    assert big.n_tokens == small.n_tokens
+    assert big.table.num_rows == small.table.num_rows
+
+    def as_set(cube):
+        cols = cube.dimensions + ["n_documents", "n_tokens"]
+        return {tuple(row[c] for c in cols) for row in cube.table.select(cols).to_pylist()}
+
+    assert as_set(big) == as_set(small)
+
+
+def test_cube_totals_match_the_sidecar(built_sidecar: Path):
+    cube = build_cube(built_sidecar, "toy")
+    total_docs = total_tokens = 0
+    for part in sorted(built_sidecar.glob("part-*.parquet")):
+        table = pq.read_table(part, columns=["est_tokens"])
+        total_docs += table.num_rows
+        total_tokens += sum(table.column("est_tokens").to_pylist())
+
+    assert cube.n_documents == total_docs
+    assert cube.n_tokens == total_tokens
+    assert sum(cube.table.column("n_documents").to_pylist()) == total_docs
+    assert sum(cube.table.column("n_tokens").to_pylist()) == total_tokens
+
+
+# ------------------------------------------------------------------------- sharding
+
+
+def test_plan_sidecar_work_partitions_completely_and_disjointly(tmp_path: Path, corpus: Path):
+    from modalities.dataloader.preprocessing.quality.pipeline import plan_sidecar_work
+
+    other = tmp_path / "other"
+    other.mkdir()
+    for i in range(5):
+        (other / f"f{i}.jsonl").write_text(json.dumps({"text": "x"}) + "\n")
+    registry = CorpusRegistry(
+        datasets=[
+            DatasetEntry(name="a", jsonl_root=corpus, glob="*.jsonl"),
+            DatasetEntry(name="b", jsonl_root=other, glob="*.jsonl"),
+        ]
+    )
+
+    seen: list[tuple[str, int]] = []
+    for shard_id in range(3):
+        for name, file_ids in plan_sidecar_work(registry, shard_id=shard_id, num_shards=3).items():
+            seen.extend((name, file_id) for file_id in file_ids)
+
+    expected = [("a", i) for i in range(2)] + [("b", i) for i in range(5)]
+    assert sorted(seen) == sorted(expected), "every file must be built exactly once across the array"
+
+
+def test_plan_sidecar_work_rejects_an_out_of_range_shard(corpus: Path):
+    from modalities.dataloader.preprocessing.quality.pipeline import plan_sidecar_work
+
+    registry = CorpusRegistry(datasets=[DatasetEntry(name="a", jsonl_root=corpus, glob="*.jsonl")])
+
+    with pytest.raises(ValueError, match="not in"):
+        plan_sidecar_work(registry, shard_id=3, num_shards=3)
+
+
+def _build_sidecar_only(tmp_path: Path, dataset_entry: DatasetEntry, suffix: str) -> Path:
+    calibration = calibrate_dataset(
+        dataset_name="toy",
+        file_paths=dataset_entry.iter_files(),
+        tokenizer=_WhitespaceTokenizer(),
+        tokenizer_name="whitespace",
+        sample_size=100,
+    )
+    out = tmp_path / f"sidecar_{suffix}"
+    SidecarBuilder(dataset_entry, calibration, index_root=tmp_path / f"idx_{suffix}").build(out, show_progress=False)
+    return out
+
+
+def test_sharded_bucketing_gives_the_same_join_as_a_single_task(
+    tmp_path: Path, dataset_entry: DatasetEntry, annotations: Path
+):
+    # Spread the annotations over several files so there is something to shard.
+    split_dir = tmp_path / "annotations_split"
+    split_dir.mkdir()
+    table = pq.read_table(sorted(annotations.glob("*.parquet"))[0])
+    for i in range(3):
+        pq.write_table(table.slice(i * 50, 50), split_dir / f"part{i}.parquet")
+    shards = sorted(split_dir.glob("*.parquet"))
+
+    single_sidecar = _build_sidecar_only(tmp_path, dataset_entry, "single")
+    bucket_annotations(
+        shard_paths=shards,
+        out_dir=tmp_path / "buckets_single",
+        n_buckets=8,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+    single = join_annotations(single_sidecar, tmp_path / "buckets_single", "toy", "toy", show_progress=False)
+
+    sharded_sidecar = _build_sidecar_only(tmp_path, dataset_entry, "sharded")
+    for shard_id in range(3):
+        bucket_annotations(
+            shard_paths=shards,
+            out_dir=tmp_path / "buckets_sharded",
+            n_buckets=8,
+            label_columns=["educational_value"],
+            shard_id=shard_id,
+            num_shards=3,
+            show_progress=False,
+        )
+    sharded = join_annotations(sharded_sidecar, tmp_path / "buckets_sharded", "toy", "toy", show_progress=False)
+
+    assert sharded.n_matched == single.n_matched
+    assert sharded.n_annotation_rows == single.n_annotation_rows
+    # The labels themselves, not just the counts.
+    single_labels = pq.read_table(sorted(single_sidecar.glob("part-*.parquet"))[0]).column("educational_value")
+    sharded_labels = pq.read_table(sorted(sharded_sidecar.glob("part-*.parquet"))[0]).column("educational_value")
+    assert single_labels.to_pylist() == sharded_labels.to_pylist()
+
+
+def test_join_refuses_an_incomplete_bucketing_run(tmp_path: Path, annotations: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import AnnotationJoinError, read_bucket_metadata
+
+    # One of three announced tasks ran, so two thirds of the annotations are absent.
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=tmp_path / "buckets_partial",
+        n_buckets=4,
+        label_columns=["educational_value"],
+        shard_id=0,
+        num_shards=3,
+        show_progress=False,
+    )
+
+    with pytest.raises(AnnotationJoinError, match="incomplete"):
+        read_bucket_metadata(tmp_path / "buckets_partial")
+
+
+def test_bucketing_rejects_an_out_of_range_shard(tmp_path: Path, annotations: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import AnnotationJoinError
+
+    with pytest.raises(AnnotationJoinError, match="not in"):
+        bucket_annotations(
+            shard_paths=sorted(annotations.glob("*.parquet")),
+            out_dir=tmp_path / "buckets_bad",
+            n_buckets=4,
+            shard_id=5,
+            num_shards=3,
+            show_progress=False,
+        )

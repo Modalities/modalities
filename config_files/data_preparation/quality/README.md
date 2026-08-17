@@ -31,13 +31,18 @@ modalities quality calibrate --registry $REG --work_dir $WORK \
     --tokenizer_config config_files/data_preparation/packed_cc_en_2048.yaml
 
 # 2. One row per document: position, length, estimated tokens, join key, native metrics.
-#    The only stage that reads the raw data. Use --index_root when the source tree is
-#    read-only, and --only/--file_id to shard the work across SLURM tasks.
-modalities quality build-sidecar --registry $REG --work_dir $WORK --index_root $WORK/idx
+#    The only stage that reads the raw data, so run it as an array. Work is divided by
+#    file across all datasets, so one array covers the whole blend.
+modalities quality build-sidecar --registry $REG --work_dir $WORK --index_root $WORK/idx \
+    --shard_id $SLURM_ARRAY_TASK_ID --num_shards 64
 
-# 3. Attach the external annotations and report coverage per dataset.
-#    Raise --num_buckets for very large splits; 1024 is reasonable for billions of rows.
-modalities quality join-annotations --registry $REG --work_dir $WORK --num_buckets 1024
+# 3a. Partition the annotation splits by a hash of their key. The expensive half of
+#     the join -- HPLT alone is ~12 bn rows -- so run it as an array.
+modalities quality bucket-annotations --registry $REG --work_dir $WORK --num_buckets 1024 \
+    --shard_id $SLURM_ARRAY_TASK_ID --num_shards 64
+
+# 3b. Attach the labels to each dataset's sidecar and report coverage. Cheap; one task.
+modalities quality join-annotations --registry $REG --work_dir $WORK
 
 # 4. Aggregate, so any threshold combination can be costed without reading the sidecars.
 modalities quality build-cube --registry $REG --work_dir $WORK
@@ -58,6 +63,35 @@ modalities data pack_encoded_data $WORK/packcfg/<dataset>/<shard>.yaml
 ```
 
 Steps 1–4 are run once per blend. Step 5 is the loop you actually iterate in.
+
+## What it costs
+
+Measured on `/data/annealing` (43 TB across 19 datasets, ~7.6 bn documents):
+
+| Stage | Cost | How often |
+|---|---|---|
+| calibrate | minutes | once per blend |
+| build-sidecar | ~3 h on 64 tasks (2 nodes) | once per blend |
+| bucket + join annotations | ~0.5 h on 64 tasks | once per blend |
+| build-cube | ~50 min, single task | once per blend |
+| **preview** | **~10 s for the whole blend** | **every threshold you try** |
+| apply | ~1 h | once you have settled |
+| pack | proportional to what survived | once you have settled |
+
+Changing thresholds, ratios or the missing-annotation policy costs only a `preview`.
+Adding a dataset or a native metric means rebuilding that dataset's sidecar and cube,
+because the metric has to come out of the raw records.
+
+Two things dominate if you get them wrong, both measured:
+
+* **Keep native-metric patterns to plain field paths** (`.fw_edu_scores`,
+  `.metadata.dclm_plus2."__label__1"`). Those are evaluated by direct dictionary lookup.
+  Anything jq cannot reduce to a field chain -- pipes, filters, indexing -- falls back to
+  jq, which re-serialises the whole document per call and costs about 13x more for the
+  entire pass. `build-sidecar` warns when a pattern takes that route.
+* **Sequential read from `/data` runs at ~282 MB/s per stream and ~3.8 GB/s aggregate.**
+  With plain paths the sidecar pass reaches ~374 MB/s per core, so it is I/O-bound and
+  more than ~16 concurrent tasks buys little.
 
 ## What the preview reports
 

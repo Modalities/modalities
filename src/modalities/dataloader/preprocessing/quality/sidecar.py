@@ -14,8 +14,9 @@ which is exactly the on-disk format of a modalities index file.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import jq
 import pyarrow as pa
@@ -43,6 +44,84 @@ BASE_FIELDS: tuple[tuple[str, pa.DataType], ...] = (
 
 class SidecarWriteError(RuntimeError):
     """Raised when a sidecar cannot be produced for a dataset."""
+
+
+# One path segment of a jq expression: a bare identifier, or a quoted key for names that
+# are not valid identifiers (``."openlid-v3"``).
+_PATH_SEGMENT = re.compile(r'\.(?:([A-Za-z_][A-Za-z0-9_]*)|"((?:[^"\\]|\\.)*)")')
+
+
+def parse_simple_path(jq_pattern: str) -> Optional[list[str]]:
+    """Recognises a jq pattern that is nothing more than a chain of field lookups.
+
+    Args:
+        jq_pattern (str): The pattern from a native-metric declaration.
+
+    Returns:
+        Optional[list[str]]: The field names to walk, or None if the pattern uses
+            anything beyond plain field access -- filters, pipes, indexing, functions.
+
+    Note:
+        This exists for speed, and the speed difference is not marginal.
+        ``jq.compile(...).input_value(record)`` converts the *whole* record into jq's
+        own representation on every call, so on a 21 KB document two such calls cost
+        more than twenty times the rest of building a sidecar row. Documents are read
+        by the billion here, so plain field access is used wherever the pattern allows
+        it and jq is kept only for patterns that genuinely need it.
+    """
+    pattern = jq_pattern.strip()
+    if not pattern.startswith("."):
+        return None
+    keys: list[str] = []
+    position = 0
+    while position < len(pattern):
+        match = _PATH_SEGMENT.match(pattern, position)
+        if match is None:
+            return None
+        bare, quoted = match.group(1), match.group(2)
+        keys.append(bare if bare is not None else quoted.replace('\\"', '"').replace("\\\\", "\\"))
+        position = match.end()
+    return keys or None
+
+
+def _lookup_path(record: Any, keys: list[str]) -> Any:
+    # Mirrors jq's behaviour for a field chain: a missing key, or a non-object where an
+    # object is needed, yields no value rather than an error.
+    current = record
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+        if current is None:
+            return None
+    return current
+
+
+def build_metric_extractor(jq_pattern: str) -> tuple[Callable[[dict[str, Any]], Any], bool]:
+    """Builds the fastest available extractor for a native-metric pattern.
+
+    Args:
+        jq_pattern (str): The pattern from a native-metric declaration.
+
+    Returns:
+        tuple[Callable[[dict[str, Any]], Any], bool]: A function pulling the value out
+            of a decoded record, and whether it took the plain-path route. The flag is
+            reported so a pattern that silently fell back to jq -- and therefore costs
+            twenty times more per document -- is visible rather than a mystery.
+    """
+    keys = parse_simple_path(jq_pattern)
+    if keys is not None:
+        return (lambda record: _lookup_path(record, keys)), True
+
+    program = jq.compile(jq_pattern)
+
+    def extract_with_jq(record: dict[str, Any]) -> Any:
+        try:
+            return program.input_value(record).first()
+        except (ValueError, StopIteration):
+            return None
+
+    return extract_with_jq, False
 
 
 def _aggregate(values: Any, aggregation: Optional[str]) -> Optional[float]:
@@ -115,7 +194,18 @@ class SidecarBuilder:
         self._calibration = calibration
         self._index_root = index_root
         self._row_group_size = row_group_size
-        self._native_programs = [(m.name, jq.compile(m.jq_pattern), m.aggregation) for m in dataset.native_metrics]
+        self._native_programs = []
+        slow_patterns: list[str] = []
+        for metric in dataset.native_metrics:
+            extractor, is_fast = build_metric_extractor(metric.jq_pattern)
+            self._native_programs.append((metric.name, extractor, metric.aggregation))
+            if not is_fast:
+                slow_patterns.append(f"{metric.name}={metric.jq_pattern}")
+        if slow_patterns:
+            get_logger(name="main").warning(
+                f"{dataset.name}: {len(slow_patterns)} native metric(s) need jq and will dominate the pass "
+                f"({', '.join(slow_patterns)}). Rewrite as a plain field path if possible."
+            )
 
     def _index_path_for(self, jsonl_path: Path) -> Path:
         if self._index_root is None:
@@ -160,11 +250,8 @@ class SidecarBuilder:
                     "est_tokens": self._calibration.estimate(record, text_bytes),
                     "join_key": key_spec.derive(record) if key_spec is not None else None,
                 }
-                for name, program, aggregation in self._native_programs:
-                    try:
-                        row[f"native_{name}"] = _aggregate(program.input_value(record).first(), aggregation)
-                    except (ValueError, StopIteration):
-                        row[f"native_{name}"] = None
+                for name, extract, aggregation in self._native_programs:
+                    row[f"native_{name}"] = _aggregate(extract(record), aggregation)
                 yield row
         finally:
             reader.close()
@@ -240,7 +327,12 @@ class SidecarBuilder:
         return written
 
 
-def resolve_source_pointers(sidecar_dir: Path, dataset: DatasetEntry, batch_size: int = 500_000) -> int:
+def resolve_source_pointers(
+    sidecar_dir: Path,
+    dataset: DatasetEntry,
+    batch_size: int = 500_000,
+    only_parts: Optional[list[int]] = None,
+) -> int:
     """Rewrites pointer join keys into the annotation keys they stand for.
 
     A translated corpus stores a ``<file>/<line>`` pointer back to the document it was
@@ -251,6 +343,9 @@ def resolve_source_pointers(sidecar_dir: Path, dataset: DatasetEntry, batch_size
         sidecar_dir (Path): Directory of sidecar parts to rewrite in place.
         dataset (DatasetEntry): The dataset, whose key spec supplies the source root.
         batch_size (int): How many pointers to resolve per pass over the source files.
+        only_parts (Optional[list[int]]): Restrict to the parts of these file ids. Lets a
+            sharded build resolve only the parts it wrote, leaving the rest to the tasks
+            that own them.
 
     Returns:
         int: Number of rows whose key was resolved.
@@ -266,7 +361,11 @@ def resolve_source_pointers(sidecar_dir: Path, dataset: DatasetEntry, batch_size
         text_field=dataset.key.text_field,
         line_offset=dataset.key.source_line_offset,
     )
-    parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
+    if only_parts is None:
+        parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
+    else:
+        candidates = (Path(sidecar_dir) / f"part-{file_id:06d}.parquet" for file_id in only_parts)
+        parts = [path for path in candidates if path.is_file()]
     n_resolved = 0
     for part in tqdm(parts, desc=f"resolve pointers {dataset.name}"):
         table = pq.read_table(part)

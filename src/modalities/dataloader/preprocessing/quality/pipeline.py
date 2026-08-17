@@ -18,7 +18,12 @@ from typing import Optional
 
 import yaml
 
-from modalities.dataloader.preprocessing.quality.annotation_join import JoinReport, bucket_annotations, join_annotations
+from modalities.dataloader.preprocessing.quality.annotation_join import (
+    JoinReport,
+    bucket_annotations,
+    join_annotations,
+    read_bucket_metadata,
+)
 from modalities.dataloader.preprocessing.quality.cube import Cube, build_cube
 from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
 from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry, KeyKind
@@ -139,12 +144,57 @@ def calibrate_blend(
     return existing
 
 
+def plan_sidecar_work(
+    registry: CorpusRegistry,
+    only: Optional[list[str]] = None,
+    shard_id: int = 0,
+    num_shards: int = 1,
+) -> dict[str, list[int]]:
+    """Assigns each task its share of the per-file sidecar work.
+
+    The unit of work is one JSONL file, and the work list is flattened across every
+    selected dataset before being divided, so one array covers the whole blend however
+    unevenly the file counts fall -- and they fall very unevenly, from four files to
+    forty thousand.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): Total number of tasks.
+
+    Returns:
+        dict[str, list[int]]: File ids this task should build, per dataset. Datasets with
+            nothing for this task are absent.
+
+    Raises:
+        ValueError: If the shard selection is out of range.
+    """
+    if not 0 <= shard_id < num_shards:
+        raise ValueError(f"shard_id {shard_id} is not in [0, {num_shards})")
+
+    work: list[tuple[str, int]] = []
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        work.extend((dataset.name, file_id) for file_id in range(len(dataset.iter_files())))
+
+    assigned: dict[str, list[int]] = {}
+    # Strided, so no task ends up holding only the largest dataset's files.
+    for position, (name, file_id) in enumerate(work):
+        if position % num_shards == shard_id:
+            assigned.setdefault(name, []).append(file_id)
+    return assigned
+
+
 def build_sidecars(
     registry: CorpusRegistry,
     work_dir: Path,
     only: Optional[list[str]] = None,
     index_root: Optional[Path] = None,
     file_ids: Optional[list[int]] = None,
+    shard_id: int = 0,
+    num_shards: int = 1,
     show_progress: bool = True,
 ) -> dict[str, int]:
     """Builds the per-document table for every dataset.
@@ -155,28 +205,56 @@ def build_sidecars(
         only (Optional[list[str]]): Restrict to these dataset names.
         index_root (Optional[Path]): Where JSONL index files live or should be created,
             for source trees that cannot be written to.
-        file_ids (Optional[list[int]]): Restrict to these file ids, for sharding one
-            dataset's build across tasks.
+        file_ids (Optional[list[int]]): Restrict to these file ids explicitly. Applies to
+            every selected dataset and cannot be combined with sharding.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): Total number of tasks sharing the work.
         show_progress (bool): Whether to show progress bars.
 
     Returns:
-        dict[str, int]: Documents written per dataset.
+        dict[str, int]: Documents written by this task, per dataset.
+
+    Raises:
+        ValueError: If explicit file ids are combined with a shard selection, since the
+            two express the same thing and the outcome would depend on which won.
     """
+    if file_ids is not None and num_shards != 1:
+        raise ValueError("pass either explicit file_ids or a shard selection, not both")
+
     calibrations = CalibrationSet.from_yaml(calibration_path(work_dir))
+    selected = [d for d in registry.enabled_datasets() if not only or d.name in only]
+    if file_ids is not None:
+        assignment: dict[str, Optional[list[int]]] = {d.name: file_ids for d in selected}
+    elif num_shards == 1:
+        assignment = {d.name: None for d in selected}
+    else:
+        assignment = plan_sidecar_work(registry, only=only, shard_id=shard_id, num_shards=num_shards)
+        get_logger(name="main").info(
+            f"shard {shard_id}/{num_shards} builds "
+            + (", ".join(f"{name}:{len(ids)} file(s)" for name, ids in sorted(assignment.items())) or "nothing")
+        )
+
     written: dict[str, int] = {}
-    for dataset in registry.enabled_datasets():
-        if only and dataset.name not in only:
+    for dataset in selected:
+        if dataset.name not in assignment:
             continue
         builder = SidecarBuilder(
             dataset=dataset,
             calibration=calibrations.get(dataset.name),
             index_root=Path(index_root) / dataset.name if index_root else None,
         )
-        parts = builder.build(sidecar_dir(work_dir, dataset.name), file_ids=file_ids, show_progress=show_progress)
+        parts = builder.build(
+            sidecar_dir(work_dir, dataset.name),
+            file_ids=assignment[dataset.name],
+            show_progress=show_progress,
+        )
         written[dataset.name] = sum(parts.values())
 
+        # Safe to run per task: each task owns the parts it just wrote.
         if dataset.key is not None and dataset.key.kind == KeyKind.SOURCE_POINTER:
-            n_resolved = resolve_source_pointers(sidecar_dir(work_dir, dataset.name), dataset)
+            n_resolved = resolve_source_pointers(
+                sidecar_dir(work_dir, dataset.name), dataset, only_parts=assignment[dataset.name]
+            )
             get_logger(name="main").info(
                 f"{dataset.name}: resolved {n_resolved:,} of {written[dataset.name]:,} pointers "
                 "into source-corpus keys"
@@ -184,24 +262,89 @@ def build_sidecars(
     return written
 
 
+def bucket_blend_annotations(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    only: Optional[list[str]] = None,
+    n_buckets: int = 1024,
+    shard_id: int = 0,
+    num_shards: int = 1,
+    force: bool = False,
+    show_progress: bool = True,
+) -> dict[str, int]:
+    """Partitions every annotation split the blend needs, ready for joining.
+
+    The expensive stage of the join and the one worth parallelising. Splits shared by
+    several datasets are bucketed once.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory receiving ``buckets/<split>/``.
+        only (Optional[list[str]]): Restrict to the splits these datasets need.
+        n_buckets (int): Partitions per split.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): How many tasks bucket each split.
+        force (bool): Re-bucket a split whose output is already complete.
+        show_progress (bool): Whether to show progress bars.
+
+    Returns:
+        dict[str, int]: Rows written by this task, per split.
+    """
+    splits: dict[str, Optional[str]] = {}
+    for dataset in registry.enabled_datasets():
+        if only and dataset.name not in only:
+            continue
+        if dataset.annotation_split and dataset.annotation_split not in splits:
+            # Whether keys need normalising is a property of the split's key space, so
+            # the first dataset naming a split settles it for every other user of it.
+            splits[dataset.annotation_split] = "urn_uuid" if dataset.key.kind == KeyKind.URN_UUID_FIELD else None
+
+    written: dict[str, int] = {}
+    for split, normalize in splits.items():
+        shards = registry.annotation_shards(split)
+        if not shards:
+            get_logger(name="main").warning(f"split {split!r}: no shards on disk, nothing to bucket")
+            continue
+        out_dir = bucket_dir(work_dir, split)
+        if not force:
+            try:
+                meta = read_bucket_metadata(out_dir)
+            except Exception:
+                pass
+            else:
+                get_logger(name="main").info(
+                    f"split {split}: already bucketed ({meta['n_rows']:,} rows, {meta['n_buckets']} buckets), skipping"
+                )
+                continue
+        n_rows, columns = bucket_annotations(
+            shard_paths=shards,
+            out_dir=out_dir,
+            n_buckets=n_buckets,
+            normalize_key=normalize,
+            shard_id=shard_id,
+            num_shards=num_shards,
+            show_progress=show_progress,
+        )
+        written[split] = n_rows
+        get_logger(name="main").info(
+            f"split {split}: shard {shard_id}/{num_shards} wrote {n_rows:,} rows "
+            f"from {len(shards)} input shard(s), columns {columns}"
+        )
+    return written
+
+
 def join_blend_annotations(
     registry: CorpusRegistry,
     work_dir: Path,
     only: Optional[list[str]] = None,
-    n_buckets: int = 256,
-    reuse_buckets: bool = True,
     show_progress: bool = True,
 ) -> list[JoinReport]:
-    """Attaches annotations to every annotated dataset's sidecar.
+    """Attaches the bucketed annotations to every annotated dataset's sidecar.
 
     Args:
         registry (CorpusRegistry): The blend's datasets.
-        work_dir (Path): Working directory holding the sidecars and receiving buckets.
+        work_dir (Path): Working directory holding the sidecars and the buckets.
         only (Optional[list[str]]): Restrict to these dataset names.
-        n_buckets (int): Partitions per annotation split. Splits of billions of rows
-            want at least 1024 so each partition fits comfortably in memory.
-        reuse_buckets (bool): Skip re-partitioning a split whose buckets already exist.
-            Several datasets share a split, so this avoids repeating the expensive part.
         show_progress (bool): Whether to show progress bars.
 
     Returns:
@@ -214,29 +357,13 @@ def join_blend_annotations(
         if not dataset.annotation_split:
             continue
 
-        shards = registry.annotation_shards(dataset.annotation_split)
-        if not shards:
+        buckets = bucket_dir(work_dir, dataset.annotation_split)
+        if not buckets.is_dir():
             get_logger(name="main").warning(
-                f"{dataset.name}: no annotation shards found for split {dataset.annotation_split!r}; "
-                "its documents stay unannotated and any predicate on them will fall back to the "
-                "missing-annotation policy"
+                f"{dataset.name}: split {dataset.annotation_split!r} has not been bucketed; its documents stay "
+                "unannotated and any predicate on them falls back to the missing-annotation policy"
             )
             continue
-
-        buckets = bucket_dir(work_dir, dataset.annotation_split)
-        if not (reuse_buckets and (buckets / "_meta.json").is_file()):
-            normalize = "urn_uuid" if dataset.key.kind == KeyKind.URN_UUID_FIELD else None
-            n_rows, columns = bucket_annotations(
-                shard_paths=shards,
-                out_dir=buckets,
-                n_buckets=n_buckets,
-                normalize_key=normalize,
-                show_progress=show_progress,
-            )
-            get_logger(name="main").info(
-                f"split {dataset.annotation_split}: bucketed {n_rows:,} rows over {len(shards)} shard(s), "
-                f"columns {columns}"
-            )
 
         reports.append(
             join_annotations(

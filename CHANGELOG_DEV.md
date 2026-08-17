@@ -276,3 +276,52 @@ the source tree is never written to.
 **Breaking Changes**
 
 None. `CombinedDataset` and every existing config keep working as before.
+
+
+## PR #XXX Quality selection: performance and sharding
+
+Follow-up to the quality-selection PR, from profiling the pipeline against the real
+43 TB blend rather than a fixture. Three of the four stages were far slower than they
+needed to be, and two of them could not be parallelised at all.
+
+**General changes**
+
+* Native metrics declared as a plain field path (`.fw_edu_scores`,
+  `.metadata.dclm_plus2."__label__1"`) are now read by direct dictionary lookup instead
+  of jq. `jq.compile(...).input_value(record)` re-serialises the whole document on every
+  call, which on a 21 KB record cost more than twenty times the rest of building a
+  sidecar row; the full pass measured **29 MB/s with jq against 374 MB/s without, 13x
+  end to end**. Patterns jq cannot reduce to a field chain still use jq, and
+  `build-sidecar` now warns when one does, since that pattern then dominates the stage.
+* `build_cube` groups with Arrow's C++ kernels instead of a Python loop over documents,
+  batching row groups so cardinality saturates before each grouping pass:
+  **246k -> 2.39M rows/s, 9.9x**. For the full blend that is ~50 minutes rather than
+  ~8.5 hours, and the stage was not shardable, so it was a hard floor.
+* `build-sidecar` takes `--shard_id`/`--num_shards`. Work is divided per JSONL file
+  across every selected dataset, so one array covers the whole blend however unevenly
+  the file counts fall. Previously the only split was per dataset, leaving a floor of
+  the slowest dataset -- ~71 h for `finepdfs-en`.
+* Annotation bucketing moved out of `join-annotations` into its own shardable
+  `bucket-annotations` stage. Each task writes its own file per bucket and the join
+  reads all of them, so the result is identical to a single-task run. Bucketing 13.9 bn
+  annotation rows was ~32 h serial, with a ~8.7 h floor from the largest single split.
+* `join-annotations` refuses to run against an incomplete bucketing run rather than
+  silently dropping the annotations a missing task was carrying, which would have looked
+  exactly like a corpus that was never annotated.
+
+**Notes**
+
+Measured on this cluster: sequential read from `/data` is ~282 MB/s per stream and
+~3.8 GB/s aggregate. With the jq fix the sidecar pass is I/O-bound, so beyond ~16
+concurrent tasks the storage is the limit rather than the code. End to end the one-time
+setup goes from ~88 h to ~4 h on two nodes; previewing a selection is unaffected at
+~10 s for the whole blend, because it only ever reads the cubes.
+
+**Breaking Changes**
+
+* `modalities quality build-sidecar` no longer takes `--file_id`; use
+  `--shard_id`/`--num_shards`.
+* `modalities quality join-annotations` no longer buckets. Run
+  `modalities quality bucket-annotations` first. Its `--num_buckets` and
+  `--rebuild_buckets` options moved to that command (`--rebuild_buckets` is now
+  `--force`).

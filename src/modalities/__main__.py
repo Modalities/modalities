@@ -813,33 +813,113 @@ def CMD_quality_calibrate(
     help="Where JSONL index files live or should be created. Use this when the source tree is read-only.",
 )
 @click.option(
-    "--file_id",
-    "file_ids",
-    multiple=True,
+    "--shard_id",
     type=int,
-    help="Restrict to these file ids, to shard one dataset's build across tasks (repeatable).",
+    default=0,
+    show_default=True,
+    help="This task's index. Set from SLURM_ARRAY_TASK_ID to run the build as an array.",
+)
+@click.option(
+    "--num_shards",
+    type=int,
+    default=1,
+    show_default=True,
+    help="How many tasks share the work. Files are divided across all selected datasets, "
+    "so one array covers the whole blend.",
 )
 def CMD_quality_build_sidecar(
-    registry_path: Path, work_dir: Path, only: tuple[str, ...], index_root: Optional[Path], file_ids: tuple[int, ...]
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    index_root: Optional[Path],
+    shard_id: int,
+    num_shards: int,
 ) -> None:
     """Records one row per document: position, estimated tokens, key and native metrics.
+
+    The only stage that reads the raw data, so the one worth running as an array. Each
+    task writes its own parquet parts, so tasks never contend.
 
     Args:
         registry_path (Path): Path to the corpus registry YAML.
         work_dir (Path): Working directory for the blend's intermediates.
         only (tuple[str, ...]): Restrict to these dataset names.
         index_root (Optional[Path]): Where JSONL index files live or should be created.
-        file_ids (tuple[int, ...]): Restrict to these file ids.
+        shard_id (int): This task's index in [0, num_shards).
+        num_shards (int): Total number of tasks sharing the work.
     """
     written = quality_pipeline.build_sidecars(
         registry=CorpusRegistry.from_yaml(registry_path),
         work_dir=work_dir,
         only=list(only) or None,
         index_root=index_root,
-        file_ids=list(file_ids) or None,
+        shard_id=shard_id,
+        num_shards=num_shards,
     )
     for name, n_documents in written.items():
         print_rank_0(f"{name}: {n_documents:,} documents")
+
+
+@quality.command(name="bucket-annotations")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to the splits these datasets need (repeatable).")
+@click.option(
+    "--num_buckets",
+    type=int,
+    default=1024,
+    show_default=True,
+    help="Partitions per annotation split. Each is loaded whole during the join, so raise this for large splits.",
+)
+@click.option(
+    "--shard_id",
+    type=int,
+    default=0,
+    show_default=True,
+    help="This task's index. Set from SLURM_ARRAY_TASK_ID to bucket as an array.",
+)
+@click.option("--num_shards", type=int, default=1, show_default=True, help="How many tasks bucket each split.")
+@click.option("--force", is_flag=True, default=False, help="Re-bucket a split even if its output is complete.")
+def CMD_quality_bucket_annotations(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_buckets: int,
+    shard_id: int,
+    num_shards: int,
+    force: bool,
+) -> None:
+    """Partitions the annotation splits by a hash of their key, ready for joining.
+
+    The expensive half of the join, since a split can run to billions of rows. Shardable,
+    and splits shared by several datasets are bucketed only once.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to the splits these datasets need.
+        num_buckets (int): Partitions per split.
+        shard_id (int): This task's index in [0, num_shards).
+        num_shards (int): How many tasks bucket each split.
+        force (bool): Re-bucket even if the output is complete.
+    """
+    written = quality_pipeline.bucket_blend_annotations(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_buckets=num_buckets,
+        shard_id=shard_id,
+        num_shards=num_shards,
+        force=force,
+    )
+    for split, n_rows in written.items():
+        print_rank_0(f"{split}: {n_rows:,} rows bucketed by this task")
 
 
 @quality.command(name="join-annotations")
@@ -852,34 +932,21 @@ def CMD_quality_build_sidecar(
 )
 @click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
 @click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
-@click.option(
-    "--num_buckets",
-    type=int,
-    default=256,
-    show_default=True,
-    help="Partitions per annotation split. Use 1024+ for splits of billions of rows.",
-)
-@click.option(
-    "--rebuild_buckets", is_flag=True, default=False, help="Re-partition a split even if its buckets already exist."
-)
-def CMD_quality_join_annotations(
-    registry_path: Path, work_dir: Path, only: tuple[str, ...], num_buckets: int, rebuild_buckets: bool
-) -> None:
-    """Attaches external annotations to each dataset's sidecar and reports coverage.
+def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tuple[str, ...]) -> None:
+    """Attaches the bucketed annotations to each dataset's sidecar and reports coverage.
+
+    Run `bucket-annotations` first. Read the reported coverage before trusting a
+    selection: on a partly downloaded split most documents may carry no label at all.
 
     Args:
         registry_path (Path): Path to the corpus registry YAML.
         work_dir (Path): Working directory for the blend's intermediates.
         only (tuple[str, ...]): Restrict to these dataset names.
-        num_buckets (int): Partitions per annotation split.
-        rebuild_buckets (bool): Re-partition even if buckets exist.
     """
     reports = quality_pipeline.join_blend_annotations(
         registry=CorpusRegistry.from_yaml(registry_path),
         work_dir=work_dir,
         only=list(only) or None,
-        n_buckets=num_buckets,
-        reuse_buckets=not rebuild_buckets,
     )
     for report in reports:
         print_rank_0(report.summary())

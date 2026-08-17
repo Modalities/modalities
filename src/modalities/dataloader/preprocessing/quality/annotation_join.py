@@ -136,12 +136,15 @@ def bucket_of(key: str, n_buckets: int) -> int:
 
 class _BucketWriter:
     # Keeps one open parquet writer per bucket so each row is written exactly once,
-    # without buffering a whole side of the join in memory.
-    def __init__(self, out_dir: Path, schema: pa.Schema, n_buckets: int, flush_rows: int = 100_000):
+    # without buffering a whole side of the join in memory. The shard suffix lets many
+    # tasks bucket one split at once: each writes its own file per bucket, and the join
+    # reads every file belonging to a bucket.
+    def __init__(self, out_dir: Path, schema: pa.Schema, n_buckets: int, shard_id: int = 0, flush_rows: int = 100_000):
         self._out_dir = Path(out_dir)
         self._out_dir.mkdir(parents=True, exist_ok=True)
         self._schema = schema
         self._n_buckets = n_buckets
+        self._shard_id = shard_id
         self._flush_rows = flush_rows
         self._writers: dict[int, pq.ParquetWriter] = {}
         self._buffers: dict[int, list[dict]] = {}
@@ -157,7 +160,7 @@ class _BucketWriter:
         if not buffer:
             return
         if bucket not in self._writers:
-            path = self._out_dir / f"bucket-{bucket:04d}.parquet"
+            path = self._out_dir / f"bucket-{bucket:04d}.{self._shard_id:04d}.parquet"
             self._writers[bucket] = pq.ParquetWriter(path, self._schema, compression="zstd")
         self._writers[bucket].write_table(pa.Table.from_pylist(buffer, schema=self._schema))
         self._buffers[bucket] = []
@@ -177,9 +180,15 @@ def bucket_annotations(
     label_columns: Optional[list[str]] = None,
     key_column: str = KEY_COLUMN,
     normalize_key: Optional[str] = None,
+    shard_id: int = 0,
+    num_shards: int = 1,
     show_progress: bool = True,
 ) -> tuple[int, list[str]]:
     """Partitions annotation shards by a hash of their key.
+
+    This is the expensive half of the join, since a split can run to billions of rows,
+    so it is shardable: run it as an array of ``num_shards`` tasks, each taking a subset
+    of the input shards. The result is identical to a single-task run.
 
     Args:
         shard_paths (list[Path]): Annotation parquet shards of one split.
@@ -193,16 +202,21 @@ def bucket_annotations(
         normalize_key (Optional[str]): Set to ``"urn_uuid"`` to strip
             ``<urn:uuid:...>`` wrappers, which occur mixed with bare UUIDs on both
             sides of some joins.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): How many tasks are bucketing this split.
         show_progress (bool): Whether to show a progress bar.
 
     Returns:
-        tuple[int, list[str]]: Rows written, and the label columns actually carried.
+        tuple[int, list[str]]: Rows written by this task, and the label columns carried.
 
     Raises:
-        AnnotationJoinError: If no shards are given or the key column is absent.
+        AnnotationJoinError: If no shards are given, the key column is absent, or the
+            shard selection is out of range.
     """
     if not shard_paths:
         raise AnnotationJoinError("no annotation shards to bucket")
+    if not 0 <= shard_id < num_shards:
+        raise AnnotationJoinError(f"shard_id {shard_id} is not in [0, {num_shards})")
 
     available = set(pq.ParquetFile(shard_paths[0]).schema_arrow.names)
     if key_column not in available:
@@ -215,16 +229,21 @@ def bucket_annotations(
         )
 
     out_dir = Path(out_dir)
-    if out_dir.exists():
+    # Only a single-task run may clear the directory; sibling tasks are writing into it.
+    if num_shards == 1 and out_dir.exists():
         shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Strided rather than contiguous, so tasks stay balanced when shard sizes trend
+    # across a split.
+    my_shards = [path for i, path in enumerate(sorted(shard_paths)) if i % num_shards == shard_id]
     schema = pa.schema([pa.field("key", pa.large_string())] + [pa.field(c, pa.large_string()) for c in carried])
-    writer = _BucketWriter(out_dir, schema, n_buckets)
+    writer = _BucketWriter(out_dir, schema, n_buckets, shard_id=shard_id)
 
     from modalities.dataloader.preprocessing.quality.registry import strip_urn_uuid
 
     n_rows = 0
     try:
-        for shard in tqdm(shard_paths, desc="bucketing annotations", disable=not show_progress):
+        for shard in tqdm(my_shards, desc="bucketing annotations", disable=not show_progress):
             parquet_file = pq.ParquetFile(shard)
             for group_idx in range(parquet_file.metadata.num_row_groups):
                 table = parquet_file.read_row_group(group_idx, columns=[key_column] + carried)
@@ -245,10 +264,66 @@ def bucket_annotations(
     finally:
         writer.close()
 
-    (out_dir / "_meta.json").write_text(
-        json.dumps({"n_buckets": n_buckets, "label_columns": carried, "n_rows": n_rows})
+    # One metadata file per task, so concurrent tasks never overwrite each other's.
+    (out_dir / f"_meta.{shard_id:04d}.json").write_text(
+        json.dumps(
+            {
+                "n_buckets": n_buckets,
+                "label_columns": carried,
+                "n_rows": n_rows,
+                "shard_id": shard_id,
+                "num_shards": num_shards,
+                "n_input_shards": len(my_shards),
+            }
+        )
     )
     return n_rows, carried
+
+
+def read_bucket_metadata(annotation_bucket_dir: Path) -> dict:
+    """Merges the metadata a bucketing run left behind, checking it is complete.
+
+    Args:
+        annotation_bucket_dir (Path): Directory written by :func:`bucket_annotations`.
+
+    Returns:
+        dict: ``n_buckets``, ``label_columns`` and the total ``n_rows`` bucketed.
+
+    Raises:
+        AnnotationJoinError: If no metadata is present, the tasks disagree on the bucket
+            count or label columns, or some announced task never finished. Joining an
+            incomplete run would silently drop the annotations that task was carrying,
+            which looks exactly like a corpus that was never annotated.
+    """
+    metadata_paths = sorted(Path(annotation_bucket_dir).glob("_meta.*.json"))
+    if not metadata_paths:
+        raise AnnotationJoinError(
+            f"{annotation_bucket_dir} holds no bucketing metadata; run 'modalities quality bucket-annotations' first"
+        )
+    merged: Optional[dict] = None
+    total_rows = 0
+    seen_shards: set[int] = set()
+    for path in metadata_paths:
+        meta = json.loads(path.read_text())
+        if merged is None:
+            merged = meta
+        elif (meta["n_buckets"], meta["label_columns"]) != (merged["n_buckets"], merged["label_columns"]):
+            raise AnnotationJoinError(
+                f"{annotation_bucket_dir} mixes incompatible bucketing runs: "
+                f"{meta['n_buckets']} buckets / {meta['label_columns']} vs "
+                f"{merged['n_buckets']} / {merged['label_columns']}. Re-bucket the split from scratch."
+            )
+        total_rows += meta.get("n_rows", 0)
+        seen_shards.add(meta.get("shard_id", 0))
+
+    expected = merged.get("num_shards", 1)
+    if len(seen_shards) != expected:
+        missing = sorted(set(range(expected)) - seen_shards)
+        raise AnnotationJoinError(
+            f"{annotation_bucket_dir} is incomplete: {len(seen_shards)} of {expected} bucketing task(s) "
+            f"finished, missing shard id(s) {missing}. Joining now would lose their annotations."
+        )
+    return {"n_buckets": merged["n_buckets"], "label_columns": merged["label_columns"], "n_rows": total_rows}
 
 
 def _iter_sidecar_parts(sidecar_dir: Path) -> list[Path]:
@@ -286,10 +361,7 @@ def join_annotations(
             found under ``duplicate_policy="error"``.
     """
     annotation_bucket_dir = Path(annotation_bucket_dir)
-    meta_path = annotation_bucket_dir / "_meta.json"
-    if not meta_path.is_file():
-        raise AnnotationJoinError(f"{annotation_bucket_dir} has no _meta.json; run bucket_annotations first")
-    meta = json.loads(meta_path.read_text())
+    meta = read_bucket_metadata(annotation_bucket_dir)
     n_buckets = meta["n_buckets"]
     label_columns: list[str] = meta["label_columns"]
 
@@ -313,11 +385,13 @@ def join_annotations(
 
         resolved: list[dict[str, Optional[str]]] = [{} for _ in keys]
         for bucket, row_indices in needed_buckets.items():
-            bucket_path = annotation_bucket_dir / f"bucket-{bucket:04d}.parquet"
-            if not bucket_path.is_file():
+            # A bucket is spread over one file per bucketing task, so all are read
+            # together; a bucket no task wrote to simply has no files.
+            bucket_paths = sorted(annotation_bucket_dir.glob(f"bucket-{bucket:04d}.*.parquet"))
+            if not bucket_paths:
                 continue
             lookup: dict[str, dict[str, Optional[str]]] = {}
-            bucket_table = pq.read_table(bucket_path)
+            bucket_table = pa.concat_tables([pq.read_table(path) for path in bucket_paths])
             bucket_keys = bucket_table.column("key").to_pylist()
             bucket_columns = {c: bucket_table.column(c).to_pylist() for c in label_columns}
             for i, bucket_key in enumerate(bucket_keys):
