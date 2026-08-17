@@ -325,3 +325,29 @@ setup goes from ~88 h to ~4 h on two nodes; previewing a selection is unaffected
   `modalities quality bucket-annotations` first. Its `--num_buckets` and
   `--rebuild_buckets` options moved to that command (`--rebuild_buckets` is now
   `--force`).
+
+
+## PR #XXX Fix: calibration read scaled with file count
+
+`quality calibrate` read a fixed 20,000 lines from *every* file of a dataset to collect a
+2,000-document sample, so its cost scaled with the file count rather than the sample size.
+Over the real blend that came to **30.3 TB and ~30 hours** -- `dolmino` alone, at 40,003
+files, accounted for 26 TB. Reported from a real run that was still going after an hour
+having finished 9 of 19 datasets.
+
+**General changes**
+
+* The sampler now draws from at most `max_probe_files` files (default 32), spaced evenly
+  across the dataset, reading only enough lines from each to fill the sample. Full
+  calibration of all 19 datasets: **4 minutes**, about 1 GB read. The three worst
+  datasets together (`dolmino`, `finephrase`, `hplt-de`) now take 67 s.
+* `calibration.yaml` is written after each dataset instead of once at the end, so
+  interrupting the stage keeps what it already measured. Previously an hour of work was
+  discarded on Ctrl-C.
+
+**Notes**
+
+Spread is preserved -- the probe files are spaced across the dataset, not taken from the
+front -- and the sample is still trimmed with a seeded choice, so calibration stays
+reproducible. Tests cover both: that the number of files opened stays bounded regardless
+of dataset size, and that probe files reach both ends of the file list.

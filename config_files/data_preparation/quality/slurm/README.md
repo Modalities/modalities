@@ -51,7 +51,9 @@ registry if the blend does not need it -- it is ~16 h of sidecar work.
 Nothing is written into `/data/annealing`. Indexes go to `$WORK/idx`.
 
 ```bash
-# 1. Token calibration. Minutes. One task.
+# 1. Token calibration. ~4 min for all 19 datasets, one task, ~1 GB read.
+#    Writes calibration.yaml after each dataset, so an interruption keeps what it
+#    measured; re-run with --only to fill in the rest.
 $MQ -m modalities quality calibrate \
     --registry $QDIR/annealing_registry.yaml --work_dir $WORK \
     --tokenizer_config $QDIR/annealing_packing_template.yaml --sample_size 2000
@@ -164,7 +166,7 @@ tree.
 
 | Stage | Measured |
 |---|---|
-| calibrate | 14 s (200 documents sampled) |
+| calibrate, all 19 datasets | 4 min 5 s (2000 documents sampled each) |
 | build-sidecar, 1 of 4 files | 55 s for 6 GB / 452,714 documents, incl. index creation |
 | bucket-annotations, finewiki split | 6 m 36 s for 43,097,138 rows (108.8k rows/s) |
 | join-annotations | 1 m 47 s, **100 % coverage**, 868,586 duplicate annotation keys (2.0 %) |

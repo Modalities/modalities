@@ -132,6 +132,9 @@ def calibrate_blend(
             sample_size=sample_size,
         )
         existing.calibrations[dataset.name] = calibration
+        # Written after every dataset, not once at the end, so interrupting the stage
+        # keeps what it already measured. Re-running with `--only` then fills the rest.
+        existing.to_yaml(path)
         get_logger(name="main").info(
             f"{dataset.name}: {calibration.bytes_per_token:.3f} bytes/token"
             + (
@@ -140,7 +143,6 @@ def calibrate_blend(
                 else ""
             )
         )
-    existing.to_yaml(path)
     return existing
 
 

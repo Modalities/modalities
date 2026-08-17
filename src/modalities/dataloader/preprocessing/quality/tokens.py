@@ -173,23 +173,38 @@ NATIVE_TOKEN_FIELDS: tuple[str, ...] = (
 )
 
 
-def _reservoir_sample_documents(
+def _probe_files(file_paths: list[Path], max_probe_files: int) -> list[Path]:
+    # An evenly spaced selection, so the sample spans the whole dataset without the read
+    # growing with the file count. Corpora here range from 4 files to 40 003; reading a
+    # fixed number of lines from every one of them would mean 26 TB for the largest.
+    if len(file_paths) <= max_probe_files:
+        return list(file_paths)
+    step = len(file_paths) / max_probe_files
+    return [file_paths[min(int(i * step), len(file_paths) - 1)] for i in range(max_probe_files)]
+
+
+def _sample_documents(
     file_paths: Iterable[Path],
     text_field: str,
     sample_size: int,
     seed: int,
-    max_lines_per_file: int,
+    max_probe_files: int,
+    max_lines_per_probe: int,
 ) -> list[dict[str, Any]]:
-    # Draws documents from across the whole dataset, not just its first file, so the
-    # calibration is not biased by whatever happens to sit at the front of the corpus.
-    rng = random.Random(seed)
-    reservoir: list[dict[str, Any]] = []
-    seen = 0
-    for path in file_paths:
+    # Reads roughly `sample_size` documents in total, spread over `max_probe_files`
+    # files, rather than `max_lines_per_probe` from every file in the dataset.
+    files = _probe_files(list(file_paths), max_probe_files)
+    if not files:
+        return []
+    per_file = max(1, -(-sample_size // len(files)))
+
+    collected: list[dict[str, Any]] = []
+    for path in files:
+        taken = 0
         try:
             with path.open(errors="replace") as f:
-                for i, line in enumerate(f):
-                    if i >= max_lines_per_file:
+                for line_no, line in enumerate(f):
+                    if taken >= per_file or line_no >= max_lines_per_probe:
                         break
                     try:
                         record = json.loads(line)
@@ -197,16 +212,16 @@ def _reservoir_sample_documents(
                         continue
                     if not isinstance(record.get(text_field), str):
                         continue
-                    seen += 1
-                    if len(reservoir) < sample_size:
-                        reservoir.append(record)
-                    else:
-                        j = rng.randrange(seen)
-                        if j < sample_size:
-                            reservoir[j] = record
+                    collected.append(record)
+                    taken += 1
         except OSError:
             continue
-    return reservoir
+
+    # Files that ran short leave the total above or below the target; trim with a seeded
+    # choice so the calibration is reproducible.
+    if len(collected) > sample_size:
+        collected = random.Random(seed).sample(collected, sample_size)
+    return collected
 
 
 def calibrate_dataset(
@@ -217,7 +232,8 @@ def calibrate_dataset(
     text_field: str = "text",
     sample_size: int = 2000,
     seed: int = 42,
-    max_lines_per_file: int = 20000,
+    max_probe_files: int = 32,
+    max_lines_per_probe: int = 100_000,
     eod_tokens_per_document: int = 1,
 ) -> TokenCalibration:
     """Measures how a dataset's records relate to our tokenizer's token counts.
@@ -229,9 +245,12 @@ def calibrate_dataset(
         tokenizer_name (str): Identifier recorded alongside the measurement.
         text_field (str): The field holding the document text.
         sample_size (int): How many documents to tokenize.
-        seed (int): Seed for the reservoir sample, so calibration is reproducible.
-        max_lines_per_file (int): Cap on lines read per file. Keeps the pass bounded on
-            corpora whose individual files hold tens of millions of documents.
+        seed (int): Seed for trimming the sample, so calibration is reproducible.
+        max_probe_files (int): How many files to draw the sample from, spread evenly
+            across the dataset. This bounds the read: the cost of calibrating is set by
+            the sample size, not by how many files the dataset happens to have.
+        max_lines_per_probe (int): Safety cap on lines scanned in one probe file, for a
+            file whose records mostly lack the text field.
         eod_tokens_per_document (int): Tokens the packer appends per document.
 
     Returns:
@@ -241,12 +260,13 @@ def calibrate_dataset(
         ValueError: If no documents could be sampled, which means the files are empty,
             unreadable, or the text field name is wrong.
     """
-    documents = _reservoir_sample_documents(
+    documents = _sample_documents(
         file_paths=file_paths,
         text_field=text_field,
         sample_size=sample_size,
         seed=seed,
-        max_lines_per_file=max_lines_per_file,
+        max_probe_files=max_probe_files,
+        max_lines_per_probe=max_lines_per_probe,
     )
     if not documents:
         raise ValueError(

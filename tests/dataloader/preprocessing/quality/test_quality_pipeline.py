@@ -574,3 +574,120 @@ def test_bucketing_rejects_an_out_of_range_shard(tmp_path: Path, annotations: Pa
             num_shards=3,
             show_progress=False,
         )
+
+
+# ------------------------------------------------------- calibration read is bounded
+
+
+def test_calibration_read_does_not_scale_with_file_count(tmp_path: Path):
+    # The whole point: a dataset with many files must not cost many times more to
+    # calibrate. Reading a fixed number of lines from every file made this stage read
+    # 30 TB over the real blend.
+    from modalities.dataloader.preprocessing.quality import tokens as tokens_module
+
+    corpus_dir = tmp_path / "many_files"
+    corpus_dir.mkdir()
+    for f in range(200):
+        with (corpus_dir / f"shard_{f:04d}.jsonl").open("w") as fh:
+            for i in range(500):
+                fh.write(json.dumps({"text": " ".join(["w"] * 20)}) + "\n")
+
+    opened: list[Path] = []
+    original_open = Path.open
+
+    def counting_open(self, *args, **kwargs):
+        opened.append(self)
+        return original_open(self, *args, **kwargs)
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(Path, "open", counting_open)
+    try:
+        calibration = tokens_module.calibrate_dataset(
+            dataset_name="many",
+            file_paths=sorted(corpus_dir.glob("*.jsonl")),
+            tokenizer=_WhitespaceTokenizer(),
+            tokenizer_name="whitespace",
+            sample_size=200,
+            max_probe_files=32,
+        )
+    finally:
+        monkey.undo()
+
+    assert calibration.sampled_documents == 200
+    jsonl_opened = [p for p in opened if p.suffix == ".jsonl"]
+    assert len(jsonl_opened) <= 32, f"opened {len(jsonl_opened)} of 200 files; the read must be bounded"
+
+
+def test_calibration_probes_files_across_the_whole_dataset(tmp_path: Path):
+    # Spread matters: a prefix would calibrate on whatever the corpus happens to be
+    # ordered by. Each file here has a distinct text length, so the sample reveals reach.
+    corpus_dir = tmp_path / "spread"
+    corpus_dir.mkdir()
+    for f in range(100):
+        with (corpus_dir / f"shard_{f:04d}.jsonl").open("w") as fh:
+            for _ in range(20):
+                fh.write(json.dumps({"text": " ".join(["w"] * (f + 1))}) + "\n")
+
+    from modalities.dataloader.preprocessing.quality.tokens import _probe_files
+
+    probed = _probe_files(sorted(corpus_dir.glob("*.jsonl")), max_probe_files=10)
+
+    assert len(probed) == 10
+    indices = [int(p.stem.split("_")[1]) for p in probed]
+    assert indices[0] < 10 and indices[-1] > 80, f"probe files clustered: {indices}"
+
+
+def test_calibration_is_reproducible_for_a_given_seed(tmp_path: Path, corpus: Path):
+    from modalities.dataloader.preprocessing.quality.tokens import calibrate_dataset as calibrate
+
+    kwargs = dict(
+        dataset_name="toy",
+        file_paths=sorted(corpus.glob("*.jsonl")),
+        tokenizer=_WhitespaceTokenizer(),
+        tokenizer_name="whitespace",
+        sample_size=50,
+    )
+    first = calibrate(**kwargs, seed=7)
+    second = calibrate(**kwargs, seed=7)
+
+    assert first.bytes_per_token == second.bytes_per_token
+    assert first.sampled_tokens == second.sampled_tokens
+
+
+def test_calibration_is_written_after_each_dataset(tmp_path: Path, corpus: Path):
+    # Interrupting a long calibration must not throw away what it already measured.
+    from modalities.dataloader.preprocessing.quality import pipeline
+    from modalities.dataloader.preprocessing.quality.tokens import CalibrationSet
+
+    other = tmp_path / "other_corpus"
+    other.mkdir()
+    (other / "a.jsonl").write_text(json.dumps({"text": "one two three"}) + "\n")
+    registry = CorpusRegistry(
+        datasets=[
+            DatasetEntry(name="first", jsonl_root=corpus, glob="*.jsonl"),
+            DatasetEntry(name="second", jsonl_root=other, glob="*.jsonl"),
+        ]
+    )
+
+    work_dir = tmp_path / "work"
+    seen_after_first: list[list[str]] = []
+    original = CalibrationSet.to_yaml
+
+    def recording_to_yaml(self, path):
+        original(self, path)
+        seen_after_first.append(sorted(self.calibrations))
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(CalibrationSet, "to_yaml", recording_to_yaml)
+    try:
+        pipeline.calibrate_blend(
+            registry=registry,
+            work_dir=work_dir,
+            tokenizer=_WhitespaceTokenizer(),
+            tokenizer_name="whitespace",
+            sample_size=20,
+        )
+    finally:
+        monkey.undo()
+
+    assert seen_after_first == [["first"], ["first", "second"]], seen_after_first
