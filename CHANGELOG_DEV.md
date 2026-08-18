@@ -380,3 +380,31 @@ Without it the failure would have surfaced much later as an unexplained 0 % cove
 Tests cover the bound directly: 20,000 rows over 1024 buckets with a 1,000-row cap, with
 the buffered total asserted after every row, plus that repeated flushes of one bucket
 still yield one file with every row.
+
+
+## PR #XXX Fix: metadata write/read race in bucket-annotations
+
+The guard added in the previous entry -- refusing to mix output from runs with different
+array sizes -- read every `_meta.*.json` in a split directory with a bare `json.loads`.
+The writer used `Path.write_text`, which truncates before writing, so the file is briefly
+empty; sibling tasks of the same array read those files, and 12 of 64 tasks of a real run
+died with `JSONDecodeError: Expecting value: line 1 column 1 (char 0)`.
+
+**General changes**
+
+* Metadata is written to a per-task `_meta.<shard>.json.tmp` and renamed onto the final
+  name. Rename is atomic, so a concurrent reader sees either the old file or the complete
+  new one.
+* Both readers -- the guard and `read_bucket_metadata` -- skip a file they cannot parse
+  rather than propagating the error, and both ignore `*.tmp`. Skipping is the safe
+  direction for `read_bucket_metadata`: an unread file leaves its shard id unseen, so the
+  run reports as incomplete instead of joining missing annotations. If no file at all can
+  be read it now raises a clear error rather than an `AttributeError`.
+
+**Notes**
+
+Verified on the real `finewiki` split: four sequential shards into one directory, 43.1 M
+rows, metadata reading back as a complete run with a matching row total and no `.tmp`
+left behind. Tests cover a truncated metadata file mid-run, an unreadable file making the
+run report incomplete, `.tmp` being ignored, and a thread rewriting metadata while the
+guard runs repeatedly.

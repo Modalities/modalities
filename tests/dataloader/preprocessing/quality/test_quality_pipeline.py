@@ -760,3 +760,106 @@ def test_bucketing_refuses_to_mix_runs_with_different_array_sizes(tmp_path: Path
             num_shards=8,
             show_progress=False,
         )
+
+
+# --------------------------------------------- bucketing metadata write/read race
+
+
+def test_a_truncated_metadata_file_does_not_stop_a_run(tmp_path: Path, annotations: Path):
+    # The regression: the guard read every _meta file with a bare json.loads, so a task
+    # that caught a sibling's file mid-write died. 12 of 64 tasks of a real run crashed
+    # this way.
+    out = tmp_path / "buckets_truncated"
+    out.mkdir()
+    (out / "_meta.0005.json").write_text("")
+
+    n_rows, _ = bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=out,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        shard_id=0,
+        num_shards=1,
+        show_progress=False,
+    )
+
+    assert n_rows == 150
+
+
+def test_read_bucket_metadata_skips_an_unreadable_file(tmp_path: Path, annotations: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import AnnotationJoinError, read_bucket_metadata
+
+    out = tmp_path / "buckets_partial_meta"
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=out,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        shard_id=0,
+        num_shards=2,
+        show_progress=False,
+    )
+    # Shard 1's metadata exists but is corrupt: the run must read as incomplete rather
+    # than raising a decode error or, worse, joining without shard 1's annotations.
+    (out / "_meta.0001.json").write_text("{ truncated")
+
+    with pytest.raises(AnnotationJoinError, match="incomplete"):
+        read_bucket_metadata(out)
+
+
+def test_metadata_write_is_atomic_and_leaves_no_temp_file(tmp_path: Path, annotations: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import read_bucket_metadata
+
+    out = tmp_path / "buckets_atomic"
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=out,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        shard_id=0,
+        num_shards=1,
+        show_progress=False,
+    )
+
+    assert not list(out.glob("*.tmp")), "an atomic write must not leave its temporary file behind"
+    # A stray .tmp must be ignored rather than parsed as metadata.
+    (out / "_meta.0009.json.tmp").write_text("{ half written")
+    meta = read_bucket_metadata(out)
+    assert meta["n_rows"] == 150
+
+
+def test_guard_survives_metadata_being_rewritten_concurrently(tmp_path: Path, annotations: Path):
+    # Exercises the actual race: one thread rewriting metadata while bucketing tasks keep
+    # entering the directory and running the guard.
+    import threading
+
+    from modalities.dataloader.preprocessing.quality.annotation_join import _write_metadata
+
+    out = tmp_path / "buckets_concurrent"
+    out.mkdir()
+    payload = {"n_buckets": 4, "label_columns": ["educational_value"], "n_rows": 1, "shard_id": 7, "num_shards": 4}
+
+    stop = threading.Event()
+
+    def rewrite() -> None:
+        while not stop.is_set():
+            _write_metadata(out / "_meta.0007.json", payload)
+
+    writer = threading.Thread(target=rewrite, daemon=True)
+    writer.start()
+    try:
+        for _ in range(20):
+            # num_shards matches the payload, so the guard must pass rather than raise --
+            # and must not blow up on a file being replaced underneath it.
+            bucket_annotations(
+                shard_paths=sorted(annotations.glob("*.parquet")),
+                out_dir=out,
+                n_buckets=4,
+                label_columns=["educational_value"],
+                shard_id=0,
+                num_shards=4,
+                show_progress=False,
+            )
+    finally:
+        stop.set()
+        writer.join(timeout=5)

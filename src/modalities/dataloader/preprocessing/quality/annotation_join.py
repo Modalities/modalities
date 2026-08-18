@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -113,6 +114,53 @@ class JoinReport:
             + (f", {self.n_duplicate_keys:,} duplicate keys" if self.n_duplicate_keys else "")
             + (f", {self.n_missing_key:,} without a key" if self.n_missing_key else "")
         )
+
+
+def _metadata_paths(annotation_bucket_dir: Path) -> list[Path]:
+    # Excludes the `.tmp` files an interrupted write can leave behind, so a half-written
+    # file is never mistaken for a task's metadata.
+    return sorted(p for p in Path(annotation_bucket_dir).glob("_meta.*.json") if p.suffix == ".json")
+
+
+def _read_metadata(path: Path) -> Optional[dict]:
+    """Reads one bucketing metadata file, returning None if it cannot be used.
+
+    Args:
+        path (Path): Path to a ``_meta.<shard>.json`` file.
+
+    Returns:
+        Optional[dict]: The parsed metadata, or None if the file is absent or unparseable.
+
+    Note:
+        Metadata is written atomically, so an unparseable file should not occur. It is
+        tolerated anyway because the alternative is a fifteen-hour pipeline dying on one
+        unreadable sidecar file -- which is exactly what happened when this was a bare
+        ``json.loads``: tasks read a sibling's file mid-write and 12 of 64 crashed.
+        Skipping is also the safe direction for :func:`read_bucket_metadata`, where a
+        missing entry makes the run look incomplete rather than joinable.
+    """
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _write_metadata(path: Path, payload: dict) -> None:
+    """Writes bucketing metadata so a concurrent reader never sees a partial file.
+
+    Args:
+        path (Path): Final path of the metadata file.
+        payload (dict): Content to write.
+
+    Note:
+        ``Path.write_text`` truncates before writing, leaving a window in which the file
+        is empty. Sibling tasks of the same array read these files, so that window is a
+        real race. Writing to a per-task temporary name and renaming makes the swap
+        atomic: a reader sees either the old file or the complete new one.
+    """
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload))
+    os.replace(tmp, path)
 
 
 def bucket_of(key: str, n_buckets: int) -> int:
@@ -277,8 +325,11 @@ def bucket_annotations(
     # A sharded run cannot clear the directory, so leftovers from a previous run with a
     # different array size would be silently mixed in and the join would read a bucket
     # made of rows from two incompatible runs.
-    for stale in out_dir.glob("_meta.*.json"):
-        previous = json.loads(stale.read_text()).get("num_shards", 1)
+    for stale in _metadata_paths(out_dir):
+        meta = _read_metadata(stale)
+        if meta is None:
+            continue
+        previous = meta.get("num_shards", 1)
         if previous != num_shards:
             raise AnnotationJoinError(
                 f"{out_dir} holds output from a run with num_shards={previous}, but this task has "
@@ -315,18 +366,18 @@ def bucket_annotations(
     finally:
         writer.close()
 
-    # One metadata file per task, so concurrent tasks never overwrite each other's.
-    (out_dir / f"_meta.{shard_id:04d}.json").write_text(
-        json.dumps(
-            {
-                "n_buckets": n_buckets,
-                "label_columns": carried,
-                "n_rows": n_rows,
-                "shard_id": shard_id,
-                "num_shards": num_shards,
-                "n_input_shards": len(my_shards),
-            }
-        )
+    # One metadata file per task, so concurrent tasks never overwrite each other's, and
+    # written atomically so a sibling reading the directory cannot catch it half-written.
+    _write_metadata(
+        out_dir / f"_meta.{shard_id:04d}.json",
+        {
+            "n_buckets": n_buckets,
+            "label_columns": carried,
+            "n_rows": n_rows,
+            "shard_id": shard_id,
+            "num_shards": num_shards,
+            "n_input_shards": len(my_shards),
+        },
     )
     return n_rows, carried
 
@@ -346,7 +397,7 @@ def read_bucket_metadata(annotation_bucket_dir: Path) -> dict:
             incomplete run would silently drop the annotations that task was carrying,
             which looks exactly like a corpus that was never annotated.
     """
-    metadata_paths = sorted(Path(annotation_bucket_dir).glob("_meta.*.json"))
+    metadata_paths = _metadata_paths(annotation_bucket_dir)
     if not metadata_paths:
         raise AnnotationJoinError(
             f"{annotation_bucket_dir} holds no bucketing metadata; run 'modalities quality bucket-annotations' first"
@@ -355,7 +406,11 @@ def read_bucket_metadata(annotation_bucket_dir: Path) -> dict:
     total_rows = 0
     seen_shards: set[int] = set()
     for path in metadata_paths:
-        meta = json.loads(path.read_text())
+        meta = _read_metadata(path)
+        if meta is None:
+            # Leaving the shard id unseen makes the run report as incomplete, which is the
+            # safe outcome: better to refuse the join than to join missing annotations.
+            continue
         if merged is None:
             merged = meta
         elif (meta["n_buckets"], meta["label_columns"]) != (merged["n_buckets"], merged["label_columns"]):
@@ -366,6 +421,12 @@ def read_bucket_metadata(annotation_bucket_dir: Path) -> dict:
             )
         total_rows += meta.get("n_rows", 0)
         seen_shards.add(meta.get("shard_id", 0))
+
+    if merged is None:
+        raise AnnotationJoinError(
+            f"{annotation_bucket_dir} has {len(metadata_paths)} metadata file(s) but none could be read; "
+            "the bucketing run did not complete. Delete the directory and re-bucket the split."
+        )
 
     expected = merged.get("num_shards", 1)
     if len(seen_shards) != expected:
