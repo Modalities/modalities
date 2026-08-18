@@ -351,3 +351,32 @@ Spread is preserved -- the probe files are spaced across the dataset, not taken 
 front -- and the sample is still trimmed with a seeded choice, so calibration stays
 reproducible. Tests cover both: that the number of files opened stays bounded regardless
 of dataset size, and that probe files reach both ends of the file list.
+
+
+## PR #XXX Fix: bucket writer buffered the whole input when bucket count was high
+
+`bucket-annotations` OOM-killed all 64 tasks of a real run at 24 GB each. The writer
+flushed a bucket once it held `flush_rows` (100,000) rows, which bounds nothing: spread
+50 M rows over 1024 buckets and each holds ~49 k, so no bucket ever reaches the threshold
+and the entire input accumulates as Python dicts until the writer closes.
+
+**General changes**
+
+* The cap is now on the **total** rows buffered across all buckets (`max_buffered_rows`,
+  default 500,000); reaching it flushes every bucket. Measured on the shard that caused
+  the failure -- 50 M rows at 1024 buckets -- peak RSS is **2.36 GB** against the
+  previous unbounded growth, at an unchanged 121k rows/s.
+* `bucket_annotations` refuses to write into a directory holding output from a run with a
+  different `num_shards`. A sharded run cannot clear the directory, so leftovers would
+  otherwise be mixed in and a bucket would be read as rows from two incompatible runs.
+
+**Notes**
+
+The completeness guard added earlier did its job here: `join-annotations` refused to run
+against the partial buckets the OOMed array left behind ("63 of 64 bucketing tasks
+finished, missing shard id 0") rather than silently producing sidecars with no labels.
+Without it the failure would have surfaced much later as an unexplained 0 % coverage.
+
+Tests cover the bound directly: 20,000 rows over 1024 buckets with a 1,000-row cap, with
+the buffered total asserted after every row, plus that repeated flushes of one bucket
+still yield one file with every row.

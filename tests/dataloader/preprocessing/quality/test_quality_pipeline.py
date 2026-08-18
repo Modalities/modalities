@@ -691,3 +691,72 @@ def test_calibration_is_written_after_each_dataset(tmp_path: Path, corpus: Path)
         monkey.undo()
 
     assert seen_after_first == [["first"], ["first", "second"]], seen_after_first
+
+
+# ------------------------------------------------------- bucket writer memory bound
+
+
+def test_bucket_writer_memory_is_bounded_by_total_not_per_bucket(tmp_path: Path):
+    # The regression that OOM-killed all 64 tasks of a real run: the flush threshold was
+    # per bucket, so with many buckets no single bucket ever reached it and the whole
+    # input stayed in memory. The bound must be on the total held across buckets.
+    from modalities.dataloader.preprocessing.quality.annotation_join import _BucketWriter
+
+    schema = pa.schema([pa.field("key", pa.large_string()), pa.field("label", pa.large_string())])
+    writer = _BucketWriter(tmp_path / "buckets", schema, n_buckets=1024, max_buffered_rows=1000)
+    try:
+        # Spread 20,000 rows over 1024 buckets: ~20 per bucket, far below any sane
+        # per-bucket threshold, so a per-bucket rule would never flush.
+        for i in range(20_000):
+            writer.add(i % 1024, {"key": f"k{i}", "label": "x"})
+            assert writer._buffered_rows < 1000 + 1, "total buffered rows exceeded the cap"
+    finally:
+        writer.close()
+
+    written = sorted((tmp_path / "buckets").glob("*.parquet"))
+    assert written, "nothing was written"
+    total = sum(pq.ParquetFile(p).metadata.num_rows for p in written)
+    assert total == 20_000, f"rows lost or duplicated across flushes: {total}"
+
+
+def test_bucket_writer_survives_repeated_flushes_of_the_same_bucket(tmp_path: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import _BucketWriter
+
+    schema = pa.schema([pa.field("key", pa.large_string())])
+    writer = _BucketWriter(tmp_path / "b", schema, n_buckets=2, max_buffered_rows=10)
+    try:
+        for i in range(100):
+            writer.add(0, {"key": f"k{i}"})
+    finally:
+        writer.close()
+
+    files = list((tmp_path / "b").glob("*.parquet"))
+    assert len(files) == 1, "one bucket must stay one file across flushes"
+    assert pq.ParquetFile(files[0]).metadata.num_rows == 100
+
+
+def test_bucketing_refuses_to_mix_runs_with_different_array_sizes(tmp_path: Path, annotations: Path):
+    from modalities.dataloader.preprocessing.quality.annotation_join import AnnotationJoinError
+
+    shards = sorted(annotations.glob("*.parquet"))
+    out = tmp_path / "mixed_buckets"
+    bucket_annotations(
+        shard_paths=shards,
+        out_dir=out,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        shard_id=0,
+        num_shards=4,
+        show_progress=False,
+    )
+
+    with pytest.raises(AnnotationJoinError, match="num_shards"):
+        bucket_annotations(
+            shard_paths=shards,
+            out_dir=out,
+            n_buckets=4,
+            label_columns=["educational_value"],
+            shard_id=0,
+            num_shards=8,
+            show_progress=False,
+        )

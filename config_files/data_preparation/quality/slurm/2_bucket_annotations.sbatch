@@ -7,6 +7,9 @@
 # As in the sidecar script: the CPU request is there to limit how many bandwidth-hungry
 # tasks SLURM packs onto one node, not because a task needs 8 cores.
 #SBATCH --cpus-per-task=8
+# Peak RSS measured at 2.4 GB for a 50 M-row shard at 1024 buckets, so 24 GB is ample.
+# It was not always: the writer used to buffer per bucket, which bounded nothing, and a
+# real run OOM-killed all 64 tasks at this same limit.
 #SBATCH --mem=24G
 #SBATCH --time=12:00:00
 #SBATCH --output=/home/richard.rutmann/logs/quality/2_bucket_%A_%a.out

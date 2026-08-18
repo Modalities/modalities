@@ -135,25 +135,62 @@ def bucket_of(key: str, n_buckets: int) -> int:
 
 
 class _BucketWriter:
-    # Keeps one open parquet writer per bucket so each row is written exactly once,
-    # without buffering a whole side of the join in memory. The shard suffix lets many
-    # tasks bucket one split at once: each writes its own file per bucket, and the join
-    # reads every file belonging to a bucket.
-    def __init__(self, out_dir: Path, schema: pa.Schema, n_buckets: int, shard_id: int = 0, flush_rows: int = 100_000):
+    """Streams rows out to one parquet file per bucket, with bounded memory.
+
+    The shard suffix in the filename lets many tasks bucket one split at once: each
+    writes its own file per bucket, and the join reads every file belonging to a bucket.
+
+    Memory is capped on the **total** rows held across all buckets, not per bucket. A
+    per-bucket threshold does not bound anything: with 1024 buckets a 50 M-row input
+    puts only ~49 k rows in each, so no bucket ever reaches a 100 k threshold and the
+    whole input ends up buffered as Python dicts. That is how this OOM-killed all 64
+    tasks of a real run at 24 GB each.
+    """
+
+    def __init__(
+        self,
+        out_dir: Path,
+        schema: pa.Schema,
+        n_buckets: int,
+        shard_id: int = 0,
+        max_buffered_rows: int = 500_000,
+    ):
+        """
+        Args:
+            out_dir (Path): Directory receiving the bucket files.
+            schema (pa.Schema): Schema of the rows being written.
+            n_buckets (int): Number of buckets.
+            shard_id (int): This task's index, used to name its files.
+            max_buffered_rows (int): Rows held across all buckets before everything is
+                flushed. Bounds memory regardless of the bucket count.
+        """
         self._out_dir = Path(out_dir)
         self._out_dir.mkdir(parents=True, exist_ok=True)
         self._schema = schema
         self._n_buckets = n_buckets
         self._shard_id = shard_id
-        self._flush_rows = flush_rows
+        self._max_buffered_rows = max_buffered_rows
         self._writers: dict[int, pq.ParquetWriter] = {}
         self._buffers: dict[int, list[dict]] = {}
+        self._buffered_rows = 0
 
     def add(self, bucket: int, row: dict) -> None:
-        buffer = self._buffers.setdefault(bucket, [])
-        buffer.append(row)
-        if len(buffer) >= self._flush_rows:
+        """Queues one row for its bucket, flushing everything if memory is up.
+
+        Args:
+            bucket (int): Bucket the row belongs to.
+            row (dict): The row, matching the writer's schema.
+        """
+        self._buffers.setdefault(bucket, []).append(row)
+        self._buffered_rows += 1
+        if self._buffered_rows >= self._max_buffered_rows:
+            self.flush_all()
+
+    def flush_all(self) -> None:
+        """Writes every buffered row out and releases the memory."""
+        for bucket in list(self._buffers):
             self._flush(bucket)
+        self._buffered_rows = 0
 
     def _flush(self, bucket: int) -> None:
         buffer = self._buffers.get(bucket)
@@ -166,8 +203,8 @@ class _BucketWriter:
         self._buffers[bucket] = []
 
     def close(self) -> None:
-        for bucket in list(self._buffers):
-            self._flush(bucket)
+        """Flushes what is left and closes every open parquet writer."""
+        self.flush_all()
         for writer in self._writers.values():
             writer.close()
         self._writers.clear()
@@ -182,6 +219,7 @@ def bucket_annotations(
     normalize_key: Optional[str] = None,
     shard_id: int = 0,
     num_shards: int = 1,
+    max_buffered_rows: int = 500_000,
     show_progress: bool = True,
 ) -> tuple[int, list[str]]:
     """Partitions annotation shards by a hash of their key.
@@ -204,6 +242,8 @@ def bucket_annotations(
             sides of some joins.
         shard_id (int): This task's index in ``[0, num_shards)``.
         num_shards (int): How many tasks are bucketing this split.
+        max_buffered_rows (int): Rows held in memory across all buckets before being
+            flushed. Raise it for throughput, lower it under a tight memory limit.
         show_progress (bool): Whether to show a progress bar.
 
     Returns:
@@ -233,11 +273,22 @@ def bucket_annotations(
     if num_shards == 1 and out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # A sharded run cannot clear the directory, so leftovers from a previous run with a
+    # different array size would be silently mixed in and the join would read a bucket
+    # made of rows from two incompatible runs.
+    for stale in out_dir.glob("_meta.*.json"):
+        previous = json.loads(stale.read_text()).get("num_shards", 1)
+        if previous != num_shards:
+            raise AnnotationJoinError(
+                f"{out_dir} holds output from a run with num_shards={previous}, but this task has "
+                f"num_shards={num_shards}. Delete the directory and re-bucket the split from scratch."
+            )
     # Strided rather than contiguous, so tasks stay balanced when shard sizes trend
     # across a split.
     my_shards = [path for i, path in enumerate(sorted(shard_paths)) if i % num_shards == shard_id]
     schema = pa.schema([pa.field("key", pa.large_string())] + [pa.field(c, pa.large_string()) for c in carried])
-    writer = _BucketWriter(out_dir, schema, n_buckets, shard_id=shard_id)
+    writer = _BucketWriter(out_dir, schema, n_buckets, shard_id=shard_id, max_buffered_rows=max_buffered_rows)
 
     from modalities.dataloader.preprocessing.quality.registry import strip_urn_uuid
 
