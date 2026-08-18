@@ -5,7 +5,12 @@
 #SBATCH --job-name=q_sidecar
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task=2
+# 8 CPUs is not what a task needs -- it is single-threaded. It is what stops SLURM
+# packing 16 of them onto one node. The binding constraint is per-node bandwidth to
+# /data, not CPU: a real run put 12 tasks on one node and each got 95 MB/s against the
+# 282 MB/s a single stream gets, while four nodes sat idle. At 8 CPUs only 4 tasks fit
+# per node, so an array of 64 spreads over 16 nodes instead of piling onto 4.
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=24:00:00
 #SBATCH --output=/home/richard.rutmann/logs/quality/1_sidecar_%A_%a.out
@@ -18,8 +23,9 @@ MQ="${MQ:-/data/user/richard.rutmann/venvs/modalities-quality/bin/python}"
 QDIR="${QDIR:-/home/richard.rutmann/repos/modalities/config_files/data_preparation/quality}"
 WORK="${WORK:?WORK is not set}"
 
-# Each task is single-threaded and I/O-bound at ~374 MB/s, against ~3.8 GB/s aggregate
-# from /data. Past roughly 16 concurrent tasks the filesystem is the limit, not the code.
+# Each task is single-threaded and I/O-bound at ~374 MB/s where bandwidth allows. The
+# 3.8 GB/s aggregate measured on the login node is not what a compute node gets, so
+# spreading tasks across nodes matters more than raising the array size.
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 unset SLURM_MEM_PER_CPU || true
 unset SLURM_MEM_PER_GPU || true

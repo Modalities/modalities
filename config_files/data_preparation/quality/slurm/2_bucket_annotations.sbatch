@@ -4,7 +4,9 @@
 #SBATCH --job-name=q_bucket
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task=2
+# As in the sidecar script: the CPU request is there to limit how many bandwidth-hungry
+# tasks SLURM packs onto one node, not because a task needs 8 cores.
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --time=12:00:00
 #SBATCH --output=/home/richard.rutmann/logs/quality/2_bucket_%A_%a.out
