@@ -14,6 +14,10 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.logging_broker.messages import Message
+from tests.end2end_tests.checkpoint_resume_utils import (
+    assert_checkpoint_resumes_optimizer_and_scheduler_state,
+    get_last_checkpoint_dir_path,
+)
 from tests.end2end_tests.custom_components import (
     MultiProcessingCudaEnv,
     SaveAllResultSubscriber,
@@ -86,9 +90,11 @@ class TestMoEEPFSDP2TPE2E:
                 os._exit(1)
 
     @staticmethod
-    def _worker_impl(process_id: int, config_file_path: Path, tmp_path: Path) -> None:
-        experiment_id = "moe-ep-fsdp2-tp-e2e"
-        checkpoint_root_path = tmp_path / experiment_id / "checkpoints"
+    def _build_main_and_components(
+        config_file_path: Path, tmp_path: Path, experiment_id: str, checkpoint_root_path: Path
+    ) -> tuple[Main, TrainingComponentsInstantiationModel]:
+        """Builds a full, independent set of components (model, optimizer, lr scheduler, ...) from the
+        test config. Called a second time to resume the checkpoint into fresh instances."""
         cfg = load_app_config_dict(
             config_file_path=config_file_path, experiments_root_path=tmp_path, experiment_id=experiment_id
         )
@@ -108,6 +114,18 @@ class TestMoEEPFSDP2TPE2E:
         components: TrainingComponentsInstantiationModel = main_obj.build_components(
             components_model_type=TrainingComponentsInstantiationModel
         )
+        return main_obj, components
+
+    @staticmethod
+    def _worker_impl(process_id: int, config_file_path: Path, tmp_path: Path) -> None:
+        experiment_id = "moe-ep-fsdp2-tp-e2e"
+        checkpoint_root_path = tmp_path / experiment_id / "checkpoints"
+        main_obj, components = TestMoEEPFSDP2TPE2E._build_main_and_components(
+            config_file_path=config_file_path,
+            tmp_path=tmp_path,
+            experiment_id=experiment_id,
+            checkpoint_root_path=checkpoint_root_path,
+        )
 
         assert getattr(components.model_raw, "_ep_wrapped", False), "Expected EP wrapping marker on raw model."
         first_layer = next(iter(components.model_raw.layers.values()))
@@ -121,9 +139,22 @@ class TestMoEEPFSDP2TPE2E:
             loss_value = message.payload.losses["train loss avg"].value
             assert torch.isfinite(loss_value), f"Found non-finite train loss: {loss_value}"
 
-        if process_id == 0:
-            checkpoint_info_file_path = checkpoint_root_path / "last_checkpoint_info.json"
-            assert checkpoint_info_file_path.exists(), "Expected checkpoint info file from DCP save."
+        # Resume the checkpoint into a fresh set of components: the EP optimizer(s) use a custom
+        # state-dict layout, so only an actual load proves that the checkpointed optimizer state is
+        # readable back (a checkpoint marker file on disk does not).
+        checkpoint_dir_path = get_last_checkpoint_dir_path(checkpoint_root_path)
+        _, resumed_components = TestMoEEPFSDP2TPE2E._build_main_and_components(
+            config_file_path=config_file_path,
+            tmp_path=tmp_path,
+            experiment_id=experiment_id,
+            checkpoint_root_path=checkpoint_root_path,
+        )
+        assert_checkpoint_resumes_optimizer_and_scheduler_state(
+            trained_app_state=components.app_state,
+            resumed_app_state=resumed_components.app_state,
+            checkpoint_dir_path=checkpoint_dir_path,
+            global_rank=process_id,
+        )
 
     @staticmethod
     def test_moe_ep_fsdp2_tp_training_and_checkpointing(tmp_path: Path) -> None:

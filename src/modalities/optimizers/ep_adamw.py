@@ -123,6 +123,16 @@ class EPAdamW(Optimizer):
         self._dense_adamw.zero_grad(set_to_none=set_to_none)
 
     def state_dict(self) -> dict:
+        # Materialize the (still zero) optimizer state of the sub-optimizers before serializing, so
+        # that the returned state dict already carries the full set of moment keys even before the
+        # first step. This matters for LOADING: torch's DCP derives its read plan from the local
+        # state_dict(), so a freshly built optimizer whose state dict is empty would read nothing and
+        # silently resume with zeroed Adam moments. torch's `get_optimizer_state_dict` does the same
+        # (via its private `_init_optim_state`), but this optimizer bypasses that helper because of
+        # its custom, non-standard state-dict layout.
+        if self._ep_adamw is not None:
+            _init_optimizer_state_(self._ep_adamw)
+        _init_optimizer_state_(self._dense_adamw)
         return {
             "ep_adamw": self._ep_adamw.state_dict() if self._ep_adamw is not None else {},
             "dense_adamw": self._dense_adamw.state_dict(),
@@ -132,6 +142,39 @@ class EPAdamW(Optimizer):
         if self._ep_adamw is not None and state_dict["ep_adamw"]:
             self._ep_adamw.load_state_dict(state_dict["ep_adamw"])
         self._dense_adamw.load_state_dict(state_dict["dense_adamw"])
+
+
+def _init_optimizer_state_(optimizer: Optimizer) -> None:
+    """Initializes an optimizer's state in-place by taking a zero-gradient, zero-learning-rate step.
+
+    Mirrors torch's ``torch.distributed.checkpoint.state_dict._init_optim_state``: the learning rate
+    is temporarily set to zero so that optimizers which update parameters irrespective of the
+    gradient (e.g. AdamW's decoupled weight decay) leave the parameters untouched. Does nothing if
+    the state already exists, or if gradients are present (i.e. mid-training), in which case the
+    step would not be a no-op.
+
+    Note that this operates on plain per-rank sub-optimizers only and therefore triggers no
+    collectives.
+    """
+    if optimizer.state:
+        return
+    if any(param.grad is not None for group in optimizer.param_groups for param in group["params"]):
+        return
+
+    for group in optimizer.param_groups:
+        for param in group["params"]:
+            if param.requires_grad:
+                param.grad = torch.zeros_like(param)
+
+    original_lrs = [group["lr"] for group in optimizer.param_groups]
+    for group in optimizer.param_groups:
+        group["lr"] = torch.tensor(0.0) if isinstance(group["lr"], torch.Tensor) else 0.0
+    try:
+        optimizer.step()
+    finally:
+        for group, lr in zip(optimizer.param_groups, original_lrs):
+            group["lr"] = lr
+        optimizer.zero_grad(set_to_none=True)
 
 
 def get_ep_adam_w(

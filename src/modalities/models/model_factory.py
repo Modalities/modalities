@@ -901,9 +901,12 @@ class QwenModelFactory:
                 use_local_output=True,
             ),
         }
-        # only keep the relevant parts of the model parallel plan
-        # (e.g. when using pipeline parallelism and not all modules are present)
-        model_tp_plan = {k: v for k, v in model_tp_plan.items() if hasattr(model, k.split(".")[0])}
+        # Only keep the relevant parts of the model parallel plan: pipeline parallelism prunes the
+        # modules a stage does not own, but leaves the attribute in place set to None, so `hasattr`
+        # would still report them as present and the plan would carry unresolvable entries.
+        model_tp_plan = {
+            k: v for k, v in model_tp_plan.items() if isinstance(getattr(model, k.split(".")[0], None), nn.Module)
+        }
         if model_tp_plan:
             parallelize_module(
                 module=model,

@@ -160,6 +160,15 @@ class Trainer:
                     - gradient_norm_score (Optional[torch.Tensor]): The gradient norm score,
                         if a training step was performed otherwise return None.
         """
+        # Keep any MoE auxiliary-loss gradient (injected via the block-output autograd side-path) on
+        # the same scale as the main loss. The scale lives on the MoEAuxLossAutoScaler class, i.e. it
+        # is process-global, so it is set unconditionally on every micro batch -- never left at
+        # whatever a previously constructed trainer in this process installed. Without pipeline
+        # parallelism the main loss is divided by gradient_acc_steps below, so the aux gradient is
+        # scaled the same way; the pipeline schedule sums per-microbatch losses instead, which
+        # corresponds to a scale of 1.0. This is a no-op for models without MoE blocks.
+        MoEAuxLossAutoScaler.set_loss_scale(1.0 if scheduled_pipeline is not None else 1.0 / self.gradient_acc_steps)
+
         if scheduled_pipeline is not None:
             pp_schedule = scheduled_pipeline.pp_schedule
             # Pipeline Parallel forward / backward inside step() call
@@ -181,11 +190,6 @@ class Trainer:
             # else continue with loss calculation
             result_batch = model_predict_batch(model=model_parts[0], batch=batch)
             loss = loss_fun(result_batch)
-            # Keep any MoE auxiliary-loss gradient (injected via the block-output autograd side-path)
-            # on the same scale as the main loss, which is divided by gradient_acc_steps here. This is
-            # a no-op for models without MoE blocks. The pipeline-parallel branch leaves the default
-            # scale of 1.0, consistent with how it sums per-microbatch losses.
-            MoEAuxLossAutoScaler.set_loss_scale(1.0 / self.gradient_acc_steps)
             (loss / self.gradient_acc_steps).backward()
 
         if (micro_batch_id + 1) % self.gradient_acc_steps == 0:

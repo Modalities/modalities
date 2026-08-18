@@ -4,6 +4,7 @@
 
 import copy
 import re
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Optional, Type, cast
 
@@ -22,10 +23,28 @@ from torch.distributed.pipelining.schedules import (
 from modalities.loss_functions import Loss
 from modalities.models.model import NNModel
 from modalities.models.parallelism.stages_generator import StagesGenerator
+from modalities.running_env.env_utils import PyTorchDtypes
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
 from modalities.utils.logger_utils import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class StaticStageIOSpec:
+    """Shapes and dtype of the tensors crossing pipeline stage boundaries, used to build STATIC
+    pipeline metadata (see PipelineFactory.get_staged_pipeline).
+
+    ``activation_dtype`` must be the dtype of the model's actual activations (i.e. the
+    mixed-precision ``param_dtype``); the pipeline allocates its P2P buffers from it, so a mismatch
+    surfaces as a shape/dtype validation error or a corrupted inter-stage transfer.
+    """
+
+    microbatch_size: int
+    sequence_length: int
+    hidden_dim: int
+    vocab_size: int
+    activation_dtype: torch.dtype
 
 
 class Pipeline:
@@ -109,10 +128,11 @@ class PipelineFactory:
         static_io_sequence_length: Optional[int] = None,
         static_io_hidden_dim: Optional[int] = None,
         static_io_vocab_size: Optional[int] = None,
+        static_io_dtype: Optional[PyTorchDtypes] = None,
     ) -> Pipeline:
         """Builds the pipeline stages for the local PP rank.
 
-        Static pipeline metadata (opt-in): if all four ``static_io_*`` arguments are provided, each
+        Static pipeline metadata (opt-in): if all ``static_io_*`` arguments are provided, each
         PipelineStage is constructed with explicit example ``input_args``/``output_args`` so that
         PyTorch runs the pipeline in STATIC metadata mode and SKIPS its live shape-inference pass
         (a dummy forward+backward through every stage). That live pass is unsafe when a stage
@@ -122,6 +142,10 @@ class PipelineFactory:
         dummy pass at all, so real training starts with all ranks in lockstep. This is what makes EP
         composable with PP; without it, EP+PP hangs during pipeline initialization. When the arguments
         are omitted (e.g. the GPT2 path), the pipeline falls back to the default DYNAMIC inference.
+        ``static_io_dtype`` must be the dtype of the actual inter-stage activations (i.e. the
+        mixed-precision ``param_dtype`` of the model), because it determines the dtype of the P2P
+        buffers the pipeline allocates. StagedPipelineConfig enforces the all-or-none rule and
+        rejects EP+PP configurations without static metadata.
 
         Note: the inter-stage activations must be plain tensors (not DTensors) for STATIC mode to be
         sufficient without also supplying gradient metadata. This holds here because tensor
@@ -138,13 +162,31 @@ class PipelineFactory:
         pp_mesh = device_mesh[ParallelismDegrees.PP.value]
         schedule_class: Type[PipelineScheduleSingle | PipelineScheduleMulti] = get_schedule_class(pp_schedule_name)
 
-        static_io_dims = (
+        static_io_settings = (
             static_io_microbatch_size,
             static_io_sequence_length,
             static_io_hidden_dim,
             static_io_vocab_size,
+            static_io_dtype,
         )
-        static_io_dims = static_io_dims if all(dim is not None for dim in static_io_dims) else None
+        if all(setting is not None for setting in static_io_settings):
+            static_io_spec = StaticStageIOSpec(
+                microbatch_size=static_io_microbatch_size,
+                sequence_length=static_io_sequence_length,
+                hidden_dim=static_io_hidden_dim,
+                vocab_size=static_io_vocab_size,
+                activation_dtype=static_io_dtype.value,
+            )
+        elif any(setting is not None for setting in static_io_settings):
+            # Defense in depth: StagedPipelineConfig already rejects partial specifications, but this
+            # factory is also callable directly and a silent fallback to dynamic inference would
+            # deadlock under EP (see docstring).
+            raise ValueError(
+                "Static pipeline I/O metadata must be specified either completely or not at all, "
+                "but only some of the static_io_* arguments were provided."
+            )
+        else:
+            static_io_spec = None
 
         pp_stages, model_parts = PipelineFactory._get_split_model(
             whole_model=whole_model,
@@ -152,7 +194,7 @@ class PipelineFactory:
             pp_mesh=pp_mesh,
             device=device,
             fqns_per_stage=fqns_per_stage,
-            static_io_dims=static_io_dims,
+            static_io_spec=static_io_spec,
         )
 
         pipeline = Pipeline(pp_stages=pp_stages, model_parts=model_parts)
@@ -162,21 +204,25 @@ class PipelineFactory:
     def _build_static_stage_io(
         stage_idx: int,
         num_stages: int,
-        static_io_dims: tuple[int, int, int, int],
+        static_io_spec: StaticStageIOSpec,
         device: torch.device,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Builds example (input_args, output_args) tensors describing a stage's I/O for STATIC
         pipeline metadata. The first stage consumes token ids (int64), every inter-stage boundary
-        carries the hidden state, and the last stage emits logits. Activations are assumed to be
-        bf16 (the mixed-precision setting used with pipeline parallelism).
+        carries the hidden state, and the last stage emits logits. The activation dtype comes from
+        the caller (``static_io_dtype``) and must match the model's actual activation dtype, since
+        the pipeline sizes its P2P buffers from it.
 
         The float activation examples set requires_grad=True: in STATIC mode PyTorch derives the
         backward gradient metadata (and thus whether to allocate the cross-stage gradient P2P
         buffers) from the requires_grad flag of these forward examples. Without it, no gradient is
         sent back and a non-first stage's backward receives a None output-gradient. Token ids are
         integer and therefore always requires_grad=False."""
-        microbatch_size, sequence_length, hidden_dim, vocab_size = static_io_dims
-        activation_dtype = torch.bfloat16
+        microbatch_size = static_io_spec.microbatch_size
+        sequence_length = static_io_spec.sequence_length
+        hidden_dim = static_io_spec.hidden_dim
+        vocab_size = static_io_spec.vocab_size
+        activation_dtype = static_io_spec.activation_dtype
 
         is_first = stage_idx == 0
         is_last = stage_idx == num_stages - 1
@@ -206,14 +252,14 @@ class PipelineFactory:
         pp_mesh: DeviceMesh,
         device: torch.device,
         fqns_per_stage: list[list[str]],
-        static_io_dims: Optional[tuple[int, int, int, int]] = None,
+        static_io_spec: Optional[StaticStageIOSpec] = None,
     ) -> tuple[list[PipelineStage], list[NNModel]]:
         num_stages = len(fqns_per_stage)
         stage_indices = PipelineFactory._get_stage_ids_of_pp_rank(pp_mesh, num_stages, schedule_class)
         stages, stage_modules = zip(
             *(
                 PipelineFactory._build_model_part_for_stage(
-                    whole_model, pp_mesh, device, fqns_per_stage, stage_idx, static_io_dims
+                    whole_model, pp_mesh, device, fqns_per_stage, stage_idx, static_io_spec
                 )
                 for stage_idx in stage_indices
             )
@@ -247,7 +293,7 @@ class PipelineFactory:
         device: torch.device,
         fqns_per_stage: list[list[str]],
         stage_idx: int,
-        static_io_dims: Optional[tuple[int, int, int, int]] = None,
+        static_io_spec: Optional[StaticStageIOSpec] = None,
     ) -> tuple[PipelineStage, NNModel]:
         num_stages = len(fqns_per_stage)
         module_names = fqns_per_stage[stage_idx]
@@ -257,12 +303,12 @@ class PipelineFactory:
         stage_modules = cast(NNModel, stage_modules)
         PipelineFactory._filter_weight_decay_groups_(stage_modules)
 
-        # When static I/O dims are provided, supply explicit example input/output tensors so the
+        # When a static I/O spec is provided, supply explicit example input/output tensors so the
         # pipeline uses STATIC metadata mode and skips its live shape-inference pass (see
         # get_staged_pipeline for why this is required for EP+PP). Otherwise fall back to DYNAMIC.
         input_args, output_args = (
-            PipelineFactory._build_static_stage_io(stage_idx, num_stages, static_io_dims, device)
-            if static_io_dims is not None
+            PipelineFactory._build_static_stage_io(stage_idx, num_stages, static_io_spec, device)
+            if static_io_spec is not None
             else (None, None)
         )
 

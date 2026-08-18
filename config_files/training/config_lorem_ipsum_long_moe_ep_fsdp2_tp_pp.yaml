@@ -352,6 +352,8 @@ staged_pipeline:
     static_io_sequence_length: ${settings.step_profile.sequence_length}
     static_io_hidden_dim: ${model_raw.config.d_model}
     static_io_vocab_size: ${model_raw.config.vocab_size}
+    # Must match the activation dtype of the model, i.e. the mixed-precision param_dtype below.
+    static_io_dtype: BF_16
 
 model_raw:
   component_key: model
