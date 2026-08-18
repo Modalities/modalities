@@ -88,9 +88,16 @@ sbatch $QDIR/slurm/1_build_sidecar.sbatch
 #    like -- it touches different data, so the two can run concurrently.
 sbatch $QDIR/slurm/2_bucket_annotations.sbatch
 
-# 4. Join, then aggregate. One task each; needs 2 and 3 finished.
-sbatch $QDIR/slurm/3_join_and_cube.sbatch
+# 4a. Join, one array task per annotated dataset. The joins are independent, so wall
+#     time is the slowest dataset (~2 h for nemotron-cc) not the sum (~6 h).
+sbatch --export=$EXPORTS --array=0-15 $QDIR/slurm/3a_join_annotations.sbatch
+
+# 4b. Aggregate into cubes. After every join task has finished. ~50 min, one task.
+sbatch --export=$EXPORTS $QDIR/slurm/3b_build_cubes.sbatch
 ```
+
+`3_join_and_cube.sbatch` still exists and does both in one task if you would rather not
+manage two submissions; it takes ~6 h instead of ~3 h.
 
 Check coverage before trusting anything: `$WORK/join_report.json` gives the annotated
 fraction per dataset. FinePDFs was 10-34% at last measurement.

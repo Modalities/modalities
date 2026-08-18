@@ -408,3 +408,43 @@ rows, metadata reading back as a complete run with a matching row total and no `
 left behind. Tests cover a truncated metadata file mid-run, an unreadable file making the
 run report incomplete, `.tmp` being ignored, and a thread rewriting metadata while the
 guard runs repeatedly.
+
+
+## PR #XXX Fix: the join re-read the whole annotation split per sidecar part
+
+`join_annotations` looped over sidecar parts on the outside and annotation buckets on the
+inside, so the entire bucketed split was read once per part. Because a part's documents
+hash across every bucket, that is full re-reads, not partial ones. Measured against the
+real blend after bucketing completed:
+
+```
+hplt-es        502 parts x 107.3 GB =  53.9 TB
+nemotron-cc  5,319 parts x  23.1 GB = 122.7 TB
+climbmix-en  6,543 parts x  24.6 GB = 161.3 TB
+TOTAL                                454.2 TB  = 451 h of reading
+```
+
+**General changes**
+
+* Sidecar parts are processed in batches (`max_batch_keys`, default 20 M documents) and
+  each annotation bucket is read once per batch. Read amplification drops from the part
+  count to the batch count: **454 TB to 5.9 TB**, 451 h to 5.8 h serial.
+* Within a batch each bucket is filtered with `pyarrow.compute.is_in` before anything is
+  materialised in Python, so memory is bounded by the batch rather than by the bucket -- a
+  bucket of a billion-row split holds millions of rows, of which one batch wants a few
+  thousand.
+* Bucket file lists are globbed once and cached, saving 65,536 directory scans per batch on
+  a 1024-bucket split written by 64 tasks.
+* Duplicate annotation keys are now counted once, among the keys the join actually wants.
+  The previous figure was inflated by the part count: `finewiki-it` reported 868,586 where
+  the real number is 36,747.
+* New `3a_join_annotations.sbatch` runs one array task per annotated dataset, resolving the
+  dataset from the registry so the mapping cannot drift. Wall time becomes the slowest
+  dataset (~2 h) rather than the sum. `3b_build_cubes.sbatch` follows it.
+
+**Notes**
+
+Verified on the real `finewiki-it` sidecar: 1,799,759 of 1,799,759 documents annotated,
+100 % coverage, in 48 s against 107 s for a quarter of the documents before. Tests assert
+that the batch size does not change any document's label, that a bucket is never read
+twice within a batch, and that a duplicate key is counted once rather than once per part.

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from tqdm import tqdm
 
@@ -451,26 +452,41 @@ def join_annotations(
     dataset_name: str,
     split_name: str,
     duplicate_policy: str = "first",
+    max_batch_keys: int = 20_000_000,
     show_progress: bool = True,
 ) -> JoinReport:
     """Copies annotation labels onto a dataset's sidecar, in place.
+
+    Sidecar parts are processed in batches, and each annotation bucket is read once per
+    batch rather than once per part. That distinction decides whether this finishes:
+    reading the bucketed split per part meant 454 TB of reads over the real blend --
+    5,319 parts for Nemotron-CC against a 23 GB split -- because every part's documents
+    hash across every bucket. Batching turns the read amplification from the part count
+    into the far smaller number of batches.
+
+    Within a batch each bucket is filtered to the keys the batch actually wants before
+    anything is materialised in Python, so memory is bounded by the batch rather than by
+    the bucket -- a bucket of a billion-row split holds millions of rows, of which a batch
+    typically wants a few thousand.
 
     Args:
         sidecar_dir (Path): Directory of sidecar parts to enrich.
         annotation_bucket_dir (Path): Output of :func:`bucket_annotations`.
         dataset_name (str): Dataset name, for the report.
         split_name (str): Annotation split name, for the report.
-        duplicate_policy (str): What to do when one key carries several annotation
-            rows. ``"first"`` keeps the first row seen; ``"error"`` refuses to join.
+        duplicate_policy (str): What to do when one key carries several annotation rows.
+            ``"first"`` keeps the first row seen; ``"error"`` refuses to join.
+        max_batch_keys (int): Documents to hold per batch. Larger batches read the
+            annotation side fewer times but hold more keys in memory.
         show_progress (bool): Whether to show progress bars.
 
     Returns:
-        JoinReport: Coverage and the counts needed to judge whether a selection built
-            on these labels is meaningful.
+        JoinReport: Coverage and the counts needed to judge whether a selection built on
+            these labels is meaningful.
 
     Raises:
-        AnnotationJoinError: If the bucket directory is unusable, or duplicates are
-            found under ``duplicate_policy="error"``.
+        AnnotationJoinError: If the bucket directory is unusable, or duplicates are found
+            under ``duplicate_policy="error"``.
     """
     annotation_bucket_dir = Path(annotation_bucket_dir)
     meta = read_bucket_metadata(annotation_bucket_dir)
@@ -481,58 +497,88 @@ def join_annotations(
     report = JoinReport(dataset=dataset_name, split=split_name, label_columns=label_columns)
     report.n_annotation_rows = meta.get("n_rows", 0)
 
-    # Which buckets this dataset actually needs. A dataset is usually far smaller than
-    # the split it joins against, so most buckets still have to be read, but only once.
+    # Cached across batches: one glob per bucket rather than one per bucket per batch,
+    # which on a 1024-bucket split with 64 bucketing tasks is 65,536 directory scans saved
+    # per batch.
+    bucket_files: dict[int, list[Path]] = {}
+
+    def files_for(bucket: int) -> list[Path]:
+        if bucket not in bucket_files:
+            bucket_files[bucket] = sorted(annotation_bucket_dir.glob(f"bucket-{bucket:04d}.*.parquet"))
+        return bucket_files[bucket]
+
+    def flush(batch: list[tuple[Path, pa.Table, list[Optional[str]]]]) -> None:
+        """Resolves one batch of parts and writes their label columns back."""
+        if not batch:
+            return
+        # key -> where it occurs, so one bucket read serves every part in the batch.
+        occurrences: dict[str, list[tuple[int, int]]] = {}
+        for part_idx, (_, _, keys) in enumerate(batch):
+            for row_idx, key in enumerate(keys):
+                if key is not None:
+                    occurrences.setdefault(key, []).append((part_idx, row_idx))
+
+        by_bucket: dict[int, list[str]] = {}
+        for key in occurrences:
+            by_bucket.setdefault(bucket_of(key, n_buckets), []).append(key)
+
+        resolved: list[list[dict[str, Optional[str]]]] = [[{} for _ in keys] for _, _, keys in batch]
+
+        for bucket, wanted_keys in by_bucket.items():
+            paths = files_for(bucket)
+            if not paths:
+                continue
+            wanted = pa.array(wanted_keys, type=pa.large_string())
+            lookup: dict[str, dict[str, Optional[str]]] = {}
+            for path in paths:
+                table = pq.read_table(path)
+                # Filter in Arrow before touching Python: a bucket of a large split holds
+                # millions of rows and this batch wants a few thousand of them.
+                table = table.filter(pc.is_in(table.column("key"), value_set=wanted))
+                if table.num_rows == 0:
+                    continue
+                bucket_keys = table.column("key").to_pylist()
+                bucket_columns = {c: table.column(c).to_pylist() for c in label_columns}
+                for i, bucket_key in enumerate(bucket_keys):
+                    if bucket_key in lookup:
+                        report.n_duplicate_keys += 1
+                        if duplicate_policy == "error":
+                            raise AnnotationJoinError(
+                                f"annotation key {bucket_key!r} appears more than once in split "
+                                f"{split_name!r}; choose duplicate_policy='first' to keep the first"
+                            )
+                        continue
+                    lookup[bucket_key] = {c: bucket_columns[c][i] for c in label_columns}
+
+            for key, labels in lookup.items():
+                for part_idx, row_idx in occurrences[key]:
+                    resolved[part_idx][row_idx] = labels
+
+        for part_idx, (part, table, _) in enumerate(batch):
+            rows = resolved[part_idx]
+            report.n_matched += sum(1 for r in rows if r)
+            for column in label_columns:
+                array = pa.array([r.get(column) if r else None for r in rows], type=pa.large_string())
+                existing = table.schema.get_field_index(column)
+                if existing >= 0:
+                    table = table.set_column(existing, pa.field(column, pa.large_string()), array)
+                else:
+                    table = table.append_column(pa.field(column, pa.large_string()), array)
+            pq.write_table(table, part, compression="zstd")
+
+    batch: list[tuple[Path, pa.Table, list[Optional[str]]]] = []
+    batch_keys = 0
     for part in tqdm(parts, desc=f"join {dataset_name}", disable=not show_progress):
         table = pq.read_table(part)
         keys = table.column("join_key").to_pylist()
         report.n_documents += len(keys)
         report.n_missing_key += sum(1 for k in keys if k is None)
-
-        needed_buckets: dict[int, list[int]] = {}
-        for row_idx, key in enumerate(keys):
-            if key is None:
-                continue
-            needed_buckets.setdefault(bucket_of(key, n_buckets), []).append(row_idx)
-
-        resolved: list[dict[str, Optional[str]]] = [{} for _ in keys]
-        for bucket, row_indices in needed_buckets.items():
-            # A bucket is spread over one file per bucketing task, so all are read
-            # together; a bucket no task wrote to simply has no files.
-            bucket_paths = sorted(annotation_bucket_dir.glob(f"bucket-{bucket:04d}.*.parquet"))
-            if not bucket_paths:
-                continue
-            lookup: dict[str, dict[str, Optional[str]]] = {}
-            bucket_table = pa.concat_tables([pq.read_table(path) for path in bucket_paths])
-            bucket_keys = bucket_table.column("key").to_pylist()
-            bucket_columns = {c: bucket_table.column(c).to_pylist() for c in label_columns}
-            for i, bucket_key in enumerate(bucket_keys):
-                if bucket_key in lookup:
-                    report.n_duplicate_keys += 1
-                    if duplicate_policy == "error":
-                        raise AnnotationJoinError(
-                            f"annotation key {bucket_key!r} appears more than once in split {split_name!r}; "
-                            "choose duplicate_policy='first' to keep the first occurrence"
-                        )
-                    continue
-                lookup[bucket_key] = {c: bucket_columns[c][i] for c in label_columns}
-            for row_idx in row_indices:
-                labels = lookup.get(keys[row_idx])
-                if labels is not None:
-                    resolved[row_idx] = labels
-
-        n_matched_here = sum(1 for r in resolved if r)
-        report.n_matched += n_matched_here
-
-        for column in label_columns:
-            values = [r.get(column) if r else None for r in resolved]
-            array = pa.array(values, type=pa.large_string())
-            existing = table.schema.get_field_index(column)
-            if existing >= 0:
-                table = table.set_column(existing, pa.field(column, pa.large_string()), array)
-            else:
-                table = table.append_column(pa.field(column, pa.large_string()), array)
-        pq.write_table(table, part, compression="zstd")
+        batch.append((part, table, keys))
+        batch_keys += len(keys)
+        if batch_keys >= max_batch_keys:
+            flush(batch)
+            batch, batch_keys = [], 0
+    flush(batch)
 
     get_logger(name="main").info(report.summary())
     return report

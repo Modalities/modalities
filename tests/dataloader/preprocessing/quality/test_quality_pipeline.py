@@ -863,3 +863,105 @@ def test_guard_survives_metadata_being_rewritten_concurrently(tmp_path: Path, an
     finally:
         stop.set()
         writer.join(timeout=5)
+
+
+# ------------------------------------------------- join batching (read amplification)
+
+
+def _sidecar_with_many_parts(tmp_path: Path, corpus: Path, suffix: str) -> tuple[Path, DatasetEntry]:
+    """A sidecar with one part per file, so batching has something to batch."""
+    entry = DatasetEntry(
+        name="toy",
+        jsonl_root=corpus,
+        glob="*.jsonl",
+        annotation_split="toy",
+        key=KeySpec(kind=KeyKind.FIELD, field="id"),
+    )
+    calibration = TokenCalibration(dataset="toy", tokenizer="w", bytes_per_token=4.0)
+    out = tmp_path / f"sidecar_{suffix}"
+    SidecarBuilder(entry, calibration, index_root=tmp_path / f"idx_{suffix}").build(out, show_progress=False)
+    return out, entry
+
+
+def test_join_result_is_independent_of_the_batch_size(tmp_path: Path, corpus: Path, annotations: Path):
+    buckets = tmp_path / "b"
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=buckets,
+        n_buckets=8,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+
+    results = {}
+    for label, batch in (("one_part_at_a_time", 1), ("all_at_once", 10_000_000)):
+        sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, label)
+        report = join_annotations(sidecar, buckets, "toy", "toy", max_batch_keys=batch, show_progress=False)
+        labels = []
+        for part in sorted(sidecar.glob("part-*.parquet")):
+            labels.extend(pq.read_table(part).column("educational_value").to_pylist())
+        results[label] = (report.n_documents, report.n_matched, labels)
+
+    small, large = results["one_part_at_a_time"], results["all_at_once"]
+    assert small[0] == large[0] == 200
+    assert small[1] == large[1] == 150
+    assert small[2] == large[2], "batching must not change which label each document gets"
+
+
+def test_join_reads_each_bucket_once_per_batch_not_once_per_part(
+    tmp_path: Path, corpus: Path, annotations: Path, monkeypatch
+):
+    # The regression this guards: reading the bucketed split once per sidecar part meant
+    # 454 TB of reads over the real blend, because every part's documents hash across
+    # every bucket.
+    buckets = tmp_path / "b2"
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=buckets,
+        n_buckets=8,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+    sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, "counted")
+    n_parts = len(list(sidecar.glob("part-*.parquet")))
+    assert n_parts == 2
+
+    import pyarrow.parquet as pq_module
+
+    reads: list[str] = []
+    original = pq_module.read_table
+
+    def counting_read_table(source, *args, **kwargs):
+        reads.append(str(source))
+        return original(source, *args, **kwargs)
+
+    monkeypatch.setattr(pq_module, "read_table", counting_read_table)
+    join_annotations(sidecar, buckets, "toy", "toy", max_batch_keys=10_000_000, show_progress=False)
+
+    bucket_reads = [r for r in reads if "bucket-" in r]
+    # One batch covers both parts, so each populated bucket is read once -- not twice.
+    assert len(bucket_reads) == len(set(bucket_reads)), f"a bucket was read more than once: {bucket_reads}"
+    assert len(bucket_reads) <= 8
+
+
+def test_join_counts_a_duplicate_key_once_not_once_per_part(tmp_path: Path, corpus: Path):
+    # Duplicates used to be counted afresh on every part, inflating the figure by the part
+    # count. Only duplicates among keys the join actually wants should be reported.
+    rows = {"id": ["doc-0-0", "doc-0-0", "doc-0-1"], "educational_value": ["high", "basic", "high"]}
+    ann_dir = tmp_path / "dup_ann"
+    ann_dir.mkdir()
+    pq.write_table(pa.table(rows), ann_dir / "a.parquet")
+
+    buckets = tmp_path / "dup_buckets"
+    bucket_annotations(
+        shard_paths=[ann_dir / "a.parquet"],
+        out_dir=buckets,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+    sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, "dup")
+
+    report = join_annotations(sidecar, buckets, "toy", "toy", max_batch_keys=1, show_progress=False)
+
+    assert report.n_duplicate_keys == 1, f"expected the one duplicate counted once, got {report.n_duplicate_keys}"
