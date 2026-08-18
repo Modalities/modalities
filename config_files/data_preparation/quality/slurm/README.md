@@ -20,11 +20,16 @@ $V/bin/pip install -e /home/richard.rutmann/repos/modalities
 Already built and verified at that path. Every command below uses `$MQ`:
 
 ```bash
-export MQ=/data/user/richard.rutmann/venvs/modalities-quality/bin/python
-export REPO=/home/richard.rutmann/repos/modalities
-export QDIR=$REPO/config_files/data_preparation/quality
-export WORK=/data/user/richard.rutmann/annealing_blend
+cd /home/richard.rutmann/repos/modalities
+source config_files/data_preparation/quality/slurm/env.sh
 ```
+
+`env.sh` sets `MQ`, `REPO`, `QDIR`, `WORK`, `HF_HOME`, `HF_TOKEN` and `EXPORTS`, only
+filling in what is unset, and refuses to continue if any of them ends up empty or points
+at something missing. Source it in every new shell. Setting them by hand works too, but a
+shell where `QDIR` is empty turns `$QDIR/slurm/x.sbatch` into `/slurm/x.sbatch`, and one
+where `WORK` is empty turns `rm -rf $WORK/buckets` into `rm -rf /buckets`. Both have
+happened.
 
 `calibrate` downloads the tokenizer, so it needs HF auth. A token is already at
 `~/.config/huggingface/token`:
@@ -147,6 +152,18 @@ print('actual tokens:', total)
 
 On a synthetic end-to-end check the estimate was within 0.03%. Measure it here before
 scaling the conclusion to 43 TB.
+
+## Clearing the bucketed annotations
+
+A sharded bucketing run cannot clear its own output directory -- sibling tasks are writing
+into it -- so clearing it is a separate, deliberate step:
+
+```bash
+bash $QDIR/slurm/reset_buckets.sh
+```
+
+It refuses to run without `WORK` set, and refuses obviously wrong paths. Sidecars are left
+alone; only `$WORK/buckets` goes.
 
 ## Re-running a failed shard
 
