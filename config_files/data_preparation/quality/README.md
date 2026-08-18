@@ -95,12 +95,22 @@ Two things dominate if you get them wrong, both measured:
 * **`build-sidecar` reads every file twice on its first run**: once for `IndexGenerator`
   to write the `.idx`, then once to build the sidecar. The floor is therefore
   `2 x 43 TB / 3.8 GB/s`, about 6.3 h -- not the 3.2 h a single pass suggests. Measured
-  on the real run: 51.3 % of the blend's bytes in 3.77 h, i.e. 3.28 GB/s of actual
-  reads, 86 % of the ceiling, projecting ~7 h. More tasks will not help.
+  The real run took ~15 h rather than the ~7 h that floor implies, for a reason that is
+  about placement rather than throughput -- see the next point.
 
   The index pass is not throwaway work: `pack_encoded_data` needs those `.idx` files and
   every later run reuses them, so a second `build-sidecar` over the same data -- after
   adding a native metric, say -- is roughly twice as fast.
+* **Per-node bandwidth binds before cluster aggregate does, so spread the tasks.** The
+  3.8 GB/s above was measured on the login node and does not transfer to a compute node.
+  On the real run SLURM packed 12 of the 64 tasks onto one node and 8 onto another while
+  four nodes sat idle; each got ~95 MB/s against the 282 MB/s a single stream gets, and
+  the job spent a nine-hour tail at a third of its starting speed.
+
+  Both array scripts therefore request 8 CPUs per task. A task is single-threaded and
+  needs one; the request exists to cap how many bandwidth-hungry tasks land on a node
+  (4 rather than 16), spreading an array of 64 across the cluster. Raise the array size
+  only after the tasks are spread -- more tasks on the same node buys nothing.
 
 ## What the preview reports
 
