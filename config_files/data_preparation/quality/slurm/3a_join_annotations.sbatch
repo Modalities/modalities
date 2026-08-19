@@ -12,7 +12,11 @@
 #SBATCH --tasks-per-node=1
 # 8 CPUs to cap tasks per node: this is bandwidth-bound, not CPU-bound. See the README.
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+# Measured 51.9 GiB peak on an 18.7 M-document nemotron-cc batch, against a real batch of
+# 20 M keys. Resolving in Arrow roughly doubled peak memory over the old per-row code (24.9
+# GiB), because the batch holds the matched annotation rows and every part's table at once.
+# 64 G left only 19% headroom on a stage that has already been OOM-killed once.
+#SBATCH --mem=160G
 # nemotron-cc measured ~12 h at 1.7 bn documents and was killed by a 12 h limit at 99.8%
 # complete. The other 15 datasets each finished inside 6.5 h.
 #SBATCH --time=48:00:00

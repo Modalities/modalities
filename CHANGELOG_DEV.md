@@ -696,3 +696,50 @@ batch holding a full `pa.Table` per part. Collecting only key columns for the sc
 re-reading the parts to write back would cut that by roughly an order of magnitude, at the
 cost of reading the sidecar twice -- cheap against 85 scans of the split. Not attempted
 here; it changes the memory profile of a stage that has already been OOM-killed once.
+
+
+## PR #XXX Measured: what the join speedup actually is, on nemotron-cc
+
+Two proxy datasets failed to predict this one. Non-scan cost per document came out 6.36 us on
+`finewiki-en` (15-character keys, 1,024 split files) and 37.59 us on `climbmix-en`
+(64-character keys, 12,288 files), and the projection from the second, 21.9 h, exceeded the
+12 h actually observed with the slower pre-vectorisation code. Two points cannot separate key
+length from fragment count, so the dataset was measured directly.
+
+60 parts of the real `nemotron-cc` sidecar -- 18,748,230 documents with 36-character UUID
+keys -- against the real 746,648,080-row split in 16,384 files, at 2.51 % density against the
+2.68 % a real 20 M-key batch sees:
+
+| implementation | batches | elapsed | us/document | peak RSS |
+|---|---|---|---|---|
+| before | 1 | 772.6 s | 41.21 | 24.9 GiB |
+| after | 1 | 505.0 s | 26.94 | 51.9 GiB |
+| after | 2 | 757.5 s | 40.40 | 51.9 GiB |
+
+**1.53x on the dataset that matters**, and equivalence holds: 224,978,760 label values
+identical across 12 columns. This also settles a specific worry -- replacing bucket routing
+with one filtered dataset scan could have been a regression here, since the case that had
+degraded was the many-file, large-key-set one, and this dataset is 16,384 files at 20 M keys
+per batch. It is not a regression; it is where the gain is.
+
+**Memory doubled, and that needed acting on.** 51.9 GiB peak against the 64 G the join sbatch
+requested is 19 % headroom on a stage that has already been OOM-killed once, so the request is
+now 160 G. Holding the matched annotation rows in Arrow is what costs it.
+
+**Decomposition**, from the one- to two-batch delta: one scan of this split costs 252.5 s, and
+non-scan work is 13.47 us/document. Extrapolated to all 1,696,565,570 documents:
+
+| batches | scan | per-document | total |
+|---|---|---|---|
+| 85 (today's 20 M default) | 6.0 h | 6.3 h | 12.3 h |
+| 17 | 1.2 h | 6.3 h | 7.5 h |
+| 9 | 0.6 h | 6.3 h | 7.0 h |
+
+Treat these as order-of-magnitude. The same method applied to the old code projects 19 h
+where 12 h was observed, so the extrapolation carries roughly 60 % error; what it does
+establish is the shape. Per-document work is the floor at about 6 h, so no amount of batching
+gets `nemotron-cc` below that, and larger batches are worth roughly 1.8x rather than the 10x
+the original vectorisation estimate implied.
+
+Reducing batch count needs the batch to stop holding a full table per part -- which would cut
+peak memory as well, the two being the same constraint seen from different sides.
