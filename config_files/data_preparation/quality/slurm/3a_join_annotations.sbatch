@@ -13,7 +13,9 @@
 # 8 CPUs to cap tasks per node: this is bandwidth-bound, not CPU-bound. See the README.
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=12:00:00
+# nemotron-cc measured ~12 h at 1.7 bn documents and was killed by a 12 h limit at 99.8%
+# complete. The other 15 datasets each finished inside 6.5 h.
+#SBATCH --time=48:00:00
 #SBATCH --output=/home/richard.rutmann/logs/quality/3a_join_%A_%a.out
 #SBATCH --error=/home/richard.rutmann/logs/quality/3a_join_%A_%a.err
 #SBATCH --array=0-15
@@ -47,5 +49,5 @@ fi
 
 echo "START $(date) dataset=$DATASET"
 srun "$MQ" -m modalities quality join-annotations \
-    --registry "$REGISTRY" --work_dir "$WORK" --only "$DATASET"
+    --registry "$REGISTRY" --work_dir "$WORK" --only "$DATASET" ${JOIN_RESUME:+--resume}
 echo "END $(date)"

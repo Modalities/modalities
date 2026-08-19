@@ -160,6 +160,23 @@ print('actual tokens:', total)
 On a synthetic end-to-end check the estimate was within 0.03%. Measure it here before
 scaling the conclusion to 43 TB.
 
+## Resuming an interrupted join
+
+The join writes labels into each sidecar part as it goes, so an interrupted run can be
+continued rather than redone:
+
+```bash
+JOIN_RESUME=1 sbatch --wait --export=$EXPORTS,JOIN_RESUME=1 \
+    --array=<task id> $QDIR/slurm/3a_join_annotations.sbatch
+```
+
+`--resume` skips parts that already carry the label columns and reports how many it
+skipped. A real interrupted `nemotron-cc` join finished in **9 minutes instead of 12
+hours** this way, having skipped 5,309 of 5,319 parts.
+
+Leave it off after re-bucketing the annotations: resuming would keep the labels from the
+previous bucketing rather than picking up the new ones.
+
 ## Clearing the bucketed annotations
 
 A sharded bucketing run cannot clear its own output directory -- sibling tasks are writing

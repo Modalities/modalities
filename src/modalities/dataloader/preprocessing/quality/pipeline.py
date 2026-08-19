@@ -339,6 +339,7 @@ def join_blend_annotations(
     registry: CorpusRegistry,
     work_dir: Path,
     only: Optional[list[str]] = None,
+    resume: bool = False,
     show_progress: bool = True,
 ) -> list[JoinReport]:
     """Attaches the bucketed annotations to every annotated dataset's sidecar.
@@ -347,6 +348,8 @@ def join_blend_annotations(
         registry (CorpusRegistry): The blend's datasets.
         work_dir (Path): Working directory holding the sidecars and the buckets.
         only (Optional[list[str]]): Restrict to these dataset names.
+        resume (bool): Skip sidecar parts that already carry labels, to continue an
+            interrupted run.
         show_progress (bool): Whether to show progress bars.
 
     Returns:
@@ -373,13 +376,20 @@ def join_blend_annotations(
                 annotation_bucket_dir=buckets,
                 dataset_name=dataset.name,
                 split_name=dataset.annotation_split,
+                resume=resume,
                 show_progress=show_progress,
             )
         )
 
-    report_path = Path(work_dir) / "join_report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps([r.to_dict() for r in reports], indent=1))
+    # One file per dataset. A single shared join_report.json meant 16 parallel `--only`
+    # tasks overwrote each other and only the last one's coverage survived.
+    report_dir = Path(work_dir) / "join_report"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    for r in reports:
+        (report_dir / f"{r.dataset}.json").write_text(json.dumps(r.to_dict(), indent=1))
+    # Merged view, rebuilt from whatever per-dataset files exist so far.
+    merged = [json.loads(p.read_text()) for p in sorted(report_dir.glob("*.json"))]
+    (Path(work_dir) / "join_report.json").write_text(json.dumps(merged, indent=1))
     return reports
 
 
@@ -401,6 +411,7 @@ def build_cubes(
         dict[str, Cube]: The cubes, also written under ``cube/``.
     """
     cubes: dict[str, Cube] = {}
+    failures: list[tuple[str, Exception]] = []
     for dataset in registry.enabled_datasets():
         if only and dataset.name not in only:
             continue
@@ -408,13 +419,27 @@ def build_cubes(
         if not directory.is_dir():
             get_logger(name="main").warning(f"{dataset.name}: no sidecar at {directory}, skipping cube")
             continue
-        cube = build_cube(directory, dataset.name, n_score_bins=n_score_bins)
+        # One unbuildable dataset must not cost the others their cubes. A single failure
+        # used to abort the stage: nine cubes were written and six perfectly healthy
+        # datasets were never attempted.
+        try:
+            cube = build_cube(directory, dataset.name, n_score_bins=n_score_bins)
+        except Exception as e:  # noqa: BLE001 - reported together at the end and re-raised
+            get_logger(name="main").error(f"{dataset.name}: cube failed: {e}")
+            failures.append((dataset.name, e))
+            continue
         cube.write(cube_path(work_dir, dataset.name))
         cubes[dataset.name] = cube
         get_logger(name="main").info(
             f"{dataset.name}: cube has {cube.table.num_rows:,} cells over {cube.n_documents:,} documents "
             f"({cube.n_tokens / 1e9:.2f}B estimated tokens); dimensions {cube.dimensions}"
         )
+
+    if failures:
+        get_logger(name="main").error(
+            f"built {len(cubes)} cube(s); {len(failures)} dataset(s) failed: " + ", ".join(name for name, _ in failures)
+        )
+        raise failures[0][1]
     return cubes
 
 

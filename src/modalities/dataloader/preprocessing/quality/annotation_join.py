@@ -439,6 +439,24 @@ def read_bucket_metadata(annotation_bucket_dir: Path) -> dict:
     return {"n_buckets": merged["n_buckets"], "label_columns": merged["label_columns"], "n_rows": total_rows}
 
 
+def _part_has_labels(part: Path, label_columns: list[str]) -> bool:
+    """Whether a sidecar part has already been written back by a join.
+
+    Args:
+        part (Path): The sidecar part.
+        label_columns (list[str]): Columns the join adds.
+
+    Returns:
+        bool: True if every label column is present. Reads only the parquet footer, so
+            this is cheap enough to check for every part of a large dataset.
+    """
+    try:
+        names = set(pq.ParquetFile(part).schema_arrow.names)
+    except OSError:
+        return False
+    return all(column in names for column in label_columns)
+
+
 def _iter_sidecar_parts(sidecar_dir: Path) -> list[Path]:
     parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
     if not parts:
@@ -453,6 +471,7 @@ def join_annotations(
     split_name: str,
     duplicate_policy: str = "first",
     max_batch_keys: int = 20_000_000,
+    resume: bool = False,
     show_progress: bool = True,
 ) -> JoinReport:
     """Copies annotation labels onto a dataset's sidecar, in place.
@@ -478,6 +497,11 @@ def join_annotations(
             ``"first"`` keeps the first row seen; ``"error"`` refuses to join.
         max_batch_keys (int): Documents to hold per batch. Larger batches read the
             annotation side fewer times but hold more keys in memory.
+        resume (bool): Skip parts that already carry the label columns, to continue an
+            interrupted run. The write-back adds columns and values together, so a part
+            having them means it was processed. Off by default: re-bucketing the
+            annotations and then resuming would silently keep the old labels, so
+            continuing has to be asked for.
         show_progress (bool): Whether to show progress bars.
 
     Returns:
@@ -568,7 +592,11 @@ def join_annotations(
 
     batch: list[tuple[Path, pa.Table, list[Optional[str]]]] = []
     batch_keys = 0
+    n_skipped = 0
     for part in tqdm(parts, desc=f"join {dataset_name}", disable=not show_progress):
+        if resume and label_columns and _part_has_labels(part, label_columns):
+            n_skipped += 1
+            continue
         table = pq.read_table(part)
         keys = table.column("join_key").to_pylist()
         report.n_documents += len(keys)
@@ -580,5 +608,9 @@ def join_annotations(
             batch, batch_keys = [], 0
     flush(batch)
 
+    if n_skipped:
+        get_logger(name="main").info(
+            f"{dataset_name}: resumed, skipped {n_skipped:,} of {len(parts):,} parts that already carried labels"
+        )
     get_logger(name="main").info(report.summary())
     return report

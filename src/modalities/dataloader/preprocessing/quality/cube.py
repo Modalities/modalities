@@ -270,7 +270,21 @@ def build_cube(
         CubeError: If the sidecar directory holds no parts.
     """
     parts = _sidecar_parts(sidecar_dir)
-    available = set(pq.ParquetFile(parts[0]).schema_arrow.names)
+    # Every part's schema, not just the first one's. Assuming they agree turned an
+    # interrupted join into an opaque `KeyError: Field "educational_value" does not exist`
+    # from inside a dict comprehension, 10 unlabelled parts out of 5,319.
+    schemas = [set(pq.ParquetFile(p).schema_arrow.names) for p in parts]
+    available = set.intersection(*schemas)
+    widest = set.union(*schemas)
+
+    inconsistent = sorted(widest - available)
+    if inconsistent:
+        n_missing = sum(1 for names in schemas if not widest <= names)
+        raise CubeError(
+            f"dataset {dataset_name!r}: {n_missing} of {len(parts)} sidecar parts are missing "
+            f"column(s) {inconsistent}. The join did not finish; re-run "
+            f"'modalities quality join-annotations --only {dataset_name} --resume' before building a cube."
+        )
 
     used_labels = [c for c in label_dimensions if c in available]
     if score_columns is None:

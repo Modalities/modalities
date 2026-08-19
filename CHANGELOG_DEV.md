@@ -448,3 +448,37 @@ Verified on the real `finewiki-it` sidecar: 1,799,759 of 1,799,759 documents ann
 100 % coverage, in 48 s against 107 s for a quarter of the documents before. Tests assert
 that the batch size does not change any document's label, that a bucket is never read
 twice within a batch, and that a duplicate key is counted once rather than once per part.
+
+
+## PR #XXX Fix: resumable join, and a cube stage that fails clearly
+
+A `nemotron-cc` join reached `5319/5319` parts and was then killed by the 12-hour limit in
+`3a_join_annotations.sbatch` during its final write-back, leaving 10 of 5,319 parts without
+labels. `build-cube` then died on that inconsistency with
+`KeyError: Field "educational_value" does not exist in schema`, after building 9 cubes and
+before attempting 6 datasets that were perfectly healthy.
+
+**General changes**
+
+* `join-annotations --resume` skips sidecar parts that already carry the label columns and
+  reports the count. Finishing the interrupted run took **9 minutes rather than 12 hours**,
+  skipping 5,309 parts. Off by default: resuming after re-bucketing the annotations would
+  silently keep the old labels, so continuing has to be asked for explicitly.
+  `3a_join_annotations.sbatch` passes it when `JOIN_RESUME` is set.
+* `build_cube` reads every part's schema rather than assuming they match the first one's,
+  and raises `CubeError` naming the dataset, how many parts are missing which columns, and
+  the `--resume` command that finishes the job.
+* `build_cubes` no longer aborts the stage on one bad dataset. It builds every healthy one,
+  logs the failures together and re-raises so the job still exits non-zero.
+* Per-dataset `join_report/<dataset>.json`, plus a merged `join_report.json`. Sixteen
+  parallel `--only` tasks had been overwriting one shared file, leaving only the last
+  dataset's coverage.
+* `3a_join_annotations.sbatch` time limit 12 h -> 48 h, with the measured `nemotron-cc`
+  figure recorded next to it.
+
+**Notes**
+
+The join being CPU-bound in Python is why `nemotron-cc` took 12 h where bytes-read implied
+2 h. Resolving in Arrow with `pc.index_in` and `Table.take` instead of per-key Python dicts
+should be worth 10-50x and is worth doing, but it is a separate change and not needed to
+produce a blend.

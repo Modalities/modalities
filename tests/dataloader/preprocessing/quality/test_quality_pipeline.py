@@ -965,3 +965,121 @@ def test_join_counts_a_duplicate_key_once_not_once_per_part(tmp_path: Path, corp
     report = join_annotations(sidecar, buckets, "toy", "toy", max_batch_keys=1, show_progress=False)
 
     assert report.n_duplicate_keys == 1, f"expected the one duplicate counted once, got {report.n_duplicate_keys}"
+
+
+# ------------------------------------------------- resume, and cube consistency checks
+
+
+def _buckets_with_label(tmp_path: Path, corpus: Path, name: str, level: str) -> Path:
+    """Buckets giving every document of `corpus` the same educational_value."""
+    ids = []
+    for shard in sorted(corpus.glob("*.jsonl")):
+        with shard.open() as f:
+            ids.extend(json.loads(line)["id"] for line in f)
+    ann = tmp_path / f"ann_{name}"
+    ann.mkdir()
+    pq.write_table(pa.table({"id": ids, "educational_value": [level] * len(ids)}), ann / "a.parquet")
+    out = tmp_path / f"buckets_{name}"
+    bucket_annotations(
+        shard_paths=[ann / "a.parquet"],
+        out_dir=out,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+    return out
+
+
+def _labels_of(sidecar: Path) -> dict[str, list]:
+    return {
+        p.name: pq.read_table(p).column("educational_value").to_pylist() for p in sorted(sidecar.glob("part-*.parquet"))
+    }
+
+
+def test_resume_skips_already_labelled_parts_and_keeps_their_values(tmp_path: Path, corpus: Path):
+    first = _buckets_with_label(tmp_path, corpus, "first", "high")
+    second = _buckets_with_label(tmp_path, corpus, "second", "none")
+    sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, "resume")
+
+    join_annotations(sidecar, first, "toy", "toy", show_progress=False)
+    before = _labels_of(sidecar)
+    assert all(v == "high" for values in before.values() for v in values)
+
+    # Drop the labels from one part, so a resumed run has exactly one part to do.
+    parts = sorted(sidecar.glob("part-*.parquet"))
+    stripped = parts[0]
+    table = pq.read_table(stripped)
+    pq.write_table(table.drop_columns(["educational_value"]), stripped)
+
+    report = join_annotations(sidecar, second, "toy", "toy", resume=True, show_progress=False)
+    after = _labels_of(sidecar)
+
+    assert all(v == "none" for v in after[stripped.name]), "the unlabelled part must be joined"
+    for other in parts[1:]:
+        assert after[other.name] == before[other.name], "an already-labelled part must be left alone"
+    # Only the one part's documents were counted.
+    assert report.n_documents == len(before[stripped.name])
+
+
+def test_resume_off_redoes_every_part(tmp_path: Path, corpus: Path):
+    first = _buckets_with_label(tmp_path, corpus, "f2", "high")
+    second = _buckets_with_label(tmp_path, corpus, "s2", "none")
+    sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, "noresume")
+
+    join_annotations(sidecar, first, "toy", "toy", show_progress=False)
+    join_annotations(sidecar, second, "toy", "toy", resume=False, show_progress=False)
+
+    after = _labels_of(sidecar)
+    assert all(v == "none" for values in after.values() for v in values), "without resume the labels must be replaced"
+
+
+def test_build_cube_rejects_a_partly_joined_sidecar(tmp_path: Path, corpus: Path):
+    from modalities.dataloader.preprocessing.quality.cube import CubeError
+
+    buckets = _buckets_with_label(tmp_path, corpus, "partial", "high")
+    sidecar, _ = _sidecar_with_many_parts(tmp_path, corpus, "partial")
+    join_annotations(sidecar, buckets, "toy", "toy", show_progress=False)
+
+    # Simulate the interrupted join: one part never got its labels.
+    victim = sorted(sidecar.glob("part-*.parquet"))[0]
+    pq.write_table(pq.read_table(victim).drop_columns(["educational_value"]), victim)
+
+    with pytest.raises(CubeError, match="sidecar parts are missing") as excinfo:
+        build_cube(sidecar, "toy")
+    message = str(excinfo.value)
+    assert "toy" in message and "educational_value" in message
+    assert "--resume" in message, "the error should say how to finish the join"
+
+
+def test_build_cubes_builds_healthy_datasets_before_raising(tmp_path: Path, corpus: Path):
+    from modalities.dataloader.preprocessing.quality import pipeline
+    from modalities.dataloader.preprocessing.quality.cube import CubeError
+
+    work = tmp_path / "work"
+    healthy_sidecar = pipeline.sidecar_dir(work, "healthy")
+    broken_sidecar = pipeline.sidecar_dir(work, "broken")
+
+    buckets = _buckets_with_label(tmp_path, corpus, "cubes", "high")
+    for name, target in (("healthy", healthy_sidecar), ("broken", broken_sidecar)):
+        built, _ = _sidecar_with_many_parts(tmp_path, corpus, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.mkdir(parents=True, exist_ok=True)
+        for p in sorted(built.glob("part-*.parquet")):
+            pq.write_table(pq.read_table(p), target / p.name)
+        join_annotations(target, buckets, name, "toy", show_progress=False)
+    victim = sorted(broken_sidecar.glob("part-*.parquet"))[0]
+    pq.write_table(pq.read_table(victim).drop_columns(["educational_value"]), victim)
+
+    registry = CorpusRegistry(
+        datasets=[
+            DatasetEntry(name="healthy", jsonl_root=corpus, glob="*.jsonl"),
+            DatasetEntry(name="broken", jsonl_root=corpus, glob="*.jsonl"),
+        ]
+    )
+
+    with pytest.raises(CubeError):
+        pipeline.build_cubes(registry, work)
+
+    # The healthy dataset's cube must exist despite the other one failing.
+    assert pipeline.cube_path(work, "healthy").is_file()
+    assert not pipeline.cube_path(work, "broken").is_file()

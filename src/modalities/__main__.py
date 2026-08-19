@@ -932,7 +932,14 @@ def CMD_quality_bucket_annotations(
 )
 @click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
 @click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
-def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tuple[str, ...]) -> None:
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Skip sidecar parts that already carry labels, to continue an interrupted run. "
+    "Omit it after re-bucketing the annotations, or the old labels are kept.",
+)
+def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tuple[str, ...], resume: bool) -> None:
     """Attaches the bucketed annotations to each dataset's sidecar and reports coverage.
 
     Run `bucket-annotations` first. Read the reported coverage before trusting a
@@ -942,11 +949,13 @@ def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tupl
         registry_path (Path): Path to the corpus registry YAML.
         work_dir (Path): Working directory for the blend's intermediates.
         only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Skip parts that already carry labels.
     """
     reports = quality_pipeline.join_blend_annotations(
         registry=CorpusRegistry.from_yaml(registry_path),
         work_dir=work_dir,
         only=list(only) or None,
+        resume=resume,
     )
     for report in reports:
         print_rank_0(report.summary())
