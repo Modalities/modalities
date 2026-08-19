@@ -20,6 +20,7 @@ from typing import Optional
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from tqdm import tqdm
 
@@ -520,76 +521,111 @@ def join_annotations(
             under ``duplicate_policy="error"``.
     """
     annotation_bucket_dir = Path(annotation_bucket_dir)
+    # Read for its own sake as well as for the label columns: it refuses an incomplete
+    # bucketing run rather than letting the join silently drop a missing task's annotations.
     meta = read_bucket_metadata(annotation_bucket_dir)
-    n_buckets = meta["n_buckets"]
     label_columns: list[str] = meta["label_columns"]
 
     parts = _iter_sidecar_parts(sidecar_dir)
     report = JoinReport(dataset=dataset_name, split=split_name, label_columns=label_columns)
     report.n_annotation_rows = meta.get("n_rows", 0)
 
-    # Cached across batches: one glob per bucket rather than one per bucket per batch,
-    # which on a 1024-bucket split with 64 bucketing tasks is 65,536 directory scans saved
-    # per batch.
-    bucket_files: dict[int, list[Path]] = {}
+    # Globbed once for the whole split rather than per bucket. Routing keys to buckets is
+    # gone: a batch holds millions of keys, which hash across every bucket, so every bucket
+    # file was read anyway -- the profile confirmed 1024 of 1024 -- and the routing cost a
+    # blake2b call per key in Python to decide nothing.
+    all_bucket_files = sorted(annotation_bucket_dir.glob("bucket-*.parquet"))
+    if not all_bucket_files:
+        raise AnnotationJoinError(
+            f"no bucket files in {annotation_bucket_dir}; run 'quality bucket-annotations' first"
+        )
 
-    def files_for(bucket: int) -> list[Path]:
-        if bucket not in bucket_files:
-            bucket_files[bucket] = sorted(annotation_bucket_dir.glob(f"bucket-{bucket:04d}.*.parquet"))
-        return bucket_files[bucket]
+    def flush(batch: list[tuple[Path, pa.Table]]) -> None:
+        """Resolves one batch of parts and writes their label columns back.
 
-    def flush(batch: list[tuple[Path, pa.Table, list[Optional[str]]]]) -> None:
-        """Resolves one batch of parts and writes their label columns back."""
+        Resolution stays in Arrow from end to end. The obvious implementation --
+        materialise the keys, build a dict from key to row, look every document up, emit a
+        list per label column -- costs a handful of Python objects per document, and at
+        1.7 bn documents for Nemotron-CC that was twelve hours. Here each part's labels come
+        from one ``index_in`` against the batch's lookup table followed by one ``take`` per
+        label column, so the per-document work happens in Arrow's kernels.
+
+        The single remaining Python loop is over the batch's *unique* keys, to route them to
+        buckets. That one cannot be vectorised: both sides of the join are bucketed in
+        separate runs, so the hash has to be stable across processes, and blake2b is not
+        something Arrow's compute layer can do. It is per unique key rather than per
+        document, and it is cheap relative to reading the buckets.
+        """
         if not batch:
             return
-        # key -> where it occurs, so one bucket read serves every part in the batch.
-        occurrences: dict[str, list[tuple[int, int]]] = {}
-        for part_idx, (_, _, keys) in enumerate(batch):
-            for row_idx, key in enumerate(keys):
-                if key is not None:
-                    occurrences.setdefault(key, []).append((part_idx, row_idx))
 
-        by_bucket: dict[int, list[str]] = {}
-        for key in occurrences:
-            by_bucket.setdefault(bucket_of(key, n_buckets), []).append(key)
+        chunks: list[pa.Array] = []
+        for _, table in batch:
+            for chunk in table.column("join_key").chunks:
+                if len(chunk) > 0:
+                    chunks.append(chunk.cast(pa.large_string()))
+        wanted_keys = (
+            pc.drop_null(pc.unique(pa.chunked_array(chunks, type=pa.large_string())))
+            if chunks
+            else pa.array([], type=pa.large_string())
+        )
 
-        resolved: list[list[dict[str, Optional[str]]]] = [[{} for _ in keys] for _, _, keys in batch]
+        # One scan over the split with the key filter pushed into it, instead of a read and
+        # an is_in per bucket file. The split is partitioned into a thousand files of a few
+        # hundred kilobytes, so opening and scanning them individually cost more than the
+        # data itself: 22 s of reads and 14 s of a thousand separate is_in calls, against
+        # 47 s total. Arrow applies the filter per row group while scanning and reads the
+        # files in parallel, so memory stays bounded by the rows that match rather than by
+        # the size of the split.
+        pieces: list[pa.Table] = []
+        if len(wanted_keys) > 0:
+            dataset = ds.dataset(all_bucket_files, format="parquet")
+            matched = dataset.to_table(
+                columns=["key"] + label_columns,
+                filter=ds.field("key").isin(wanted_keys),
+            )
+            if matched.num_rows:
+                pieces.append(matched)
 
-        for bucket, wanted_keys in by_bucket.items():
-            paths = files_for(bucket)
-            if not paths:
-                continue
-            wanted = pa.array(wanted_keys, type=pa.large_string())
-            lookup: dict[str, dict[str, Optional[str]]] = {}
-            for path in paths:
-                table = pq.read_table(path)
-                # Filter in Arrow before touching Python: a bucket of a large split holds
-                # millions of rows and this batch wants a few thousand of them.
-                table = table.filter(pc.is_in(table.column("key"), value_set=wanted))
-                if table.num_rows == 0:
-                    continue
-                bucket_keys = table.column("key").to_pylist()
-                bucket_columns = {c: table.column(c).to_pylist() for c in label_columns}
-                for i, bucket_key in enumerate(bucket_keys):
-                    if bucket_key in lookup:
-                        report.n_duplicate_keys += 1
-                        if duplicate_policy == "error":
-                            raise AnnotationJoinError(
-                                f"annotation key {bucket_key!r} appears more than once in split "
-                                f"{split_name!r}; choose duplicate_policy='first' to keep the first"
-                            )
-                        continue
-                    lookup[bucket_key] = {c: bucket_columns[c][i] for c in label_columns}
+        lookup_keys: Optional[pa.Array] = None
+        lookup: Optional[pa.Table] = None
+        if pieces:
+            lookup = pa.concat_tables(pieces, promote_options="permissive")
+            keys_column = lookup.column("key").cast(pa.large_string()).combine_chunks()
+            unique_keys = pc.unique(keys_column)
+            n_duplicates = len(keys_column) - len(unique_keys)
+            if n_duplicates:
+                report.n_duplicate_keys += n_duplicates
+                if duplicate_policy == "error":
+                    counts = pc.value_counts(keys_column)
+                    repeated = counts.field("values").filter(pc.greater(counts.field("counts"), 1))
+                    example = repeated[0].as_py() if len(repeated) else "<unknown>"
+                    raise AnnotationJoinError(
+                        f"annotation key {example!r} appears more than once in split "
+                        f"{split_name!r}; choose duplicate_policy='first' to keep the first"
+                    )
+                # index_in reports the first position of each value, which is exactly the
+                # "keep the first row seen" policy, done in one pass instead of a loop.
+                lookup = lookup.take(pc.index_in(unique_keys, value_set=keys_column))
+                lookup_keys = unique_keys
+            else:
+                lookup_keys = keys_column
 
-            for key, labels in lookup.items():
-                for part_idx, row_idx in occurrences[key]:
-                    resolved[part_idx][row_idx] = labels
+        for part, table in batch:
+            keys = table.column("join_key").cast(pa.large_string())
+            if lookup is None or lookup_keys is None or len(lookup_keys) == 0:
+                indices = None
+            else:
+                indices = pc.index_in(keys, value_set=lookup_keys)
+                report.n_matched += len(indices) - indices.null_count
 
-        for part_idx, (part, table, _) in enumerate(batch):
-            rows = resolved[part_idx]
-            report.n_matched += sum(1 for r in rows if r)
             for column in label_columns:
-                array = pa.array([r.get(column) if r else None for r in rows], type=pa.large_string())
+                if indices is None:
+                    array = pa.nulls(table.num_rows, type=pa.large_string())
+                else:
+                    # A null index yields a null label, so unmatched documents fall out
+                    # correctly without being special-cased.
+                    array = pc.take(lookup.column(column), indices).cast(pa.large_string())
                 existing = table.schema.get_field_index(column)
                 if existing >= 0:
                     table = table.set_column(existing, pa.field(column, pa.large_string()), array)
@@ -597,7 +633,7 @@ def join_annotations(
                     table = table.append_column(pa.field(column, pa.large_string()), array)
             pq.write_table(table, part, compression="zstd")
 
-    batch: list[tuple[Path, pa.Table, list[Optional[str]]]] = []
+    batch: list[tuple[Path, pa.Table]] = []
     batch_keys = 0
     n_skipped = 0
     for part in tqdm(parts, desc=f"join {dataset_name}", disable=not show_progress):
@@ -611,11 +647,12 @@ def join_annotations(
             report.n_missing_key += existing.column("join_key").null_count
             continue
         table = pq.read_table(part)
-        keys = table.column("join_key").to_pylist()
-        report.n_documents += len(keys)
-        report.n_missing_key += sum(1 for k in keys if k is None)
-        batch.append((part, table, keys))
-        batch_keys += len(keys)
+        # Kept as Arrow: materialising this column was 1.7 bn Python strings for the
+        # largest dataset, before any joining had happened at all.
+        report.n_documents += table.num_rows
+        report.n_missing_key += table.column("join_key").null_count
+        batch.append((part, table))
+        batch_keys += table.num_rows
         if batch_keys >= max_batch_keys:
             flush(batch)
             batch, batch_keys = [], 0

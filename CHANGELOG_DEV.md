@@ -642,3 +642,57 @@ The blend also loads: 8 packed files combined through `WeightedCombinedDataset` 
 factors 0.5/1.0/1.5/2.0, length 74,033 against 74,032 expected, samples pulled at both
 boundaries and the middle. The fractional factors exercise the partial-pass permutation,
 which no test on real data had reached. Nothing was written under the source root.
+
+
+## PR #XXX Perf: resolve the join in Arrow, and drop bucket routing
+
+The join built a `dict[key, list[(part, row)]]` over every document, a per-row dict of
+labels for every document, and a Python list comprehension per label column -- a handful of
+Python objects per document, at 1.7 bn documents for Nemotron-CC. Each part is now resolved
+with one `index_in` against the batch's lookup table and one `take` per label column, and
+the key column stays Arrow in the outer loop, where materialising it had been 1.7 bn Python
+strings before any joining began.
+
+Profiling what remained showed the next cost was not per-row work at all: 22 s of reads and
+14 s of a thousand separate `is_in` calls, out of 47 s, because a 554 MB split is
+partitioned into 1024 files of roughly 540 KB. The routing those buckets exist for also
+turned out to decide nothing -- a batch holds millions of keys, which hash across every
+bucket, so the profile recorded all 1024 files being read anyway, after a blake2b call per
+key in Python to choose them. Routing is gone, replaced by one `pyarrow.dataset` scan with
+the key filter pushed into it. Arrow applies the filter per row group and reads in parallel,
+so memory stays bounded by matching rows rather than by split size.
+
+**Measured** on `finewiki-en`, 6.6 M documents against the 43 M-row FineWiki split, both
+implementations on separate copies of the same sidecar:
+
+| | elapsed | per document |
+|---|---|---|
+| before | 88.7 s | 13.41 us |
+| after | 42.1 s | 6.36 us |
+
+Equivalence was verified twice rather than assumed: 79,375,860 label values identical across
+12 columns on the benchmark, and 1,441,584 values identical across all four join-key kinds
+on the smoke blend, with duplicate-key counts matching exactly (390 / 2 / 1,936 / 6,025).
+That check mattered because "keep the first row seen" had to survive reimplementation as
+`index_in` over unique values, which reports each value's first position.
+
+**What this does not fix, and it is the larger cost.** The annotation split is scanned once
+per batch, and batch count scales with documents:
+
+| dataset | documents | batches @ 20 M | annotation rows | row scans |
+|---|---|---|---|---|
+| finewiki-en | 6.6 M | 1 | 43 M | 43 M |
+| hplt-de | 176 M | 9 | 3.76 bn | 33.8 bn |
+| climbmix-en | 553 M | 28 | 552 M | 15.5 bn |
+| nemotron-cc | 1.70 bn | 85 | 747 M | 63.5 bn |
+
+So `nemotron-cc` reads its 22 GB split 85 times, about 1.9 TB, and that is what its twelve
+hours were mostly spent on. The benchmark above has exactly one batch, so it measures the
+overhead this commit addresses and none of the re-scanning, and it should not be read as a
+prediction for `nemotron-cc`.
+
+Reducing the scans means letting batches hold far more keys, which today is bounded by the
+batch holding a full `pa.Table` per part. Collecting only key columns for the scan and
+re-reading the parts to write back would cut that by roughly an order of magnitude, at the
+cost of reading the sidecar twice -- cheap against 85 scans of the split. Not attempted
+here; it changes the memory profile of a stage that has already been OOM-killed once.
