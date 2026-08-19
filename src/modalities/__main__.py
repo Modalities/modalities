@@ -758,9 +758,11 @@ def quality() -> None:
 @click.option(
     "--sample_size",
     type=int,
-    default=2000,
+    default=4000,
     show_default=True,
-    help="Documents tokenized per dataset to measure the estimator.",
+    help="Documents tokenized per dataset to measure the estimator. Sampled in proportion to "
+    "document length and grouped into size strata, so the rare very long documents that "
+    "dominate a corpus's byte count are represented.",
 )
 @click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
 def CMD_quality_calibrate(

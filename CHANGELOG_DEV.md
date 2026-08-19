@@ -564,3 +564,57 @@ genuine coverage figures with zeros, which reads as a failed join rather than a 
 one. Coverage is a property of the sidecar, not of the run, so skipped parts now
 contribute their existing labels to the totals, and `n_parts_resumed` records how many
 were not redone.
+
+
+## PR #XXX Fix: the token estimator was 16-19% out, and looked stable while being wrong
+
+The end-to-end smoke run compared the preview's estimates against a real packing run for
+the first time. Document counts matched exactly, but `finewiki-de` tokens were 10.7% out,
+and chasing that found two independent defects in the calibration.
+
+**The sample was a prefix.** `_sample_documents` took the first N documents of each probe
+file. Being deterministic, it produced identical ratios across every seed, which reads as
+stability rather than as a sample that never moves. On the FineWiki snapshot the first
+2,000 documents gave 3.531 bytes per token where the whole file gives 4.214 -- 16% out,
+applied to every token figure downstream. I introduced this when bounding an earlier 30 TB
+read: I capped the read by taking a prefix and never made the within-file sample spread.
+
+**One global ratio cannot describe a corpus.** FineWiki's ratio runs from 3.571 for
+documents under a kilobyte to 34.648 for the nine documents above 256 KB -- and those nine
+hold 5.7% of all bytes. A single sum ratio is therefore hostage to whether the sample
+caught them, which is why the global estimator's error swung between -19.4% and +4.2%
+across seeds.
+
+**General changes**
+
+* Documents are sampled at offsets spread evenly across each file, and the document
+  *containing* each offset is taken rather than the one following it. That makes selection
+  proportional to length, which is what a byte-weighted ratio needs: the top stratum went
+  from 2 sampled documents per 2,000 to 44.
+* The ratio is measured per size stratum (log-spaced, six of them) and applied per document
+  from the length the sidecar already records exactly. A stratum reached by fewer than 20
+  documents falls back to the corpus-wide ratio rather than becoming an estimator of its
+  own.
+* The corpus-wide ratio now uses inverse-probability weights. Under length-proportional
+  sampling a plain sum ratio is weighted by the square of length and came out 62% low.
+* Each document's ratio is measured on a slice of at most 64 KB, taken from a random
+  position inside it. Length-proportional sampling means the multi-megabyte documents do get
+  sampled, and tokenizing them in full took calibration from 1.5 minutes to over 10; a
+  document's ratio is far more uniform within itself than across the corpus, so a slice
+  measures it well. Calibration is now ~15 s per dataset.
+* `--sample_size` default raised from 2000 to 4000, for margin.
+
+**Result on the FineWiki snapshot**, against the true token count of all 27,846 documents:
+
+| estimator | worst error over 5 seeds |
+|---|---|
+| global ratio, prefix sample (before) | 16.2% bias, invisible across seeds |
+| global ratio, spread sample | 19.4% |
+| stratified, spread sample | 0.8% |
+
+**Notes**
+
+Calibrations written before this change have no strata and fall back to the global ratio,
+so they still load; they should be re-measured. Changing a calibration changes `est_tokens`
+in the sidecars, which means rebuilding them -- worth folding into the rebuild the source
+re-shard already forces.

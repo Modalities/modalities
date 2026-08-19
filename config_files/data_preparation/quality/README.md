@@ -133,6 +133,25 @@ A `~` next to a row means a numeric threshold fell inside a cube bin rather than
 edge, so that row was interpolated. Re-run with `--exact` to scan the per-document
 sidecars instead.
 
+**How wrong can the interpolation be?** Measured on the smoke blend, comparing the cube
+against a full per-document scan of the same selection:
+
+| dataset | predicate kind | cube tokens | exact tokens | error |
+|---|---|---|---|---|
+| finewiki-de | ordinal only | 20.65M | 20.65M | 0.00% |
+| climbmix-en | ordinal only | 54.38M | 54.38M | 0.00% |
+| klettermix-de | ordinal + score | 18.95M | 19.02M | -0.37% |
+| dolmino | score only | 46.91M | 48.66M | -3.60% |
+| finepdfs-es | ordinal + score | 9.66M | 8.59M | +12.46% |
+| **total** | | **152.64M** | **153.44M** | **-0.52%** |
+
+Ordinal predicates are exact -- levels are cube dimensions, so no interpolation happens.
+Numeric thresholds are only exact when they land on a bin edge, and the error does not
+shrink with dataset size, because the bin count is fixed rather than proportional. Use the
+cube to explore, then `--exact` before committing to a budget, or raise
+`--num_score_bins` when building the cube. `apply` always scans the sidecar, so the
+manifest it writes carries exact figures regardless.
+
 ### When a predicate is not in the cube
 
 The join attaches twelve annotation columns; the cube groups on seven (`audience_level`,
