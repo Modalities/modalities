@@ -618,3 +618,27 @@ Calibrations written before this change have no strata and fall back to the glob
 so they still load; they should be re-measured. Changing a calibration changes `est_tokens`
 in the sidecars, which means rebuilding them -- worth folding into the rebuild the source
 re-shard already forces.
+
+
+## PR #XXX End-to-end validation of the estimator against a real packing run
+
+Re-ran the whole smoke pipeline after the estimator fix. Estimated against packed tokens,
+with document counts as the exact control:
+
+| dataset | est tokens | packed | error | docs selected | docs packed |
+|---|---|---|---|---|---|
+| finewiki-de | 18,506,144 | 18,438,976 | -0.36% | 20,693 | 20,693 |
+| finepdfs-es | 8,644,194 | 8,505,597 | -1.60% | 825 | 825 |
+| climbmix-en | 54,527,783 | 54,493,399 | -0.06% | 60,834 | 60,834 |
+| klettermix-de | 19,799,809 | 19,818,254 | +0.09% | 22,915 | 22,915 |
+| dolmino | 48,320,010 | 48,508,512 | +0.39% | 8,106 | 8,106 |
+| **total** | **149,797,940** | **149,764,738** | **-0.02%** | | |
+
+`finewiki-de` was -10.72% before the fix. Document counts match exactly, which is the
+stronger check: the filtered index names exactly the selected documents, so any difference
+would be a defect in materialize rather than estimator error.
+
+The blend also loads: 8 packed files combined through `WeightedCombinedDataset` with repeat
+factors 0.5/1.0/1.5/2.0, length 74,033 against 74,032 expected, samples pulled at both
+boundaries and the middle. The fractional factors exercise the partial-pass permutation,
+which no test on real data had reached. Nothing was written under the source root.

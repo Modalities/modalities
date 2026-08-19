@@ -134,16 +134,16 @@ edge, so that row was interpolated. Re-run with `--exact` to scan the per-docume
 sidecars instead.
 
 **How wrong can the interpolation be?** Measured on the smoke blend, comparing the cube
-against a full per-document scan of the same selection:
+against the exact per-document figures `apply` writes into the manifest:
 
 | dataset | predicate kind | cube tokens | exact tokens | error |
 |---|---|---|---|---|
-| finewiki-de | ordinal only | 20.65M | 20.65M | 0.00% |
-| climbmix-en | ordinal only | 54.38M | 54.38M | 0.00% |
-| klettermix-de | ordinal + score | 18.95M | 19.02M | -0.37% |
-| dolmino | score only | 46.91M | 48.66M | -3.60% |
-| finepdfs-es | ordinal + score | 9.66M | 8.59M | +12.46% |
-| **total** | | **152.64M** | **153.44M** | **-0.52%** |
+| finewiki-de | ordinal only | 18.51M | 18.51M | 0.00% |
+| climbmix-en | ordinal only | 54.53M | 54.53M | 0.00% |
+| klettermix-de | ordinal + score | 19.73M | 19.80M | -0.35% |
+| dolmino | score only | 46.58M | 48.32M | -3.60% |
+| finepdfs-es | ordinal + score | 9.73M | 8.64M | +12.61% |
+| **total** | | **150.80M** | **149.80M** | **+0.67%** |
 
 Ordinal predicates are exact -- levels are cube dimensions, so no interpolation happens.
 Numeric thresholds are only exact when they land on a bin edge, and the error does not
@@ -251,11 +251,26 @@ cheaper than discovering a bug 15 hours into a real build.
 
 ## Two things to be careful about
 
-**Token counts are estimates.** They are measured per document from the text, using a
-per-dataset bytes-per-token ratio or a rescaled native token count. On a synthetic
-end-to-end check the estimate came within 0.03% of the packed total, but validate it on
-your own data by comparing the preview against the packed result for one small dataset
-before trusting a large budget.
+**Token counts are estimates, and a corpus has no single bytes-per-token ratio.** On the
+German FineWiki snapshot the ratio runs from 3.571 for documents under a kilobyte to 34.648
+for the nine documents above 256 KB -- and those nine hold 5.7% of all bytes. So the
+calibration measures a ratio per log-spaced size stratum and applies it per document from
+the byte length the sidecar records exactly. Getting there needed the sample to be drawn at
+offsets spread across each file, taking the document *containing* each offset so that
+selection is proportional to length; sampling uniformly by document count found 2 of the
+top-stratum documents per 2,000 draws, where length-proportional sampling finds 44.
+
+Measured against the true token count of all 27,846 documents, worst case over five seeds:
+16.2% error for the original estimator (a fixed bias, identical across seeds, so it looked
+stable), 19.4% for a global ratio on a spread sample, 0.8% for the stratified estimate.
+
+Datasets carrying their own token count in every record (FinePDFs, KletterMix, FinePhrase)
+are estimated from that field rescaled to our tokenizer, per document, and need no
+stratifying.
+
+Still validate on your own data: pack one small dataset and compare against the manifest's
+`est_tokens_kept`. `slurm/check_smoke_run.py` does exactly this comparison, and reports the
+document counts alongside -- those are not estimates and must match exactly.
 
 **Decide what to do with unannotated documents.** `missing_annotation: keep` treats an
 annotation predicate as satisfied for documents that have no label; `drop` treats it as
