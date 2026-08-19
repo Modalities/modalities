@@ -978,7 +978,21 @@ def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tupl
     show_default=True,
     help="Quantile bins per native metric. A threshold on a bin edge stays exact.",
 )
-def CMD_quality_build_cube(registry_path: Path, work_dir: Path, only: tuple[str, ...], num_score_bins: int) -> None:
+@click.option(
+    "--label_dimension",
+    "label_dimensions",
+    multiple=True,
+    help="Annotation column to group on, repeatable. Defaults to the seven ordinal fields; "
+    "name a field here if a selection thresholds on it, or the preview must scan the sidecar. "
+    "Each added field multiplies the cell count by its number of levels.",
+)
+def CMD_quality_build_cube(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_score_bins: int,
+    label_dimensions: tuple[str, ...],
+) -> None:
     """Aggregates the sidecars so a selection can be costed without reading them again.
 
     Args:
@@ -986,12 +1000,14 @@ def CMD_quality_build_cube(registry_path: Path, work_dir: Path, only: tuple[str,
         work_dir (Path): Working directory for the blend's intermediates.
         only (tuple[str, ...]): Restrict to these dataset names.
         num_score_bins (int): Quantile bins per native metric.
+        label_dimensions (tuple[str, ...]): Annotation columns to group on.
     """
     quality_pipeline.build_cubes(
         registry=CorpusRegistry.from_yaml(registry_path),
         work_dir=work_dir,
         only=list(only) or None,
         n_score_bins=num_score_bins,
+        label_dimensions=list(label_dimensions) or None,
     )
 
 
@@ -1010,15 +1026,28 @@ def CMD_quality_build_cube(registry_path: Path, work_dir: Path, only: tuple[str,
     default=False,
     help="Scan the per-document sidecars instead of the cubes. Slower, but exact for any threshold.",
 )
-def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool) -> None:
+@click.option(
+    "--allow_fallback",
+    is_flag=True,
+    default=False,
+    help="Let a dataset whose cube cannot answer a predicate be scanned from its sidecar. "
+    "That reads every document, so it costs minutes to hours rather than seconds.",
+)
+def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool, allow_fallback: bool) -> None:
     """Reports how many documents and tokens a selection yields, per dataset and in total.
 
     Args:
         selection_path (Path): Path to the selection YAML.
         work_dir (Path): Working directory holding the cubes and sidecars.
         exact (bool): Scan the sidecars instead of the cubes.
+        allow_fallback (bool): Permit per-dataset sidecar scans where a cube falls short.
     """
-    _, report = quality_pipeline.preview_selection(selection_path=selection_path, work_dir=work_dir, force_exact=exact)
+    _, report = quality_pipeline.preview_selection(
+        selection_path=selection_path,
+        work_dir=work_dir,
+        force_exact=exact,
+        allow_sidecar_fallback=allow_fallback,
+    )
     print_rank_0(report)
 
 

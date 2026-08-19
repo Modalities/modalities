@@ -171,6 +171,7 @@ datasets:
       - {name: token_count, jq_pattern: .token_count}
   - name: dolmino
     jsonl_root: /data/annealing/english/Dolmino
+    note: "dclm_plus2 exists only under stem-heavy-crawl; it was null in all of 400 sampled sidecar parts, so the cube drops it"
     native_metrics:
       - {name: dclm_plus2, jq_pattern: '.metadata.dclm_plus2."__label__1"'}
       - {name: len_cl100k_base, jq_pattern: .metadata.len_cl100k_base}

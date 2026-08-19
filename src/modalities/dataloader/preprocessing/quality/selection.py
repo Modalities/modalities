@@ -587,24 +587,33 @@ def evaluate_blend(
     cubes: dict[str, Cube],
     sidecar_dirs: Optional[dict[str, Path]] = None,
     force_exact: bool = False,
+    allow_sidecar_fallback: bool = False,
 ) -> BlendResult:
     """Evaluates a whole selection.
 
     Args:
         config (SelectionConfig): The blend specification.
         cubes (dict[str, Cube]): Cube per dataset name.
-        sidecar_dirs (Optional[dict[str, Path]]): Sidecar directory per dataset, used
-            when a cube cannot answer a predicate or when exactness is demanded.
+        sidecar_dirs (Optional[dict[str, Path]]): Sidecar directory per dataset, used when
+            a cube cannot answer a predicate or when exactness is demanded.
         force_exact (bool): Scan sidecars for every dataset instead of using cubes.
+        allow_sidecar_fallback (bool): Permit scanning a sidecar for datasets whose cube
+            cannot answer a predicate. Off by default, because that scan is thousands of
+            times more expensive than a cube lookup and a `preview` is meant to return in
+            seconds: a selection thresholding one ungrouped field turned a preview of this
+            blend into a read over 1.7 billion documents.
 
     Returns:
         BlendResult: Per-dataset and total figures.
 
     Raises:
         SelectionError: If a dataset can be evaluated neither from a cube nor from a
-            sidecar.
+            sidecar, or if a predicate needs a sidecar scan that was not permitted. Every
+            such dataset is reported together, so one run tells you everything to fix.
     """
     results: list[DatasetResult] = []
+    unanswerable: list[str] = []
+
     for dataset in config.enabled_datasets():
         policy = config.policy_for(dataset)
         sidecar_dir = (sidecar_dirs or {}).get(dataset.name)
@@ -619,14 +628,33 @@ def evaluate_blend(
         if cube is None:
             if sidecar_dir is None:
                 raise SelectionError(f"no cube and no sidecar for dataset {dataset.name!r}")
+            if not allow_sidecar_fallback:
+                unanswerable.append(f"  {dataset.name}: no cube was built; run 'quality build-cube'")
+                continue
             results.append(evaluate_on_sidecar(sidecar_dir, dataset, policy))
             continue
+
         try:
             results.append(evaluate_on_cube(cube, dataset, policy))
-        except SelectionError:
+        except SelectionError as e:
             if sidecar_dir is None:
                 raise
+            if not allow_sidecar_fallback:
+                unanswerable.append(
+                    f"  {dataset.name}: {e} "
+                    f"(answering it from the sidecar means reading {cube.n_documents:,} documents)"
+                )
+                continue
             results.append(evaluate_on_sidecar(sidecar_dir, dataset, policy))
+
+    if unanswerable:
+        raise SelectionError(
+            "these predicates cannot be answered from the cubes:\n"
+            + "\n".join(unanswerable)
+            + "\n\nEither drop or replace the offending predicate, rebuild the cube with that field as a "
+            "dimension (build-cube --label_dimension ...), or accept the cost with --allow-fallback. "
+            "A sidecar scan is exact but reads every document, so it takes minutes to hours rather than seconds."
+        )
 
     return BlendResult(datasets=results, target_tokens=config.target_tokens)
 

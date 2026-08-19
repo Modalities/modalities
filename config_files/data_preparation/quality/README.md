@@ -133,6 +133,29 @@ A `~` next to a row means a numeric threshold fell inside a cube bin rather than
 edge, so that row was interpolated. Re-run with `--exact` to scan the per-document
 sidecars instead.
 
+### When a predicate is not in the cube
+
+The join attaches twelve annotation columns; the cube groups on seven (`audience_level`,
+`commercial_bias`, `content_length`, `content_ratio` and `time_sensitivity` are attached but
+not grouped), because grouping on all twelve would multiply the cell count by thousands. A
+native metric that is null throughout a dataset is dropped from its cube too.
+
+Thresholding a field the cube does not carry is therefore expressible in a selection but
+cannot be answered from the cube, and `preview` refuses rather than quietly reading every
+document:
+
+```
+these predicates cannot be answered from the cubes:
+  nemotron-cc: cube for 'nemotron-cc' was not grouped on label 'commercial_bias' ...
+    (answering it from the sidecar means reading 1,696,565,570 documents)
+```
+
+Three ways out: drop or replace the predicate; rebuild that dataset's cube naming the field
+(`build-cube --only nemotron-cc --label_dimension commercial_bias --label_dimension ...`,
+listing the others too, since the flag replaces the default set); or accept the cost with
+`--allow_fallback`. That last is what used to happen silently, and it turned a 13-second
+preview into a job still running after ten minutes.
+
 ## Applying the ratio at training time
 
 The ratio is not baked into the data. Use the `weighted_combined` dataset and read the

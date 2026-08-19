@@ -398,6 +398,7 @@ def build_cubes(
     work_dir: Path,
     only: Optional[list[str]] = None,
     n_score_bins: int = 10,
+    label_dimensions: Optional[list[str]] = None,
 ) -> dict[str, Cube]:
     """Aggregates every dataset's sidecar into a cube.
 
@@ -406,6 +407,11 @@ def build_cubes(
         work_dir (Path): Working directory holding sidecars and receiving cubes.
         only (Optional[list[str]]): Restrict to these dataset names.
         n_score_bins (int): Quantile bins per native metric.
+        label_dimensions (Optional[list[str]]): Annotation columns to group on. Defaults to
+            :data:`~...cube.DEFAULT_LABEL_DIMENSIONS`, which is a subset of the columns the
+            join attaches -- grouping on all twelve would multiply the cell count by
+            thousands. Name a field here when a selection needs to threshold on it, or the
+            preview will have to scan the sidecar instead.
 
     Returns:
         dict[str, Cube]: The cubes, also written under ``cube/``.
@@ -423,7 +429,12 @@ def build_cubes(
         # used to abort the stage: nine cubes were written and six perfectly healthy
         # datasets were never attempted.
         try:
-            cube = build_cube(directory, dataset.name, n_score_bins=n_score_bins)
+            cube = build_cube(
+                directory,
+                dataset.name,
+                n_score_bins=n_score_bins,
+                **({"label_dimensions": label_dimensions} if label_dimensions else {}),
+            )
         except Exception as e:  # noqa: BLE001 - reported together at the end and re-raised
             get_logger(name="main").error(f"{dataset.name}: cube failed: {e}")
             failures.append((dataset.name, e))
@@ -468,6 +479,7 @@ def preview_selection(
     selection_path: Path,
     work_dir: Path,
     force_exact: bool = False,
+    allow_sidecar_fallback: bool = False,
 ) -> tuple[BlendResult, str]:
     """Costs a selection in documents and tokens.
 
@@ -475,6 +487,8 @@ def preview_selection(
         selection_path (Path): The selection YAML.
         work_dir (Path): Working directory holding the cubes and sidecars.
         force_exact (bool): Scan the per-document sidecars instead of the cubes.
+        allow_sidecar_fallback (bool): Permit a sidecar scan for datasets whose cube cannot
+            answer a predicate, instead of reporting them.
 
     Returns:
         tuple[BlendResult, str]: The evaluated blend and its rendered table.
@@ -483,7 +497,13 @@ def preview_selection(
     names = [d.name for d in config.enabled_datasets()]
     cubes = load_cubes(work_dir, names)
     sidecars = {name: sidecar_dir(work_dir, name) for name in names}
-    result = evaluate_blend(config, cubes, sidecar_dirs=sidecars, force_exact=force_exact)
+    result = evaluate_blend(
+        config,
+        cubes,
+        sidecar_dirs=sidecars,
+        force_exact=force_exact,
+        allow_sidecar_fallback=allow_sidecar_fallback,
+    )
     return result, format_blend_report(result, datasets_in_order=names)
 
 

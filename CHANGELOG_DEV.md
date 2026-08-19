@@ -482,3 +482,32 @@ The join being CPU-bound in Python is why `nemotron-cc` took 12 h where bytes-re
 2 h. Resolving in Arrow with `pc.index_in` and `Table.take` instead of per-key Python dicts
 should be worth 10-50x and is worth doing, but it is a separate change and not needed to
 produce a blend.
+
+
+## PR #XXX Fix: preview refused to admit it was scanning 1.7 bn documents
+
+`evaluate_blend` caught the `SelectionError` a cube raises for a field it was not grouped
+on and quietly scanned the per-document sidecar instead. A sidecar scan is exact but reads
+every document, so a preview advertised as taking seconds ran for over ten minutes on the
+real blend: `nemotron-cc` thresholded `commercial_bias`, which the join attaches but the
+cube does not group, and `dolmino` thresholded `dclm_plus2`, which exists only under one of
+its subdirectories and was null in all of 400 sampled sidecar parts.
+
+**General changes**
+
+* The fallback is now opt-in via `--allow_fallback`. Without it every unanswerable
+  predicate is collected and reported together, naming the dataset, the field, the
+  dimensions the cube does carry, and how many documents a scan would read. The real
+  selection now fails in **16 s** with both problems named, instead of hanging.
+* `build-cube --label_dimension` (repeatable) chooses which annotation columns to group on,
+  so a field a selection needs can be added. The flag replaces the default seven rather
+  than extending it, and each field multiplies the cell count by its number of levels.
+* The example selection no longer thresholds fields the default cubes lack, with a comment
+  at each site saying why and how to re-enable it. The registry records that dolmino's
+  `dclm_plus2` is confined to `stem-heavy-crawl`.
+
+**Notes**
+
+First full preview of the real blend: 13.7 s across 19 cubes, 3.04 T effective tokens
+against a 400 B target. Coverage is 100 % for finewiki, HPLT, Nemotron-CC, ClimbMix and
+KletterMix, and 92.5-99.7 % for FinePDFs.

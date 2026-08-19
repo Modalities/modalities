@@ -48,7 +48,11 @@ datasets:
     ratio: 1.2
     predicates:
       - {field: content_quality, op: at_least, value: adequate}
-      - {field: commercial_bias, op: at_least, value: minimal}
+      # `commercial_bias` is joined onto the sidecar but is not one of the seven fields
+      # the cube groups on by default, so thresholding it here would force the preview to
+      # read all 1.7 bn documents. To use it, rebuild this dataset's cube with
+      #   build-cube --only nemotron-cc --label_dimension commercial_bias ...
+      # naming the other seven too, since the flag replaces the default set.
 
   - name: climbmix-en
     ratio: 1.0
@@ -106,7 +110,10 @@ datasets:
   - name: dolmino
     ratio: 1.0
     predicates:
-      - {field: dclm_plus2, op: gte, value: 0.5}
+      # `dclm_plus2` only exists in the stem-heavy-crawl subdirectory -- it was null in
+      # every one of 400 sampled sidecar parts -- so it is dropped from the cube and
+      # cannot be thresholded. Length is the signal that is actually present here.
+      - {field: len_cl100k_base, op: gte, value: 200}
 
   # Declared but excluded, so the reason is recorded rather than implied by absence.
   - name: nemotron-cc-v2

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pyarrow as pa
 import pytest
 
@@ -214,3 +216,80 @@ def test_report_marks_interpolated_rows_and_shows_the_target_gap():
     assert "~" in report
     assert "score gte 3.0" in report
     assert "under" in report
+
+
+def _cube_without(field: str) -> Cube:
+    """A cube grouped on educational_value only, so any other field is unanswerable."""
+    table = pa.table({"educational_value": ["high", "basic"], "n_documents": [10, 20], "n_tokens": [100, 200]})
+    return Cube(
+        dataset="toy",
+        label_dimensions=["educational_value"],
+        score_binnings={},
+        table=table,
+        n_documents=30,
+        n_tokens=300,
+    )
+
+
+def test_blend_refuses_a_silent_sidecar_scan_and_names_every_offender(tmp_path: Path):
+    # A predicate the cube cannot answer used to fall back to reading every document
+    # without saying so, which turned a "seconds" preview into a 1.7-billion-document
+    # scan. It must be reported instead.
+    from modalities.dataloader.preprocessing.quality.selection import evaluate_blend
+
+    config = SelectionConfig(
+        datasets=[
+            DatasetSelection(
+                name="toy",
+                predicates=[Predicate(field="commercial_bias", op=Op.AT_LEAST, value="minimal")],
+            ),
+            DatasetSelection(
+                name="other",
+                predicates=[Predicate(field="content_quality", op=Op.AT_LEAST, value="good")],
+            ),
+        ]
+    )
+    cubes = {"toy": _cube_without("commercial_bias"), "other": _cube_without("content_quality")}
+    sidecars = {"toy": tmp_path, "other": tmp_path}
+
+    with pytest.raises(SelectionError) as excinfo:
+        evaluate_blend(config, cubes, sidecar_dirs=sidecars)
+
+    message = str(excinfo.value)
+    assert "commercial_bias" in message and "content_quality" in message, "both offenders must be reported at once"
+    assert "30" in message, "the message should say how many documents a fallback would read"
+    assert "--allow-fallback" in message
+
+
+def test_blend_falls_back_when_explicitly_allowed(tmp_path: Path, monkeypatch):
+    from modalities.dataloader.preprocessing.quality import selection as selection_module
+
+    config = SelectionConfig(
+        datasets=[
+            DatasetSelection(
+                name="toy", predicates=[Predicate(field="commercial_bias", op=Op.AT_LEAST, value="minimal")]
+            )
+        ]
+    )
+    called: list[str] = []
+
+    def fake_sidecar(sidecar_dir, dataset, policy):
+        called.append(dataset.name)
+        return selection_module.DatasetResult(dataset.name, 30, 15, 300, 150, dataset.ratio)
+
+    monkeypatch.setattr(selection_module, "evaluate_on_sidecar", fake_sidecar)
+    result = selection_module.evaluate_blend(
+        config, {"toy": _cube_without("commercial_bias")}, sidecar_dirs={"toy": tmp_path}, allow_sidecar_fallback=True
+    )
+
+    assert called == ["toy"]
+    assert result.datasets[0].n_documents_kept == 15
+
+
+def test_blend_reports_a_dataset_with_no_cube_at_all(tmp_path: Path):
+    from modalities.dataloader.preprocessing.quality.selection import evaluate_blend
+
+    config = SelectionConfig(datasets=[DatasetSelection(name="toy")])
+
+    with pytest.raises(SelectionError, match="no cube was built"):
+        evaluate_blend(config, {}, sidecar_dirs={"toy": tmp_path})
