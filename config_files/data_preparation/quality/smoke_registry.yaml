@@ -1,0 +1,65 @@
+# Registry for the end-to-end smoke test.
+#
+# Points at the frozen snapshot built by `slurm/make_smoke_snapshot.py`, not at the live
+# corpora. The corpora are still being transferred, and a re-shard mid-run invalidates
+# every byte offset recorded against them -- which is exactly what happened to the first
+# full run. The snapshot makes this test repeatable.
+#
+# The five datasets cover all four distinct join-key kinds plus the native-metrics-only
+# path, which is every branch of the join:
+#
+#   field           finewiki-de     the plain case
+#   urn_uuid_field  finepdfs-es     ids stored both wrapped and bare, mixed within a file
+#   sha256_text     climbmix-en     no identifier at all; keyed by a hash of its own text
+#   source_pointer  klettermix-de   translated corpus, keyed via the English original
+#   (none)          dolmino         native metrics only, no annotations
+#
+# HPLT is absent on purpose: same `field` kind as FineWiki, and its annotation buckets are
+# 327 GB, so including it would cost an hour of reads to exercise no new code.
+
+annotation_root: /data/michael.fromm/hf-cache/datasets--openeurollm--propella-annotations/snapshots/e80fc1407801a15b956f40c642d3709b528abbc9/data/propella-1-4b
+extra_annotation_roots:
+  - /data/alex.jude/.cache/huggingface/datasets--openeurollm--propella-annotations/snapshots/9e9c5083f81dc4bbd2708b65816a4dc41f59b911/data/propella-1-4b
+
+datasets:
+  - name: finewiki-de
+    jsonl_root: /data/user/richard.rutmann/annealing_smoke_data/german/Finewiki
+    glob: "*.jsonl"
+    annotation_split: finewiki
+    key: {kind: field, field: id}
+
+  - name: finepdfs-es
+    jsonl_root: /data/user/richard.rutmann/annealing_smoke_data/spanish/Finepdfs
+    glob: "*.jsonl"
+    annotation_split: finepdfs/spa_Latn
+    key: {kind: urn_uuid_field, field: id}
+    native_metrics:
+      - {name: fw_edu, jq_pattern: .fw_edu_scores, aggregation: max}
+      - {name: full_doc_lid_score, jq_pattern: .full_doc_lid_score}
+
+  - name: climbmix-en
+    jsonl_root: /data/user/richard.rutmann/annealing_smoke_data/english/Climbmix
+    glob: "*.jsonl"
+    annotation_split: nemotron-climbmix
+    key: {kind: sha256_text}
+
+  # The snapshot keeps only documents pointing into `part_65`, so resolving these pointers
+  # reads one 16 GB file of the original corpus rather than scattering across many. The
+  # source corpus is the real one -- it is read, never written.
+  - name: klettermix-de
+    jsonl_root: /data/user/richard.rutmann/annealing_smoke_data/german/AIML-TUDA-KletterMix-filtered
+    glob: "*.jsonl"
+    annotation_split: nemotron-climbmix
+    key:
+      kind: source_pointer
+      field: id
+      source_root: /data/annealing/Nemotron-ClimbMix
+      source_line_offset: 0
+    native_metrics:
+      - {name: proxy_score, jq_pattern: .proxy_score}
+      - {name: token_count, jq_pattern: .token_count}
+
+  - name: dolmino
+    jsonl_root: /data/user/richard.rutmann/annealing_smoke_data/english/Dolmino
+    native_metrics:
+      - {name: len_cl100k_base, jq_pattern: .metadata.len_cl100k_base}

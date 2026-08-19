@@ -1,0 +1,27 @@
+# Tokenizer and packing settings for the end-to-end smoke test.
+#
+# Identical to `annealing_packing_template.yaml` except that the placeholder paths point
+# into the frozen snapshot, so the config validates on its own. Keep the tokenizer the
+# same as the real template: the point of the smoke run is to check the token estimates
+# against a real packing run, and that comparison only transfers to the real blend if both
+# use the same tokenizer.
+
+settings:
+  # Placeholders. `write-packing-configs` replaces all three per source file.
+  src_path: /data/user/richard.rutmann/annealing_smoke_data/german/Finewiki/000_00000.jsonl
+  index_path: null
+  dst_path: /data/user/richard.rutmann/annealing_smoke/placeholder.pbin
+  jq_pattern: .text
+  num_cpus: ${node_env:num_cpus}
+  eod_token: <|endoftext|>
+  processing_batch_size: 1000
+  raw_samples_queue_size: 100
+  processed_samples_queue_size: 100
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+    padding: false
+    truncation: false

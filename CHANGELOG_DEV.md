@@ -511,3 +511,46 @@ its subdirectories and was null in all of 400 sampled sidecar parts.
 First full preview of the real blend: 13.7 s across 19 cubes, 3.04 T effective tokens
 against a 400 B target. Coverage is 100 % for finewiki, HPLT, Nemotron-CC, ClimbMix and
 KletterMix, and 92.5-99.7 % for FinePDFs.
+
+
+## PR #XXX Fix: pin the source file list a sidecar was built against
+
+A sidecar row locates its document by `(file_id, byte_offset, byte_len)`, and `file_id`
+was a position in a file list re-derived from the filesystem at every stage. That makes
+every recorded offset depend on the source tree never changing, with nothing recording
+what it looked like.
+
+An ongoing transfer then re-sharded four corpora after their sidecars were built.
+`Nemotron-CC` went from 606 MB files to 137 MB files while keeping nearly the same file
+count, so the count comparison that existed passed and the offsets pointed past end of
+file. Eleven of nineteen datasets were unusable and only one -- whose file count fell to
+zero -- failed loudly. The rest would have packed a blend of wrong byte ranges.
+
+**General changes**
+
+* `build-sidecar` records its file list in `sidecar/<dataset>/_files.json`, written
+  atomically because a sharded build has every task describing the same list.
+* `apply` resolves ids through that manifest instead of re-globbing, so a file added to
+  the tree cannot renumber anything, and refuses to run if a recorded file changed size or
+  disappeared. Paths are relative, so moving or snapshotting a tree stays valid.
+* New `quality verify-sidecar`: seeks to recorded offsets and compares the document found
+  against the recorded text length, catching a file rewritten at the same size. Rows at
+  offset zero are skipped -- the first document of any JSONL file parses, so they succeed
+  against a completely different file, which is how the broken sidecars looked healthy.
+  `--adopt` stamps a manifest onto a pre-existing sidecar, but only one that verifies.
+* `build_sidecars` no longer defaults its index root to the source tree. `SidecarBuilder`
+  writes a `.idx` beside each JSONL when given no index root, which would modify a shared
+  read-only corpus; it now defaults to `work_dir/idx`.
+
+**Testing**
+
+* `slurm/make_smoke_snapshot.py` freezes ~1 GB of five corpora, chosen to cover all four
+  distinct join-key kinds plus the native-metrics-only path -- every branch of the join --
+  and `smoke_registry.yaml` / `smoke_selection.yaml` run the full pipeline over it in
+  minutes rather than 15 hours.
+* `slurm/check_smoke_run.py` compares packed token counts against the preview's estimates,
+  loads the output as a `WeightedCombinedDataset` including a fractional repeat factor,
+  and asserts nothing was written under the source root.
+* `test_file_manifest.py` covers the re-shard that preserves the file count, a prepended
+  file that would renumber ids, a removed file, `apply` refusing a drifted tree, and that
+  adoption is refused for a sidecar that does not verify.

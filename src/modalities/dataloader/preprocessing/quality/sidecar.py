@@ -25,6 +25,7 @@ from tqdm import tqdm
 
 from modalities.dataloader.create_index import IndexGenerator
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
+from modalities.dataloader.preprocessing.quality.file_manifest import FileManifest
 from modalities.dataloader.preprocessing.quality.registry import DatasetEntry, KeyKind, SourcePointerResolver
 from modalities.dataloader.preprocessing.quality.tokens import TokenCalibration
 from modalities.utils.logger_utils import get_logger
@@ -319,6 +320,11 @@ class SidecarBuilder:
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        # Pin the file list the ids in these parts refer to. Every shard of a sharded
+        # build sees the same list and writes identical content, so a racing write is
+        # harmless; without this the ids are only meaningful while the source tree
+        # happens to be unchanged.
+        FileManifest.from_entry(self._dataset).write(output_dir)
         written: dict[str, int] = {}
         iterator = tqdm(selected, desc=f"sidecar {self._dataset.name}", disable=not show_progress)
         for file_id, jsonl_path in iterator:

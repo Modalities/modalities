@@ -182,6 +182,54 @@ A factor of 2.0 draws a dataset twice per epoch, 0.6 draws six tenths of it. Not
 duplicated on disk, and changing the blend means changing a number rather than rebuilding
 data.
 
+## The source tree must not move underneath a sidecar
+
+A sidecar row locates its document by `(file_id, byte_offset, byte_len)`, where `file_id`
+is a position in the dataset's sorted file list. If the source tree changes between
+building the sidecar and using it, the same id names a different file and every offset is
+wrong.
+
+This is not hypothetical. A transfer re-sharded four corpora after their sidecars were
+built -- `Nemotron-CC` went from 606 MB files to 137 MB files while keeping nearly the
+same file *count* -- and the only check that existed compared counts. Eleven of nineteen
+datasets had unusable sidecars, and just one of them failed loudly.
+
+So `build-sidecar` records the file list it used in `sidecar/<dataset>/_files.json`, and
+`apply` resolves ids through that list and refuses to run if any recorded file has
+changed size or vanished. Paths are stored relative to the root, so moving or snapshotting
+a tree is fine; only the file set has to agree.
+
+Run the direct check after any transfer, and before `apply` on a tree that might have been
+touched:
+
+```bash
+$MQ -m modalities quality verify-sidecar --registry $REG --work_dir $WORK
+```
+
+It seeks to recorded offsets and compares the document it finds against the recorded text
+length, so it catches a file that was rewritten at the same size. It skips rows at offset
+zero on purpose: the first document of any JSONL file parses, so those rows succeed even
+against a completely different file, and sampling them is exactly how a broken sidecar
+looked healthy. `--adopt` stamps a manifest onto a sidecar built before manifests existed,
+but only if it verifies.
+
+A drifted dataset needs its sidecar rebuilt, then re-joined and re-cubed. The annotation
+buckets are unaffected -- they are built from the annotation cache, not the corpora -- so
+the expensive bucketing stage does not repeat.
+
+## Testing the pipeline end to end
+
+`slurm/make_smoke_snapshot.py` freezes about 1 GB of five corpora into a snapshot, and
+`smoke_registry.yaml` / `smoke_selection.yaml` run the whole pipeline over it in minutes.
+The five datasets cover all four distinct join-key kinds plus the native-metrics-only
+path, which is every branch of the join; HPLT is left out because it shares FineWiki's key
+kind and would add 327 GB of bucket reads to exercise no new code. `slurm/check_smoke_run.py`
+then compares the packed token counts against the preview's estimates, loads the result as
+a `WeightedCombinedDataset`, and asserts nothing was written into the source tree.
+
+Use it after any change to the sidecar, join, cube, or materialize stages. It is much
+cheaper than discovering a bug 15 hours into a real build.
+
 ## Two things to be careful about
 
 **Token counts are estimates.** They are measured per document from the text, using a

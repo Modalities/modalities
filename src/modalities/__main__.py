@@ -30,6 +30,7 @@ from modalities.config.instantiation_models import TrainingComponentsInstantiati
 from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
 from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
 from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry
+from modalities.dataloader.preprocessing.quality.verify import format_verify_report
 from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
@@ -959,6 +960,73 @@ def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tupl
     )
     for report in reports:
         print_rank_0(report.summary())
+
+
+@quality.command(name="verify-sidecar")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the sidecars.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--num_parts",
+    type=int,
+    default=8,
+    show_default=True,
+    help="Sidecar parts to sample per dataset.",
+)
+@click.option(
+    "--num_rows_per_part",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Documents to probe per sampled part. Rows at offset 0 are skipped, since the first "
+    "document of any JSONL file parses and so proves nothing.",
+)
+@click.option(
+    "--adopt",
+    is_flag=True,
+    default=False,
+    help="Write a source file manifest for verified sidecars that lack one, so later stages can "
+    "detect drift cheaply. Only sidecars that pass verification are stamped.",
+)
+def CMD_quality_verify_sidecar(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_parts: int,
+    num_rows_per_part: int,
+    adopt: bool,
+) -> None:
+    """Checks that the sidecars' byte offsets still describe the current source files.
+
+    Run this after any data transfer, and before apply on a blend whose source tree may
+    have been touched. A corpus that was re-sharded after its sidecar was built yields a
+    blend of wrong byte ranges, and this is the only check that reads the source bytes.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory holding the sidecars.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        num_parts (int): Sidecar parts to sample per dataset.
+        num_rows_per_part (int): Documents to probe per sampled part.
+        adopt (bool): Stamp a manifest onto verified sidecars that lack one.
+    """
+    reports = quality_pipeline.verify_sidecars(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_parts=num_parts,
+        n_rows_per_part=num_rows_per_part,
+        adopt=adopt,
+    )
+    print_rank_0(format_verify_report(reports))
+    if any(not r.ok for r in reports):
+        raise SystemExit(1)
 
 
 @quality.command(name="build-cube")

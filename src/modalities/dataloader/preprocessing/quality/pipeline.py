@@ -35,6 +35,7 @@ from modalities.dataloader.preprocessing.quality.selection import (
 )
 from modalities.dataloader.preprocessing.quality.sidecar import SidecarBuilder, resolve_source_pointers
 from modalities.dataloader.preprocessing.quality.tokens import CalibrationSet, calibrate_dataset
+from modalities.dataloader.preprocessing.quality.verify import VerifyReport, adopt_manifest, verify_sidecar
 from modalities.utils.logger_utils import get_logger
 
 
@@ -205,8 +206,10 @@ def build_sidecars(
         registry (CorpusRegistry): The blend's datasets.
         work_dir (Path): Working directory receiving ``sidecar/<dataset>/``.
         only (Optional[list[str]]): Restrict to these dataset names.
-        index_root (Optional[Path]): Where JSONL index files live or should be created,
-            for source trees that cannot be written to.
+        index_root (Optional[Path]): Where JSONL index files live or should be created.
+            Defaults to ``work_dir/idx``, never the source tree. Source corpora are
+            typically shared and read-only, and an index written beside a JSONL file is a
+            modification of somebody else's data; pass an explicit path to override.
         file_ids (Optional[list[int]]): Restrict to these file ids explicitly. Applies to
             every selected dataset and cannot be combined with sharding.
         shard_id (int): This task's index in ``[0, num_shards)``.
@@ -222,6 +225,10 @@ def build_sidecars(
     """
     if file_ids is not None and num_shards != 1:
         raise ValueError("pass either explicit file_ids or a shard selection, not both")
+
+    # Never default to writing indexes beside the source JSONL, which is what
+    # SidecarBuilder does when given no index root.
+    index_root = Path(index_root) if index_root is not None else Path(work_dir) / "idx"
 
     calibrations = CalibrationSet.from_yaml(calibration_path(work_dir))
     selected = [d for d in registry.enabled_datasets() if not only or d.name in only]
@@ -243,7 +250,7 @@ def build_sidecars(
         builder = SidecarBuilder(
             dataset=dataset,
             calibration=calibrations.get(dataset.name),
-            index_root=Path(index_root) / dataset.name if index_root else None,
+            index_root=index_root / dataset.name,
         )
         parts = builder.build(
             sidecar_dir(work_dir, dataset.name),
@@ -258,8 +265,7 @@ def build_sidecars(
                 sidecar_dir(work_dir, dataset.name), dataset, only_parts=assignment[dataset.name]
             )
             get_logger(name="main").info(
-                f"{dataset.name}: resolved {n_resolved:,} of {written[dataset.name]:,} pointers "
-                "into source-corpus keys"
+                f"{dataset.name}: resolved {n_resolved:,} of {written[dataset.name]:,} pointers into source-corpus keys"
             )
     return written
 
@@ -390,6 +396,46 @@ def join_blend_annotations(
     # Merged view, rebuilt from whatever per-dataset files exist so far.
     merged = [json.loads(p.read_text()) for p in sorted(report_dir.glob("*.json"))]
     (Path(work_dir) / "join_report.json").write_text(json.dumps(merged, indent=1))
+    return reports
+
+
+def verify_sidecars(
+    registry: CorpusRegistry,
+    work_dir: Path,
+    only: Optional[list[str]] = None,
+    n_parts: int = 8,
+    n_rows_per_part: int = 4,
+    adopt: bool = False,
+) -> list[VerifyReport]:
+    """Checks every dataset's sidecar against its source files.
+
+    Worth running before ``apply`` on any blend whose source tree might have been touched
+    since the sidecars were built, and after any data transfer. A sidecar whose corpus was
+    re-sharded underneath it produces a blend of wrong byte ranges, and this is the only
+    stage that looks at the source bytes to find out.
+
+    Args:
+        registry (CorpusRegistry): The blend's datasets.
+        work_dir (Path): Working directory holding the sidecars.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        n_parts (int): Sidecar parts to sample per dataset.
+        n_rows_per_part (int): Documents to probe per sampled part.
+        adopt (bool): Write a file manifest for verified sidecars that lack one, so later
+            stages can check for drift cheaply. Only verified sidecars are stamped.
+
+    Returns:
+        list[VerifyReport]: One report per dataset, in registry order.
+    """
+    datasets = [d for d in registry.enabled_datasets() if only is None or d.name in set(only)]
+    reports: list[VerifyReport] = []
+    for dataset in datasets:
+        directory = sidecar_dir(work_dir, dataset.name)
+        report = verify_sidecar(directory, dataset, n_parts=n_parts, n_rows_per_part=n_rows_per_part)
+        if adopt and report.ok and not report.has_manifest:
+            adopt_manifest(directory, dataset, report)
+            report.has_manifest = True
+            report.notes.append("manifest adopted after verification")
+        reports.append(report)
     return reports
 
 

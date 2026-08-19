@@ -23,6 +23,7 @@ import pyarrow.parquet as pq
 import yaml
 from tqdm import tqdm
 
+from modalities.dataloader.preprocessing.quality.file_manifest import FileManifest, ManifestError
 from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry, DatasetEntry
 from modalities.dataloader.preprocessing.quality.selection import (
     DatasetSelection,
@@ -113,15 +114,21 @@ def materialize_dataset(
         MaterializedDataset: Counts and the written index paths.
 
     Raises:
-        MaterializationError: If the sidecar is missing, or refers to a file id the
-            registry no longer resolves -- which means the corpus changed since the
-            sidecar was built and the offsets can no longer be trusted.
+        MaterializationError: If the sidecar is missing, or if the source tree changed
+            since the sidecar was built -- the byte offsets then describe documents that
+            are no longer at those positions, so the blend would be silently wrong.
     """
     parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
     if not parts:
         raise MaterializationError(f"no sidecar parts found in {sidecar_dir}")
 
-    source_files = dataset_entry.iter_files()
+    # File ids are positions in a file list, so they only mean anything against the list
+    # the sidecar was built from. Resolve through the recorded manifest and refuse if the
+    # tree has moved underneath us.
+    try:
+        source_files = FileManifest.read(sidecar_dir).require_current(dataset_entry)
+    except ManifestError as e:
+        raise MaterializationError(str(e)) from e
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -153,8 +160,8 @@ def materialize_dataset(
     for file_id, entries in sorted(per_file.items()):
         if file_id >= len(source_files):
             raise MaterializationError(
-                f"dataset {dataset_selection.name!r}: sidecar references file id {file_id} but the registry "
-                f"now resolves only {len(source_files)} files. Rebuild the sidecar; the byte offsets are stale."
+                f"dataset {dataset_selection.name!r}: sidecar references file id {file_id} but its manifest "
+                f"records only {len(source_files)} files. The sidecar is internally inconsistent; rebuild it."
             )
         source_path = source_files[file_id]
         # Index entries must be ordered by position, as a freshly generated index is.
