@@ -1017,8 +1017,11 @@ def test_resume_skips_already_labelled_parts_and_keeps_their_values(tmp_path: Pa
     assert all(v == "none" for v in after[stripped.name]), "the unlabelled part must be joined"
     for other in parts[1:]:
         assert after[other.name] == before[other.name], "an already-labelled part must be left alone"
-    # Only the one part's documents were counted.
-    assert report.n_documents == len(before[stripped.name])
+    # The report describes the whole sidecar, not just the part this run redid: a resumed
+    # join that counted only its own work reported 0% coverage, which reads as a failure.
+    assert report.n_parts_resumed == len(parts) - 1
+    assert report.n_documents == sum(len(v) for v in after.values())
+    assert report.n_matched == report.n_documents
 
 
 def test_resume_off_redoes_every_part(tmp_path: Path, corpus: Path):
@@ -1083,3 +1086,42 @@ def test_build_cubes_builds_healthy_datasets_before_raising(tmp_path: Path, corp
     # The healthy dataset's cube must exist despite the other one failing.
     assert pipeline.cube_path(work, "healthy").is_file()
     assert not pipeline.cube_path(work, "broken").is_file()
+
+
+def test_resumed_join_reports_the_sidecars_real_coverage(
+    tmp_path: Path, dataset_entry: DatasetEntry, annotations: Path
+):
+    """A resumed join must describe the sidecar, not just the work it happened to redo.
+
+    The first version counted only the parts it re-joined, so a run that skipped
+    everything wrote a report saying 0 documents and 0% coverage. That reads as a failed
+    join, and on the real blend it overwrote genuine coverage figures with zeros.
+    """
+    calibration = calibrate_dataset(
+        dataset_name="toy",
+        file_paths=dataset_entry.iter_files(),
+        tokenizer=_WhitespaceTokenizer(),
+        tokenizer_name="whitespace",
+        sample_size=50,
+    )
+    sidecar_dir = tmp_path / "sidecar"
+    SidecarBuilder(dataset_entry, calibration, index_root=tmp_path / "idx").build(sidecar_dir, show_progress=False)
+    buckets = tmp_path / "buckets"
+    bucket_annotations(
+        shard_paths=sorted(annotations.glob("*.parquet")),
+        out_dir=buckets,
+        n_buckets=4,
+        label_columns=["educational_value"],
+        show_progress=False,
+    )
+
+    first = join_annotations(sidecar_dir, buckets, "toy", "toy", show_progress=False)
+    assert first.n_documents == 200
+    assert first.n_matched == 150
+    assert first.n_parts_resumed == 0
+
+    resumed = join_annotations(sidecar_dir, buckets, "toy", "toy", resume=True, show_progress=False)
+    assert resumed.n_parts_resumed == 2
+    assert resumed.n_documents == first.n_documents
+    assert resumed.n_matched == first.n_matched
+    assert resumed.coverage == first.coverage

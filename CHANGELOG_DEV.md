@@ -554,3 +554,13 @@ zero -- failed loudly. The rest would have packed a blend of wrong byte ranges.
 * `test_file_manifest.py` covers the re-shard that preserves the file count, a prepended
   file that would renumber ids, a removed file, `apply` refusing a drifted tree, and that
   adoption is refused for a sidecar that does not verify.
+
+
+## PR #XXX Fix: a resumed join reported 0% coverage
+
+`--resume` counted only the parts it re-joined, so a run that skipped everything wrote a
+report saying 0 documents and 0.0 coverage. On the smoke run it overwrote three datasets'
+genuine coverage figures with zeros, which reads as a failed join rather than a skipped
+one. Coverage is a property of the sidecar, not of the run, so skipped parts now
+contribute their existing labels to the totals, and `n_parts_resumed` records how many
+were not redone.

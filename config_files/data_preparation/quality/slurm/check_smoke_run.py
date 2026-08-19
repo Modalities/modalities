@@ -23,16 +23,19 @@ from pathlib import Path
 
 import yaml
 
+from modalities.dataloader.create_packed_data import EmbeddedStreamData
 from modalities.dataloader.dataset import PackedMemMapDatasetContinuous, WeightedCombinedDataset
 
 
-def count_packed_tokens(pbin_paths: list[Path], sequence_length: int = 2048) -> tuple[int, int]:
+def count_packed_tokens(pbin_paths: list[Path]) -> tuple[int, int]:
     """Counts tokens and documents across packed files.
+
+    Read from each file's own header rather than from a dataset view: the data section
+    length divided by the token width is the exact number of tokens written, with no
+    dependence on a block size and no final partial block to reason about.
 
     Args:
         pbin_paths (list[Path]): The ``.pbin`` files to read.
-        sequence_length (int): Block size used to open the packed file. Irrelevant to the
-            token count, which comes from the file's own document index.
 
     Returns:
         tuple[int, int]: Total tokens and total documents.
@@ -40,11 +43,9 @@ def count_packed_tokens(pbin_paths: list[Path], sequence_length: int = 2048) -> 
     n_tokens = 0
     n_docs = 0
     for path in pbin_paths:
-        dataset = PackedMemMapDatasetContinuous(raw_data_path=path, sample_key="input_ids", block_size=sequence_length)
-        # The continuous view concatenates documents, so its length times the block size
-        # is the token count up to the final partial block.
-        n_tokens += len(dataset) * sequence_length
-        n_docs += len(dataset._index_base) if hasattr(dataset, "_index_base") else 0
+        stream = EmbeddedStreamData(path, load_index=True)
+        n_tokens += stream.data_len // stream.token_size_in_bytes
+        n_docs += len(stream.index_base)
     return n_tokens, n_docs
 
 
@@ -71,9 +72,9 @@ def main() -> int:
     failures: list[str] = []
 
     print("=" * 78)
-    print("1. estimated vs packed tokens")
+    print("1. estimated vs packed tokens, and selected vs packed documents")
     print("=" * 78)
-    print(f"{'dataset':<16} {'estimated':>16} {'packed':>16} {'error':>9}  verdict")
+    print(f"{'dataset':<16} {'est tokens':>15} {'packed':>15} {'error':>8} {'docs sel':>10} {'docs packed':>11}")
     print("-" * 78)
     total_est = 0
     total_packed = 0
@@ -81,23 +82,33 @@ def main() -> int:
         name = record["name"]
         pbins = sorted((args.packed_dir / name).rglob("*.pbin"))
         if not pbins:
-            print(f"{name:<16} {record['est_tokens_kept']:>16,} {'-':>16} {'-':>9}  NOT PACKED")
+            print(f"{name:<16} {record['est_tokens_kept']:>15,} {'NOT PACKED':>15}")
             failures.append(f"{name}: no packed output under {args.packed_dir / name}")
             continue
-        packed, _ = count_packed_tokens(pbins, args.sequence_length)
+        packed, n_docs = count_packed_tokens(pbins)
         estimated = record["est_tokens_kept"]
         error = (packed - estimated) / estimated if estimated else 0.0
         ok = abs(error) <= args.tolerance
         total_est += estimated
         total_packed += packed
-        print(f"{name:<16} {estimated:>16,} {packed:>16,} {error * 100:>8.2f}%  {'ok' if ok else 'OUT OF TOLERANCE'}")
+        selected = record["n_documents_kept"]
+        print(
+            f"{name:<16} {estimated:>15,} {packed:>15,} {error * 100:>7.2f}% {selected:>10,} {n_docs:>11,}"
+            f"{'' if ok else '   TOKENS OUT OF TOLERANCE'}"
+            f"{'' if n_docs == selected else '   DOC COUNT MISMATCH'}"
+        )
         if not ok:
             failures.append(f"{name}: estimate off by {error * 100:.2f}% (tolerance {args.tolerance * 100:.0f}%)")
+        # Documents are not estimated: the filtered index lists exactly the selected
+        # documents, so the packer must emit exactly that many. Any difference is a bug in
+        # materialize or in the index, not estimator error.
+        if n_docs != selected:
+            failures.append(f"{name}: selection kept {selected:,} documents but {n_docs:,} were packed")
 
     if total_est:
         total_error = (total_packed - total_est) / total_est
         print("-" * 78)
-        print(f"{'TOTAL':<16} {total_est:>16,} {total_packed:>16,} {total_error * 100:>8.2f}%")
+        print(f"{'TOTAL':<16} {total_est:>15,} {total_packed:>15,} {total_error * 100:>7.2f}%")
 
     print()
     print("=" * 78)
@@ -112,7 +123,10 @@ def main() -> int:
         for pbin in pbins:
             datasets.append(
                 PackedMemMapDatasetContinuous(
-                    raw_data_path=pbin, sample_key="input_ids", block_size=args.sequence_length
+                    raw_data_path=pbin,
+                    sample_key="input_ids",
+                    block_size=args.sequence_length,
+                    reuse_last_target=True,
                 )
             )
             factors.append(float(record["ratio"]))

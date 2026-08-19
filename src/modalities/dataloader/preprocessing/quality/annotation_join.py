@@ -64,6 +64,10 @@ class JoinReport:
             real in at least one published split, so they are counted rather than
             assumed away.
         n_missing_key (int): Documents whose sidecar row had no join key at all.
+        n_parts_resumed (int): Parts that already carried labels and were not re-joined.
+            Their documents still count towards the totals above, read back from the
+            labels already on disk: coverage describes the sidecar, not the run, and a
+            resumed join that reported 0% would read as a failed one.
         label_columns (list[str]): Columns actually copied across.
     """
 
@@ -74,6 +78,7 @@ class JoinReport:
     n_annotation_rows: int = 0
     n_duplicate_keys: int = 0
     n_missing_key: int = 0
+    n_parts_resumed: int = 0
     label_columns: list[str] = field(default_factory=list)
 
     @property
@@ -100,6 +105,7 @@ class JoinReport:
             "n_annotation_rows": self.n_annotation_rows,
             "n_duplicate_keys": self.n_duplicate_keys,
             "n_missing_key": self.n_missing_key,
+            "n_parts_resumed": self.n_parts_resumed,
             "label_columns": self.label_columns,
         }
 
@@ -114,6 +120,7 @@ class JoinReport:
             f"({self.coverage:.1%}) from {self.n_annotation_rows:,} annotation rows"
             + (f", {self.n_duplicate_keys:,} duplicate keys" if self.n_duplicate_keys else "")
             + (f", {self.n_missing_key:,} without a key" if self.n_missing_key else "")
+            + (f", {self.n_parts_resumed:,} parts already joined" if self.n_parts_resumed else "")
         )
 
 
@@ -595,7 +602,13 @@ def join_annotations(
     n_skipped = 0
     for part in tqdm(parts, desc=f"join {dataset_name}", disable=not show_progress):
         if resume and label_columns and _part_has_labels(part, label_columns):
+            # Count what this part already holds instead of ignoring it, so a resumed run
+            # reports the sidecar's real coverage rather than only what it happened to do.
             n_skipped += 1
+            existing = pq.read_table(part, columns=["join_key", label_columns[0]])
+            report.n_documents += existing.num_rows
+            report.n_matched += existing.num_rows - existing.column(label_columns[0]).null_count
+            report.n_missing_key += existing.column("join_key").null_count
             continue
         table = pq.read_table(part)
         keys = table.column("join_key").to_pylist()
@@ -608,6 +621,7 @@ def join_annotations(
             batch, batch_keys = [], 0
     flush(batch)
 
+    report.n_parts_resumed = n_skipped
     if n_skipped:
         get_logger(name="main").info(
             f"{dataset_name}: resumed, skipped {n_skipped:,} of {len(parts):,} parts that already carried labels"
