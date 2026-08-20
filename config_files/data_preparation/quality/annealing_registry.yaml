@@ -50,28 +50,28 @@ datasets:
   # 32-hex ids, used verbatim. No quality score of any kind in the records, so propella
   # is the only quality signal available for these 14 TB.
   - name: hplt-de
-    jsonl_root: /data/annealing/german/HPLTv4
+    jsonl_root: /data/annealing/german/hpltv4
     annotation_split: hplt-4-unfiltered/deu_Latn
     key: {kind: field, field: id}
     native_metrics:
       - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
       - {name: cluster_size, jq_pattern: .cluster_size}
   - name: hplt-fr
-    jsonl_root: /data/annealing/french/HPLTv4
+    jsonl_root: /data/annealing/french/hpltv4
     annotation_split: hplt-4-unfiltered/fra_Latn
     key: {kind: field, field: id}
     native_metrics:
       - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
       - {name: cluster_size, jq_pattern: .cluster_size}
   - name: hplt-it
-    jsonl_root: /data/annealing/italian/HPLTv4
+    jsonl_root: /data/annealing/italian/hpltv4
     annotation_split: hplt-4-unfiltered/ita_Latn
     key: {kind: field, field: id}
     native_metrics:
       - {name: lid_prob, jq_pattern: ".\"openlid-v3\".prob", aggregation: max}
       - {name: cluster_size, jq_pattern: .cluster_size}
   - name: hplt-es
-    jsonl_root: /data/annealing/spanish/HPLTv4
+    jsonl_root: /data/annealing/spanish/hpltv4
     annotation_split: hplt-4-unfiltered/spa_Latn
     key: {kind: field, field: id}
     native_metrics:
