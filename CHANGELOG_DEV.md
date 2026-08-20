@@ -798,3 +798,46 @@ vigintiles from a continuous score.
 
 Not ablated. The cluster was busy, so this is verified against the paper's published example
 and by unit tests, not by a training run.
+
+
+## PR #XXX Repetition accounting, and per-predicate attribution
+
+Two ideas taken from a colleague's TokenFabric design, which applies routing policy at
+training time rather than offline. Most of that architecture does not transfer -- chunk-boundary
+activation, shard servers, live telemetry solve problems an offline pipeline does not have --
+but two of its principles apply directly.
+
+**Repetition is per pass, and nothing was checking it.** `target_tokens` was documented as
+"only used to report the gap", and that is all it did. A ratio is relative to one pass over the
+blend, so if the run consumes more tokens than the blend yields, the loader wraps and every
+factor is multiplied. The upsampling curves added in the previous change can assign 7x, which
+two passes turn into 14x -- past the point where repetition pays, and silently.
+
+`target_tokens` now means what the run consumes. `max_total_exposure` caps how often anything
+may be seen; a dataset with a curve uses its own `max_factor` instead. `preview` reports the
+accounting, `apply` refuses, `--allow_overexposure` overrides. Caps apply to the requested
+factor even with no target declared -- a ratio of 9 against a cap of 2 is a violation at any
+number of passes -- and the report says the wrapping multiplier is unknown rather than assuming
+one pass.
+
+On the smoke blend, declaring a 300 M run against its 151 M yield: `climbmix-en / high` asked
+for 2.53x and would be seen **5.01x** against its own declared 4x cap.
+
+**`preview --explain` attributes retention to individual predicates.** The per-dataset figure
+says nothing about which condition caused it. This reports, per predicate, what it matches
+alone and its *marginal* effect -- how many more tokens the dataset would keep with that
+predicate dropped and the others left in place -- plus a pairwise overlap matrix. It is
+milliseconds: the per-cell weights are the whole computation.
+
+It found two redundant predicates on the smoke blend at once: `content_integrity at_least
+mostly_complete` on `finepdfs-es` (21 k marginal out of 65 M) and `educational_value at_least
+basic` on `klettermix-de` (matches 100.0% of tokens, 425 marginal).
+
+**Two bugs found while building it**
+
+* The overlap diagonal computed each predicate's factor times itself. For an interpolated
+  predicate the factors are fractional, so squaring them undercounts -- it read 8.19 M where
+  the predicate matched 9.75 M. The diagonal is now the match count.
+* `_cube_weights` tested the cumulative exactness flag when recording which predicates were
+  interpolated, so once any predicate was interpolated every later one was reported as
+  interpolated too. Now per predicate.

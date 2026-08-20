@@ -8,6 +8,7 @@ is synthetic and runs in milliseconds -- no corpus, no cluster.
 
 import pytest
 
+from modalities.dataloader.preprocessing.quality.selection import exposure_report
 from modalities.dataloader.preprocessing.quality.upsampling import (
     UNANNOTATED_BUCKET,
     QualityBucket,
@@ -141,3 +142,50 @@ def test_a_spec_needs_exactly_one_target():
         UpsamplingSpec(quality_field="q")
     with pytest.raises(ValueError, match="exactly one of"):
         UpsamplingSpec(quality_field="q", target_tokens=1, target_ratio=1.0)
+
+
+# ------------------------------------------------------- exposure once wrapping is counted
+
+
+def test_exposure_multiplies_the_factor_by_the_number_of_passes():
+    report = exposure_report(
+        entries=[("a", 2.0, 2.5), ("b", 1.0, 2.5)],
+        effective_tokens=100.0,
+        training_tokens=200.0,
+    )
+    assert report.passes == pytest.approx(2.0)
+    assert report.rows[0].exposure == pytest.approx(4.0)
+    # 2.0 asked for, 4.0 actually seen, against a 2.5 cap.
+    assert [row.label for row in report.exceeded] == ["a"]
+
+
+def test_a_blend_that_covers_the_run_does_not_wrap():
+    report = exposure_report(
+        entries=[("a", 2.0, 2.5)], effective_tokens=400.0, training_tokens=200.0
+    )
+    assert report.passes == pytest.approx(0.5)
+    assert report.rows[0].exposure == pytest.approx(1.0)
+    assert not report.exceeded
+
+
+def test_without_a_declared_target_only_wrapping_is_unknown():
+    """The cap still applies to the requested factor -- a ratio of 9 against a cap of 2 is a
+    violation at any number of passes. What is unknown without a target is only the
+    multiplier on top, and the report says so rather than implying one pass."""
+    report = exposure_report(entries=[("a", 9.0, 2.0)], effective_tokens=100.0, training_tokens=None)
+    assert report.passes == 1.0
+    assert report.rows[0].exposure == pytest.approx(9.0)
+    assert [row.label for row in report.exceeded] == ["a"]
+    assert "cannot be checked" in report.describe()
+
+
+def test_a_factor_within_its_cap_at_one_pass_passes():
+    report = exposure_report(entries=[("a", 1.8, 2.0)], effective_tokens=100.0, training_tokens=None)
+    assert not report.exceeded
+
+
+def test_a_row_without_a_cap_is_never_exceeded():
+    report = exposure_report(
+        entries=[("a", 50.0, None)], effective_tokens=1.0, training_tokens=100.0
+    )
+    assert not report.exceeded

@@ -31,6 +31,7 @@ from modalities.dataloader.preprocessing.quality.selection import (
     MissingPolicy,
     SelectionConfig,
     document_mask,
+    exposure_report,
     ordered_quality_levels,
 )
 from modalities.dataloader.preprocessing.quality.upsampling import (
@@ -341,12 +342,31 @@ def materialize_dataset_buckets(
     return results
 
 
+def _cap_for(config: SelectionConfig, materialized: MaterializedDataset) -> Optional[float]:
+    """Finds the repetition cap that applies to one materialised row.
+
+    Args:
+        config (SelectionConfig): The selection.
+        materialized (MaterializedDataset): The row, which may be one bucket of a dataset.
+
+    Returns:
+        Optional[float]: The dataset's own curve cap when it has one, otherwise the
+            blend-wide cap, or None if neither was declared.
+    """
+    source = materialized.source_dataset or materialized.name
+    for dataset in config.datasets:
+        if dataset.name == source and dataset.upsampling is not None:
+            return dataset.upsampling.max_factor
+    return config.max_total_exposure
+
+
 def materialize_blend(
     config: SelectionConfig,
     registry: CorpusRegistry,
     sidecar_root: Path,
     output_root: Path,
     show_progress: bool = True,
+    allow_overexposure: bool = False,
 ) -> Path:
     """Writes filtered indexes and a manifest for a whole selection.
 
@@ -393,6 +413,36 @@ def materialize_blend(
             materialized.append(materialize_dataset(**arguments))
 
     total_effective = sum(d.tokens_kept * d.ratio for d in materialized)
+
+    # Ratios are per pass. If the run consumes more than one pass, every factor is
+    # multiplied, so a bucket set to 7x becomes 14x on a second pass -- well past where
+    # repetition pays. Checked here rather than at preview because this is the point of
+    # commitment: preview reports it, apply refuses.
+    exposure = exposure_report(
+        entries=[
+            (
+                d.name,
+                d.ratio,
+                _cap_for(config, d),
+            )
+            for d in materialized
+        ],
+        effective_tokens=total_effective,
+        training_tokens=config.target_tokens,
+    )
+    if exposure.exceeded and not allow_overexposure:
+        offenders = "\n".join(
+            f"  {row.label}: {row.factor:.2f}x requested, seen {row.exposure:.2f}x over "
+            f"{exposure.passes:.2f} passes, cap {row.cap:g}x"
+            for row in exposure.exceeded
+        )
+        raise MaterializationError(
+            f"the run would repeat data past its declared cap:\n{offenders}\n"
+            f"The blend yields {total_effective:,.0f} effective tokens and the run consumes "
+            f"{config.target_tokens:,.0f}, so it wraps {exposure.passes:.2f} times. Raise the "
+            f"blend's yield, lower target_tokens, relax the cap, or pass allow_overexposure "
+            f"to proceed anyway."
+        )
     manifest = {
         "selection_fingerprint": config_fingerprint(config),
         "missing_annotation": config.missing_annotation.value,

@@ -31,7 +31,9 @@ from modalities.dataloader.preprocessing.quality.selection import (
     BlendResult,
     SelectionConfig,
     evaluate_blend,
+    SelectionError,
     format_blend_report,
+    predicate_breakdown,
 )
 from modalities.dataloader.preprocessing.quality.sidecar import SidecarBuilder, resolve_source_pointers
 from modalities.dataloader.preprocessing.quality.tokens import CalibrationSet, calibrate_dataset
@@ -526,6 +528,7 @@ def preview_selection(
     work_dir: Path,
     force_exact: bool = False,
     allow_sidecar_fallback: bool = False,
+    explain: bool = False,
 ) -> tuple[BlendResult, str]:
     """Costs a selection in documents and tokens.
 
@@ -550,7 +553,23 @@ def preview_selection(
         force_exact=force_exact,
         allow_sidecar_fallback=allow_sidecar_fallback,
     )
-    return result, format_blend_report(result, datasets_in_order=names)
+    report = format_blend_report(result, datasets_in_order=names, config=config)
+
+    if explain:
+        # Attribution needs the cubes, so it is only available on the cube path; an exact
+        # sidecar scan does not produce per-cell weights to slice.
+        sections = ["", "per-predicate attribution"]
+        for dataset in config.enabled_datasets():
+            cube = cubes.get(dataset.name)
+            if cube is None or not dataset.predicates:
+                continue
+            try:
+                sections.append(predicate_breakdown(cube, dataset, config.policy_for(dataset)).describe())
+            except SelectionError as e:
+                sections.append(f"  {dataset.name}: {e}")
+        report = report + "\n".join(sections)
+
+    return result, report
 
 
 def apply_selection(
@@ -559,6 +578,7 @@ def apply_selection(
     work_dir: Path,
     output_dir: Path,
     show_progress: bool = True,
+    allow_overexposure: bool = False,
 ) -> Path:
     """Writes a selection out as filtered index files plus a manifest.
 
@@ -568,6 +588,8 @@ def apply_selection(
         work_dir (Path): Working directory holding the sidecars.
         output_dir (Path): Directory receiving the index trees and manifest.
         show_progress (bool): Whether to show progress bars.
+        allow_overexposure (bool): Proceed even when the run would repeat data past a
+            declared cap.
 
     Returns:
         Path: Path to the written manifest.
@@ -580,6 +602,7 @@ def apply_selection(
         sidecar_root=Path(work_dir) / "sidecar",
         output_root=output_dir,
         show_progress=show_progress,
+        allow_overexposure=allow_overexposure,
     )
 
 

@@ -254,6 +254,60 @@ is then whatever the dataloader's even spread picks.
 carried into materialisation, which is not built. Setting a non-ordinal `quality_field` is
 refused when the config loads, rather than after a preview has already succeeded.
 
+## Repetition is per pass, so declare what the run consumes
+
+A `ratio` of 2.0 draws a dataset twice *per pass over the blend*. If the run consumes more
+tokens than the blend yields, the loader comes round again and every factor is multiplied by
+the number of passes. A bucket set to 7x under a curve becomes 14x on a second pass, which is
+well past the point where repetition pays for itself.
+
+`target_tokens` is what the run will actually consume, and it is what makes this checkable:
+
+```yaml
+target_tokens: 400_000_000_000     # what the run consumes
+max_total_exposure: 3.0            # refuse if anything is seen more often than this
+```
+
+A dataset with an upsampling curve uses its own `max_factor` as the cap instead, since that is
+already declared. `preview` always reports the accounting; `apply` refuses, because that is the
+point of commitment:
+
+```
+repetition, once wrapping is counted
+  run consumes 300,000,000 tokens from 150,800,110 effective -- wraps 1.99 passes
+                             factor  exposure     cap
+    climbmix-en / high         2.53      5.04       4  OVER
+    klettermix-de              2.00      3.98     2.5  OVER
+```
+
+Pass `--allow_overexposure` to `apply` to proceed anyway. Without `target_tokens` the caps
+still apply to the requested factors, but the multiplier from wrapping is unknown and the
+report says so rather than assuming one pass.
+
+## Which predicate is actually doing the work
+
+`preview --explain` attributes a dataset's retention to its individual predicates and shows
+how they overlap. It costs milliseconds, because the per-cell weights are the whole
+computation and the cube is already loaded.
+
+```
+  finepdfs-es: 9,727,716 of 65,540,305 tokens kept
+    predicate                                         matches   share       marginal
+    fw_edu gte 1.5                                  9,748,842  14.9%     55,753,485 ~
+    content_integrity at_least mostly_complete     65,481,201  99.9%         21,126
+```
+
+`marginal` is the number to read: how many more tokens the dataset would keep if that
+predicate were dropped and the others left alone. A marginal of zero means the predicate is
+fully shadowed by its neighbours -- it changes nothing and only makes the selection harder to
+read. On the smoke blend this immediately found two: `content_integrity` on `finepdfs-es`
+(21 k marginal out of 65 M) and `educational_value at_least basic` on `klettermix-de`, which
+matches 100.0% of tokens.
+
+The overlap matrix below the table gives tokens matching each pair. Its diagonal is each
+predicate's own match count -- not the product with itself, which for an interpolated
+predicate squares a fractional survival rate and undercounts.
+
 ## The source tree must not move underneath a sidecar
 
 A sidecar row locates its document by `(file_id, byte_offset, byte_len)`, where `file_id`

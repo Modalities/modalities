@@ -32,6 +32,7 @@ from modalities.dataloader.preprocessing.quality.selection import (
     Predicate,
     evaluate_on_cube,
     evaluate_on_sidecar,
+    predicate_breakdown,
 )
 from modalities.dataloader.preprocessing.quality.upsampling import UNANNOTATED_BUCKET, UpsamplingSpec
 from modalities.dataloader.preprocessing.quality.sidecar import SidecarBuilder
@@ -1232,3 +1233,72 @@ def test_materializing_a_curve_refuses_a_sidecar_without_the_quality_column(
             output_dir=tmp_path / "mix2",
             show_progress=False,
         )
+
+
+# ------------------------------------------------------------ per-predicate attribution
+
+
+def test_attribution_finds_the_predicate_that_does_nothing(built_sidecar: Path):
+    """A predicate matching everything the others already keep is the interesting case: it
+    changes no numbers while making the selection harder to read."""
+    cube = build_cube(built_sidecar, "toy", label_dimensions=["educational_value"])
+    selection = DatasetSelection(
+        name="toy",
+        predicates=[
+            Predicate(field="educational_value", op=Op.AT_LEAST, value="basic"),
+            # Every level is at least "none", so this one cannot remove anything.
+            Predicate(field="educational_value", op=Op.AT_LEAST, value="none"),
+        ],
+    )
+    breakdown = predicate_breakdown(cube, selection, MissingPolicy.KEEP)
+
+    binding, redundant = breakdown.contributions
+    assert binding.marginal_tokens > 0
+    assert redundant.marginal_tokens == 0
+    assert "no effect given the others" in breakdown.describe()
+
+
+def test_attribution_totals_agree_with_the_blend_evaluation(built_sidecar: Path):
+    cube = build_cube(built_sidecar, "toy", label_dimensions=["educational_value"])
+    selection = DatasetSelection(
+        name="toy", predicates=[Predicate(field="educational_value", op=Op.AT_LEAST, value="basic")]
+    )
+    breakdown = predicate_breakdown(cube, selection, MissingPolicy.KEEP)
+    result = evaluate_on_cube(cube, selection, MissingPolicy.KEEP)
+
+    assert breakdown.kept_tokens == result.tokens_kept
+    assert breakdown.total_tokens == result.tokens_total
+
+
+def test_the_overlap_diagonal_is_the_predicate_itself(built_sidecar: Path):
+    """Not the product with itself: an interpolated predicate has fractional factors, and
+    squaring them undercounts. On real data that read 8.19 M where it matched 9.75 M."""
+    cube = build_cube(built_sidecar, "toy")
+    selection = DatasetSelection(
+        name="toy",
+        predicates=[
+            Predicate(field="score", op=Op.GTE, value=2.5),
+            Predicate(field="educational_value", op=Op.AT_LEAST, value="basic"),
+        ],
+    )
+    breakdown = predicate_breakdown(cube, selection, MissingPolicy.KEEP)
+    for i, contribution in enumerate(breakdown.contributions):
+        assert breakdown.overlap_tokens[i][i] == contribution.matched_tokens
+    # And the matrix is symmetric.
+    assert breakdown.overlap_tokens[0][1] == breakdown.overlap_tokens[1][0]
+
+
+def test_attribution_reports_which_predicate_was_interpolated(built_sidecar: Path):
+    cube = build_cube(built_sidecar, "toy")
+    selection = DatasetSelection(
+        name="toy",
+        predicates=[
+            Predicate(field="score", op=Op.GTE, value=2.5),
+            Predicate(field="educational_value", op=Op.AT_LEAST, value="basic"),
+        ],
+    )
+    breakdown = predicate_breakdown(cube, selection, MissingPolicy.KEEP)
+    numeric, ordinal = breakdown.contributions
+    # A threshold inside a quantile bin is interpolated; an ordinal level never is.
+    assert not numeric.exact
+    assert ordinal.exact

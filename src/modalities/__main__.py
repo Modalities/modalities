@@ -1103,7 +1103,16 @@ def CMD_quality_build_cube(
     help="Let a dataset whose cube cannot answer a predicate be scanned from its sidecar. "
     "That reads every document, so it costs minutes to hours rather than seconds.",
 )
-def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool, allow_fallback: bool) -> None:
+@click.option(
+    "--explain",
+    is_flag=True,
+    default=False,
+    help="Attribute each dataset's retention to its individual predicates, and show how they "
+    "overlap. Answers which condition binds and which is redundant.",
+)
+def CMD_quality_preview(
+    selection_path: Path, work_dir: Path, exact: bool, allow_fallback: bool, explain: bool
+) -> None:
     """Reports how many documents and tokens a selection yields, per dataset and in total.
 
     Args:
@@ -1111,12 +1120,14 @@ def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool, allow
         work_dir (Path): Working directory holding the cubes and sidecars.
         exact (bool): Scan the sidecars instead of the cubes.
         allow_fallback (bool): Permit per-dataset sidecar scans where a cube falls short.
+        explain (bool): Attribute retention to individual predicates.
     """
     _, report = quality_pipeline.preview_selection(
         selection_path=selection_path,
         work_dir=work_dir,
         force_exact=exact,
         allow_sidecar_fallback=allow_fallback,
+        explain=explain,
     )
     print_rank_0(report)
 
@@ -1140,7 +1151,20 @@ def CMD_quality_preview(selection_path: Path, work_dir: Path, exact: bool, allow
 @click.option(
     "--output_dir", type=Path, required=True, help="Directory receiving the filtered index files and the mix manifest."
 )
-def CMD_quality_apply(selection_path: Path, registry_path: Path, work_dir: Path, output_dir: Path) -> None:
+@click.option(
+    "--allow_overexposure",
+    is_flag=True,
+    default=False,
+    help="Materialise even when the run would repeat data past a declared cap. Off by default: "
+    "ratios are per pass, so a run that wraps multiplies every one of them.",
+)
+def CMD_quality_apply(
+    selection_path: Path,
+    registry_path: Path,
+    work_dir: Path,
+    output_dir: Path,
+    allow_overexposure: bool,
+) -> None:
     """Writes a selection out as filtered index files plus a manifest.
 
     The source data is not copied or modified. Point `pack_encoded_data` at a written
@@ -1153,6 +1177,7 @@ def CMD_quality_apply(selection_path: Path, registry_path: Path, work_dir: Path,
         output_dir (Path): Directory receiving the index files and manifest.
     """
     manifest_path = quality_pipeline.apply_selection(
+        allow_overexposure=allow_overexposure,
         selection_path=selection_path,
         registry_path=registry_path,
         work_dir=work_dir,
