@@ -14,8 +14,17 @@
 # having no label rather than for failing the filter.
 missing_annotation: keep
 
-# Only used to report the gap; it does not adjust any ratio.
+# What the training run will consume. It adjusts no ratio, but it is what makes the ratios
+# checkable: a ratio is per pass over the blend, so if the blend yields less than this the
+# loader wraps and every factor is multiplied by the number of passes.
 target_tokens: 400_000_000_000
+
+# Refuse to materialise if any dataset would be seen more often than this once wrapping is
+# counted. Set above the largest ratio below (3.0) so it does not fire on the intended
+# design, only on an accident -- a blend trimmed too far, or a ratio raised without
+# re-checking the yield. A dataset with an `upsampling` curve uses its own `max_factor`
+# instead, since that is already a declared cap. Pass --allow_overexposure to override.
+max_total_exposure: 4.0
 
 datasets:
   # Web text carries the most junk, so it gets the strictest filter and is downsampled.
