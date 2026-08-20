@@ -44,6 +44,21 @@ datasets:
 
   # Already filtered upstream to a high-quality subset, so a light touch and a mild
   # upsample.
+  #
+  # This is the natural place to try a quality-aware curve instead of the flat ratio: a
+  # single number repeats the barely-adequate documents exactly as often as the excellent
+  # ones. Replace `ratio` with the block below to make the repeat factor rise with quality.
+  # `preview` prints the resulting per-bucket factors, and `apply` then writes one index
+  # tree per bucket so each can carry its own factor into training.
+  #
+  #   upsampling:
+  #     quality_field: content_quality        # ordinal axis, worst to best
+  #     target_tokens: 900_000_000_000        # what this dataset should contribute
+  #     max_factor: 7.0                       # no bucket repeated more than this
+  #     discard_below_percentile: 40          # drop the weakest 40% of tokens
+  #
+  # Note that `ratio` and `upsampling` are mutually exclusive: the curve already determines how much
+  # is drawn, so setting both is refused rather than silently ignoring one.
   - name: nemotron-cc
     ratio: 1.2
     predicates:

@@ -10,7 +10,11 @@ import pytest
 from modalities.dataloader.large_file_lines_reader import LargeFileLinesReader
 from modalities.dataloader.preprocessing.quality.annotation_join import bucket_annotations, join_annotations
 from modalities.dataloader.preprocessing.quality.cube import build_cube
-from modalities.dataloader.preprocessing.quality.materialize import materialize_dataset
+from modalities.dataloader.preprocessing.quality.materialize import (
+    MaterializationError,
+    materialize_dataset,
+    materialize_dataset_buckets,
+)
 from modalities.dataloader.preprocessing.quality.registry import (
     CorpusRegistry,
     DatasetEntry,
@@ -29,6 +33,7 @@ from modalities.dataloader.preprocessing.quality.selection import (
     evaluate_on_cube,
     evaluate_on_sidecar,
 )
+from modalities.dataloader.preprocessing.quality.upsampling import UNANNOTATED_BUCKET, UpsamplingSpec
 from modalities.dataloader.preprocessing.quality.sidecar import SidecarBuilder
 from modalities.dataloader.preprocessing.quality.tokens import TokenCalibration, calibrate_dataset
 
@@ -1125,3 +1130,105 @@ def test_resumed_join_reports_the_sidecars_real_coverage(
     assert resumed.n_documents == first.n_documents
     assert resumed.n_matched == first.n_matched
     assert resumed.coverage == first.coverage
+
+
+
+# --------------------------------------------------------------- quality-aware upsampling
+
+
+def _curve_selection(target_ratio: float = 1.0, discard: float = 0.0) -> DatasetSelection:
+    return DatasetSelection(
+        name="toy",
+        upsampling=UpsamplingSpec(
+            quality_field="educational_value",
+            target_ratio=target_ratio,
+            max_factor=4.0,
+            discard_below_percentile=discard,
+        ),
+    )
+
+
+def test_a_curve_over_a_cube_hits_its_target_and_rises_with_quality(built_sidecar: Path, tmp_path: Path):
+    cube = build_cube(built_sidecar, "toy", label_dimensions=["educational_value"])
+    result = evaluate_on_cube(cube, _curve_selection(target_ratio=1.5), MissingPolicy.KEEP)
+
+    assert result.plan is not None
+    assert result.effective_tokens == pytest.approx(result.plan.tokens_available * 1.5, rel=1e-6)
+    factors = [b.factor for b in result.plan.buckets]
+    assert factors == sorted(factors)
+    # The unannotated fifty of two hundred documents cannot be ordered, so they form the
+    # bottom bucket rather than being silently dropped or silently kept at full weight.
+    assert result.plan.buckets[0].bucket.label == UNANNOTATED_BUCKET
+
+
+def test_a_curve_and_a_flat_ratio_cannot_both_be_given():
+    with pytest.raises(ValueError, match="already determines how much is drawn"):
+        DatasetSelection(
+            name="toy",
+            ratio=2.0,
+            upsampling=UpsamplingSpec(quality_field="educational_value", target_ratio=1.0),
+        )
+
+
+def test_a_curve_needs_an_ordinal_quality_field():
+    with pytest.raises(ValueError, match="needs an ordinal quality_field"):
+        DatasetSelection(name="toy", upsampling=UpsamplingSpec(quality_field="score", target_ratio=1.0))
+
+
+def test_materializing_a_curve_writes_one_index_tree_per_bucket(
+    built_sidecar: Path, dataset_entry: DatasetEntry, tmp_path: Path
+):
+    selection = _curve_selection(target_ratio=1.0, discard=20.0)
+    results = materialize_dataset_buckets(
+        sidecar_dir=built_sidecar,
+        dataset_entry=dataset_entry,
+        dataset_selection=selection,
+        missing_policy=MissingPolicy.KEEP,
+        output_dir=tmp_path / "mix",
+        show_progress=False,
+    )
+
+    assert results, "a curve must produce at least one bucket"
+    # Each row is its own dataset for packing, but still points back at the registry entry.
+    assert {r.source_dataset for r in results} == {"toy"}
+    assert all(r.name.startswith("toy__") for r in results)
+    assert all(r.ratio > 0 for r in results)
+    # Factors rise with quality, and the whole point is that they differ.
+    assert len({round(r.ratio, 6) for r in results}) > 1
+
+    # No document may appear in two buckets: they are disjoint by construction, and an
+    # overlap would silently duplicate documents on top of the intended repetition.
+    seen: set[tuple[str, int, int]] = set()
+    for result in results:
+        for source, index_path in result.index_files.items():
+            entries = pickle.loads(Path(index_path).read_bytes())
+            for offset, length in entries:
+                key = (source, offset, length)
+                assert key not in seen, f"document {key} appears in more than one quality bucket"
+                seen.add(key)
+
+
+def test_materializing_a_curve_refuses_a_sidecar_without_the_quality_column(
+    tmp_path: Path, dataset_entry: DatasetEntry, annotations: Path
+):
+    """The curve orders by a joined label, so an unjoined sidecar cannot support one."""
+    calibration = calibrate_dataset(
+        dataset_name="toy",
+        file_paths=dataset_entry.iter_files(),
+        tokenizer=_WhitespaceTokenizer(),
+        tokenizer_name="whitespace",
+        sample_size=50,
+    )
+    sidecar_dir = tmp_path / "unjoined"
+    SidecarBuilder(dataset_entry, calibration, index_root=tmp_path / "idx2").build(
+        sidecar_dir, show_progress=False
+    )
+    with pytest.raises(MaterializationError, match="no column 'educational_value'"):
+        materialize_dataset_buckets(
+            sidecar_dir=sidecar_dir,
+            dataset_entry=dataset_entry,
+            dataset_selection=_curve_selection(),
+            missing_policy=MissingPolicy.KEEP,
+            output_dir=tmp_path / "mix2",
+            show_progress=False,
+        )

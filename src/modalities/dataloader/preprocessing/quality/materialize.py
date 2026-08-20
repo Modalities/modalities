@@ -18,6 +18,7 @@ import json
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import pyarrow.parquet as pq
 import yaml
@@ -30,6 +31,13 @@ from modalities.dataloader.preprocessing.quality.selection import (
     MissingPolicy,
     SelectionConfig,
     document_mask,
+    ordered_quality_levels,
+)
+from modalities.dataloader.preprocessing.quality.upsampling import (
+    UNANNOTATED_BUCKET,
+    QualityBucket,
+    UpsamplingError,
+    solve_curve,
 )
 from modalities.utils.logger_utils import get_logger
 
@@ -49,6 +57,10 @@ class MaterializedDataset:
         n_documents_kept (int): Documents listed in the written indexes.
         tokens_kept (int): Estimated tokens of the kept documents.
         index_files (dict[str, str]): Source JSONL path to written index path.
+        source_dataset (Optional[str]): The registry dataset this came from, when ``name``
+            carries a quality bucket suffix and so no longer matches the registry.
+        quality_bucket (Optional[str]): The quality level this row covers, when the dataset
+            was split by a quality curve.
     """
 
     name: str
@@ -57,6 +69,8 @@ class MaterializedDataset:
     n_documents_kept: int
     tokens_kept: int
     index_files: dict[str, str]
+    source_dataset: Optional[str] = None
+    quality_bucket: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Renders the record for the manifest.
@@ -73,6 +87,8 @@ class MaterializedDataset:
             if self.n_documents_total
             else 0.0,
             "est_tokens_kept": self.tokens_kept,
+            "source_dataset": self.source_dataset or self.name,
+            "quality_bucket": self.quality_bucket,
             "index_files": self.index_files,
         }
 
@@ -182,6 +198,149 @@ def materialize_dataset(
     )
 
 
+def materialize_dataset_buckets(
+    sidecar_dir: Path,
+    dataset_entry: DatasetEntry,
+    dataset_selection: DatasetSelection,
+    missing_policy: MissingPolicy,
+    output_dir: Path,
+    show_progress: bool = True,
+) -> list[MaterializedDataset]:
+    """Writes one index tree per quality bucket, each with its own repeat factor.
+
+    A quality curve gives a different repeat factor to each quality level, and the packer
+    emits one file per source file, so documents of different levels have to end up in
+    different indexes for their factors to mean anything. Each bucket therefore becomes its
+    own row of the manifest, its own packed output, and its own entry in the training
+    blend's repeat factors.
+
+    The curve is solved from the token counts found here rather than from the cube, because
+    this stage reads every document anyway: the numbers are exact, so the curve hits its
+    token target exactly rather than to within the cube's interpolation error.
+
+    Args:
+        sidecar_dir (Path): Directory of that dataset's sidecar parts.
+        dataset_entry (DatasetEntry): Registry entry, for mapping file ids to paths.
+        dataset_selection (DatasetSelection): The rule to apply. Must carry an
+            ``upsampling`` spec.
+        missing_policy (MissingPolicy): Policy for unannotated documents.
+        output_dir (Path): Directory receiving one subdirectory per bucket.
+        show_progress (bool): Whether to show a progress bar.
+
+    Returns:
+        list[MaterializedDataset]: One entry per bucket that survived with a non-zero
+            factor, worst quality first.
+
+    Raises:
+        MaterializationError: If the sidecar is missing, the source tree has drifted, the
+            quality field is absent, or the curve cannot be solved.
+    """
+    spec = dataset_selection.upsampling
+    if spec is None:
+        raise MaterializationError(f"dataset {dataset_selection.name!r} has no upsampling spec")
+
+    parts = sorted(Path(sidecar_dir).glob("part-*.parquet"))
+    if not parts:
+        raise MaterializationError(f"no sidecar parts found in {sidecar_dir}")
+    try:
+        source_files = FileManifest.read(sidecar_dir).require_current(dataset_entry)
+    except ManifestError as e:
+        raise MaterializationError(str(e)) from e
+
+    levels = list(ordered_quality_levels(spec.quality_field))
+    # Unannotated documents cannot be ordered, so they form the bottom bucket.
+    bucket_labels = [UNANNOTATED_BUCKET] + levels
+    per_bucket: dict[str, dict[int, list[tuple[int, int]]]] = {label: {} for label in bucket_labels}
+    tokens_of: dict[str, int] = dict.fromkeys(bucket_labels, 0)
+    documents_of: dict[str, int] = dict.fromkeys(bucket_labels, 0)
+    n_total = 0
+
+    for part in tqdm(parts, desc=f"select {dataset_selection.name}", disable=not show_progress):
+        parquet_file = pq.ParquetFile(part)
+        if spec.quality_field not in parquet_file.schema_arrow.names:
+            raise MaterializationError(
+                f"dataset {dataset_selection.name!r}: sidecar has no column "
+                f"{spec.quality_field!r} to order quality by; join the annotations first"
+            )
+        for group_idx in range(parquet_file.metadata.num_row_groups):
+            table = parquet_file.read_row_group(group_idx)
+            n_total += table.num_rows
+            mask = document_mask(table, dataset_selection, missing_policy)
+            if not mask.any():
+                continue
+            file_ids = table.column("file_id").to_numpy(zero_copy_only=False)[mask]
+            offsets = table.column("byte_offset").to_numpy(zero_copy_only=False)[mask]
+            lengths = table.column("byte_len").to_numpy(zero_copy_only=False)[mask]
+            tokens = table.column("est_tokens").to_numpy(zero_copy_only=False)[mask]
+            quality = table.column(spec.quality_field).to_pylist()
+            kept_quality = [q for q, keep in zip(quality, mask) if keep]
+
+            for file_id, offset, length, token, level in zip(
+                file_ids, offsets, lengths, tokens, kept_quality
+            ):
+                label = UNANNOTATED_BUCKET if level is None or level not in tokens_of else level
+                per_bucket[label].setdefault(int(file_id), []).append((int(offset), int(length)))
+                tokens_of[label] += int(token)
+                documents_of[label] += 1
+
+    buckets = [
+        QualityBucket(
+            label=label,
+            n_documents=documents_of[label],
+            n_tokens=tokens_of[label],
+            unannotated=label == UNANNOTATED_BUCKET,
+        )
+        for label in bucket_labels
+        if tokens_of[label] > 0
+    ]
+    try:
+        plan = solve_curve(buckets, spec)
+    except UpsamplingError as e:
+        raise MaterializationError(f"dataset {dataset_selection.name!r}: {e}") from e
+
+    results: list[MaterializedDataset] = []
+    for bucket_plan in plan.buckets:
+        label = bucket_plan.bucket.label
+        if bucket_plan.factor <= 0:
+            continue
+        slug = label.strip("<>").replace(" ", "_")
+        bucket_dir = Path(output_dir) / slug
+        index_files: dict[str, str] = {}
+        for file_id, entries in sorted(per_bucket[label].items()):
+            if file_id >= len(source_files):
+                raise MaterializationError(
+                    f"dataset {dataset_selection.name!r}: sidecar references file id {file_id} but its "
+                    f"manifest records only {len(source_files)} files. Rebuild it."
+                )
+            source_path = source_files[file_id]
+            entries.sort()
+            relative = source_path.relative_to(dataset_entry.jsonl_root).with_suffix(".idx")
+            index_path = bucket_dir / relative
+            index_path.parent.mkdir(parents=True, exist_ok=True)
+            index_path.write_bytes(pickle.dumps(entries))
+            index_files[str(source_path)] = str(index_path)
+
+        results.append(
+            MaterializedDataset(
+                name=f"{dataset_selection.name}__{slug}",
+                ratio=bucket_plan.factor,
+                n_documents_total=n_total,
+                n_documents_kept=bucket_plan.bucket.n_documents,
+                tokens_kept=bucket_plan.bucket.n_tokens,
+                index_files=index_files,
+                source_dataset=dataset_selection.name,
+                quality_bucket=label,
+            )
+        )
+
+    get_logger(name="main").info(
+        f"{dataset_selection.name}: quality curve on {spec.quality_field} over "
+        f"{len(plan.buckets)} bucket(s), {len(results)} kept, exponent {plan.exponent:.2f}, "
+        f"drawing {plan.tokens_drawn:,.0f} of {plan.tokens_available:,} available tokens"
+    )
+    return results
+
+
 def materialize_blend(
     config: SelectionConfig,
     registry: CorpusRegistry,
@@ -218,16 +377,20 @@ def materialize_blend(
                 f"dataset {dataset_selection.name!r} has no sidecar at {sidecar_dir}; "
                 "run 'modalities data quality build-sidecar' for it first"
             )
-        materialized.append(
-            materialize_dataset(
-                sidecar_dir=sidecar_dir,
-                dataset_entry=entry,
-                dataset_selection=dataset_selection,
-                missing_policy=config.policy_for(dataset_selection),
-                output_dir=output_root / dataset_selection.name,
-                show_progress=show_progress,
-            )
+        arguments = dict(
+            sidecar_dir=sidecar_dir,
+            dataset_entry=entry,
+            dataset_selection=dataset_selection,
+            missing_policy=config.policy_for(dataset_selection),
+            output_dir=output_root / dataset_selection.name,
+            show_progress=show_progress,
         )
+        # A curve splits one dataset into several rows, one per quality bucket, so that each
+        # can carry its own repeat factor through packing and into the training blend.
+        if dataset_selection.upsampling is not None:
+            materialized.extend(materialize_dataset_buckets(**arguments))
+        else:
+            materialized.append(materialize_dataset(**arguments))
 
     total_effective = sum(d.tokens_kept * d.ratio for d in materialized)
     manifest = {
@@ -240,7 +403,10 @@ def materialize_blend(
                 **d.to_dict(),
                 "est_effective_tokens": int(d.tokens_kept * d.ratio),
                 "blend_share": round(d.tokens_kept * d.ratio / total_effective, 6) if total_effective else 0.0,
-                "predicates": [p.describe() for p in next(s for s in config.datasets if s.name == d.name).predicates],
+                "predicates": [
+                    p.describe()
+                    for p in next(s for s in config.datasets if s.name == (d.source_dataset or d.name)).predicates
+                ],
             }
             for d in materialized
         ],

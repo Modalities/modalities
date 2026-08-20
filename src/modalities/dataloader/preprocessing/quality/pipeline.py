@@ -614,7 +614,8 @@ def write_packing_configs(
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for dataset in manifest["datasets"]:
-        entry = registry.get(dataset["name"])
+        # Bucket rows are named "<dataset>__<level>", so the registry lookup uses the source.
+        entry = registry.get(dataset.get("source_dataset") or dataset["name"])
         for source_path, index_path in dataset["index_files"].items():
             relative = Path(source_path).relative_to(entry.jsonl_root)
             config = dict(template)

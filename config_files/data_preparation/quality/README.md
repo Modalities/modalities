@@ -201,6 +201,59 @@ A factor of 2.0 draws a dataset twice per epoch, 0.6 draws six tenths of it. Not
 duplicated on disk, and changing the blend means changing a number rather than rebuilding
 data.
 
+## Quality-aware upsampling curves
+
+A `ratio` treats every surviving document alike: `nemotron-cc` filtered to "content quality
+at least adequate" and set to 1.2 repeats the barely-adequate documents exactly as often as
+the excellent ones. A curve makes the repeat factor rise with quality instead, so the token
+budget is spent where the quality signal says it should be.
+
+```yaml
+- name: nemotron-cc
+  upsampling:
+    quality_field: content_quality      # ordinal axis, worst to best
+    target_tokens: 900_000_000_000      # or target_ratio, as a multiple of what is available
+    max_factor: 7.0                     # no bucket repeated more than this
+    discard_below_percentile: 40        # drop the weakest 40% of tokens
+  predicates: [...]                     # still applied first; the curve works on survivors
+```
+
+`ratio` and `upsampling` are mutually exclusive -- both express the same decision, so
+setting both is refused rather than one being silently ignored.
+
+The method and the functional form come from Dolma 3 / Olmo 3 (arXiv:2512.13961 §3.4.4,
+appendix A.2.4), which measured it against flat quality filtering on 1B models and found it
+better at every matched repetition factor -- 0.740 against 0.843-0.870 bits-per-byte on their
+maths suite. Quality goes on a [0, 1] axis where each bucket's width is its share of the
+dataset's tokens, and the repeat factor is `C * (x - a)**p` above the discard threshold `a`,
+with `p` chosen so the top bucket sits exactly at `max_factor`.
+
+Reproducing their published example -- twenty equal vigintiles, discard the bottom 40%,
+repeat at most 7x, draw as many tokens as the pool holds -- gives exactly their figure: the
+bottom eight buckets dropped, the top at 7.00x, monotone in between.
+
+**What `apply` does with it.** The packer emits one file per source file, so documents with
+different factors have to live in different indexes. Each bucket therefore becomes its own
+index tree, its own manifest row (named `<dataset>__<level>`, with `source_dataset` naming
+the registry entry), its own packed output, and its own repeat factor in
+`WeightedCombinedDataset`. The curve is re-solved from the exact token counts found during
+`apply` rather than from the cube, since that stage reads every document anyway.
+
+### Two limits worth knowing
+
+**The axis is only as fine as the field.** Dolma 3 cuts twenty vigintiles because their
+quality signal is a continuous classifier score. Propella labels are ordinal with about five
+levels, and the levels are not evenly filled: on the smoke blend, `climbmix-en` has 81.9% of
+its tokens in `moderate` and 17.9% in `high`. A curve over that axis can still do something
+useful -- it drew 2.53x the `high` tokens and 6% of the `moderate` ones -- but it cannot
+express a finer preference than the levels allow. A threshold falling inside a level applies
+a fractional factor to the whole level rather than splitting it, and which documents survive
+is then whatever the dataloader's even spread picks.
+
+**Only ordinal fields for now.** A native numeric metric would need the cube's quantile edges
+carried into materialisation, which is not built. Setting a non-ordinal `quality_field` is
+refused when the config loads, rather than after a preview has already succeeded.
+
 ## The source tree must not move underneath a sidecar
 
 A sidecar row locates its document by `(file_id, byte_offset, byte_len)`, where `file_id`

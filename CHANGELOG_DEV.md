@@ -743,3 +743,58 @@ the original vectorisation estimate implied.
 
 Reducing batch count needs the batch to stop holding a full table per part -- which would cut
 peak memory as well, the two being the same constraint seen from different sides.
+
+
+## PR #XXX Feature: quality-aware upsampling curves
+
+A `ratio` gives every surviving document of a dataset the same repeat factor, so a dataset
+filtered to "content quality at least adequate" repeats its barely-adequate documents exactly
+as often as its excellent ones. `upsampling` replaces the scalar with a curve whose factor
+rises with quality.
+
+Method and functional form from Dolma 3 / Olmo 3 (arXiv:2512.13961 §3.4.4, appendix A.2.4),
+which measured it against flat quality filtering on 1B models and found it better at every
+matched repetition factor -- 0.740 against 0.843-0.870 bits-per-byte on their maths suite.
+Quality is placed on a [0, 1] axis where a bucket's width is its share of the dataset's
+tokens; the factor is `C * (x - a)**p` above the discard threshold, with the integral pinned
+to the token target, no bucket above `max_factor`, and monotone.
+
+Reproducing their published example -- twenty vigintiles, discard the bottom 40%, cap 7x,
+draw one pool's worth of tokens -- returns exactly their figure: bottom eight buckets dropped,
+top at 7.00x, monotone between.
+
+**Deliberate departures from the paper**
+
+* Their family carries an extra `exp(lam * (x - a))`. Fixing `lam = 0` makes the solution
+  unique instead of a feasible region, and every integral analytic, so no quadrature is
+  needed. The remaining degree of freedom is spent pushing the top bucket to exactly
+  `max_factor`, which is where their own figure sits.
+* The exponent is capped at 8. Steepest-admissible is right when the cap binds, but when the
+  target is a small fraction of the pool -- the regime of any blend that draws far fewer
+  tokens than it holds -- no exponent violates the cap, "steepest" is unbounded, and the
+  budget collapses onto the top bucket: the hard top-k filtering the curve exists to beat.
+  A first attempt did exactly that, solving to exponent 512 with one surviving bucket.
+* Unannotated documents cannot be ordered, so they form an explicit `<unannotated>` bucket at
+  the bottom of the axis. Named in the report rather than folded in, because for a dataset
+  with partial coverage this decides the fate of the majority.
+
+**Downstream**
+
+`apply` writes one index tree per bucket, since the packer emits one file per source file and
+factors only mean anything if documents carrying different ones are in different indexes. Each
+bucket becomes a manifest row named `<dataset>__<level>` carrying `source_dataset`, so the
+registry lookup in `write-packing-configs` still resolves, and lands as its own repeat factor
+in `WeightedCombinedDataset`. The curve is re-solved from the exact counts `apply` observes
+rather than from the cube's interpolated ones.
+
+**Limits**
+
+Ordinal fields only; a numeric axis needs the cube's quantile edges carried into
+materialisation, and a non-ordinal `quality_field` is refused at config load rather than after
+a preview has succeeded. And the axis is only as fine as the field: propella labels have about
+five levels, unevenly filled -- `climbmix-en` holds 81.9% of its tokens in `moderate` -- so a
+curve cannot express a finer preference than the levels allow, where Dolma 3 cuts twenty
+vigintiles from a continuous score.
+
+Not ablated. The cluster was busy, so this is verified against the paper's published example
+and by unit tests, not by a training run.

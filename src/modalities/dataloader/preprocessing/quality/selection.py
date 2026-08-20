@@ -26,6 +26,14 @@ import yaml
 from pydantic import BaseModel, Field, model_validator
 
 from modalities.dataloader.preprocessing.quality.cube import MISSING, Cube
+from modalities.dataloader.preprocessing.quality.upsampling import (
+    UNANNOTATED_BUCKET,
+    QualityBucket,
+    UpsamplingError,
+    UpsamplingPlan,
+    UpsamplingSpec,
+    solve_curve,
+)
 
 # Ordinal scales, worst value first. Ordering is what gives `at_least` its meaning, so
 # these are stated explicitly rather than inferred: `information_density` in particular
@@ -209,6 +217,9 @@ class DatasetSelection(BaseModel):
         predicates (list[Predicate]): Conditions combined with AND. An empty list
             keeps every document, which is how an unannotated dataset participates.
         missing_annotation (Optional[MissingPolicy]): Overrides the config-wide policy.
+        upsampling (Optional[UpsamplingSpec]): Replaces ``ratio`` with a quality-aware
+            curve, so the repeat factor rises with quality instead of being one number for
+            every surviving document. Mutually exclusive with a non-default ``ratio``.
         enabled (bool): Whether this dataset takes part.
     """
 
@@ -216,7 +227,27 @@ class DatasetSelection(BaseModel):
     ratio: float = Field(default=1.0, ge=0.0)
     predicates: list[Predicate] = Field(default_factory=list)
     missing_annotation: Optional[MissingPolicy] = None
+    upsampling: Optional[UpsamplingSpec] = None
     enabled: bool = True
+
+    @model_validator(mode="after")
+    def _check_ratio_or_curve(self) -> "DatasetSelection":
+        # Silently ignoring one of them would make a config mean something other than it
+        # reads, and the two express the same decision.
+        if self.upsampling is not None and self.ratio != 1.0:
+            raise ValueError(
+                f"dataset {self.name!r} sets both 'ratio: {self.ratio}' and 'upsampling'; the curve "
+                f"already determines how much is drawn. Remove the ratio."
+            )
+        if self.upsampling is not None and self.upsampling.quality_field not in ORDINAL_SCALES:
+            # Checked at config load rather than mid-run: a numeric axis would need quantile
+            # edges carried from the cube into materialisation, which is not built yet, and
+            # discovering that after the preview succeeded would be worse than refusing now.
+            raise ValueError(
+                f"dataset {self.name!r}: upsampling needs an ordinal quality_field, and "
+                f"{self.upsampling.quality_field!r} is not one. Available: {sorted(ORDINAL_SCALES)}"
+            )
+        return self
 
 
 class SelectionConfig(BaseModel):
@@ -290,6 +321,8 @@ class DatasetResult:
         exact (bool): Whether the figures are exact. False when a numeric threshold
             fell inside a cube bin, so the count had to be interpolated.
         approximations (list[str]): Predicates that forced interpolation.
+        plan (Optional[UpsamplingPlan]): The solved quality curve, when the dataset uses one
+            instead of a flat ratio.
     """
 
     name: str
@@ -300,15 +333,32 @@ class DatasetResult:
     ratio: float
     exact: bool = True
     approximations: list[str] = field(default_factory=list)
+    plan: Optional[UpsamplingPlan] = None
 
     @property
     def effective_tokens(self) -> float:
         """Tokens the blend draws from this dataset.
 
         Returns:
-            float: Kept tokens scaled by the ratio.
+            float: Kept tokens scaled by the ratio, or what the curve draws.
         """
+        if self.plan is not None:
+            return self.plan.tokens_drawn
         return self.tokens_kept * self.ratio
+
+    @property
+    def ratio_label(self) -> str:
+        """How the up/downsampling is described in a report.
+
+        Returns:
+            str: The flat ratio, or the curve's range of factors.
+        """
+        if self.plan is None:
+            return f"{self.ratio:.2f}"
+        factors = [b.factor for b in self.plan.buckets if b.factor > 0]
+        if not factors:
+            return "curve"
+        return f"{min(factors):.2f}-{max(factors):.2f}x"
 
     @property
     def row_retention(self) -> float:
@@ -387,8 +437,90 @@ def _bin_fraction_above(binning, threshold: float, bin_index: int) -> float:
     return float(np.clip((high - threshold) / (high - low), 0.0, 1.0))
 
 
-def evaluate_on_cube(cube: Cube, dataset: DatasetSelection, missing_policy: MissingPolicy) -> DatasetResult:
-    """Evaluates a dataset's rule against its cube.
+def quality_buckets_from_cube(
+    cube: Cube, quality_field: str, weight: np.ndarray
+) -> list[QualityBucket]:
+    """Groups a cube's surviving cells into buckets ordered worst to best quality.
+
+    Unannotated documents cannot be placed on a quality axis, so they form their own bucket
+    at the bottom of the order. Putting them there is a choice worth knowing about: it means
+    a dataset whose annotation coverage is partial will see its unannotated majority treated
+    as lowest quality, and discarded first. The report names the bucket explicitly so this is
+    visible rather than implied.
+
+    Args:
+        cube (Cube): The dataset's cube.
+        quality_field (str): Ordinal label or native metric to order by.
+        weight (np.ndarray): Per-cell survival weight from the predicates.
+
+    Returns:
+        list[QualityBucket]: Non-empty buckets, worst quality first.
+
+    Raises:
+        SelectionError: If the cube was not grouped on the field.
+    """
+    table = cube.table
+    documents = table.column("n_documents").to_numpy(zero_copy_only=False).astype(np.float64) * weight
+    tokens = table.column("n_tokens").to_numpy(zero_copy_only=False).astype(np.float64) * weight
+
+    if quality_field not in cube.label_dimensions:
+        raise SelectionError(
+            f"cube for {cube.dataset!r} was not grouped on {quality_field!r}, so it cannot order "
+            f"documents by it. Grouped labels: {cube.label_dimensions}. Rebuild the cube with "
+            f"--label_dimension {quality_field}."
+        )
+    scale = ordered_quality_levels(quality_field)
+    rank = {level: i for i, level in enumerate(scale)}
+    values = table.column(quality_field).to_pylist()
+    keys = np.array(
+        [-1 if (v is None or v == MISSING) else rank.get(v, -1) for v in values], dtype=np.int64
+    )
+    order = sorted({int(k) for k in keys})
+    labels = {k: (UNANNOTATED_BUCKET if k < 0 else scale[k]) for k in order}
+
+    buckets: list[QualityBucket] = []
+    for key in order:
+        mask = keys == key
+        n_tokens = int(round(float(tokens[mask].sum())))
+        if n_tokens <= 0:
+            continue
+        buckets.append(
+            QualityBucket(
+                label=labels[key],
+                n_documents=int(round(float(documents[mask].sum()))),
+                n_tokens=n_tokens,
+                unannotated=key < 0,
+            )
+        )
+    return buckets
+
+
+def ordered_quality_levels(quality_field: str) -> tuple[str, ...]:
+    """Lists a field's levels from worst to best quality.
+
+    Args:
+        quality_field (str): An ordinal annotation field.
+
+    Returns:
+        tuple[str, ...]: Its declared levels in ascending order.
+
+    Raises:
+        SelectionError: If the field has no declared ordinal scale, so its levels cannot be
+            ordered and no curve over them would mean anything.
+    """
+    scale = ORDINAL_SCALES.get(quality_field)
+    if scale is None:
+        raise SelectionError(
+            f"{quality_field!r} has no declared ordinal scale, so its levels cannot be ordered worst "
+            f"to best. Ordinal fields: {sorted(ORDINAL_SCALES)}"
+        )
+    return scale
+
+
+def _cube_weights(
+    cube: Cube, dataset: DatasetSelection, missing_policy: MissingPolicy
+) -> tuple[np.ndarray, bool, list[str]]:
+    """Computes each cube cell's surviving fraction under a dataset's predicates.
 
     Args:
         cube (Cube): The dataset's cube.
@@ -396,17 +528,15 @@ def evaluate_on_cube(cube: Cube, dataset: DatasetSelection, missing_policy: Miss
         missing_policy (MissingPolicy): Policy for unannotated documents.
 
     Returns:
-        DatasetResult: Kept documents and tokens, flagged as exact or interpolated.
+        tuple[np.ndarray, bool, list[str]]: Per-cell weight in [0, 1], whether every
+            predicate was answered exactly, and the predicates that had to be interpolated.
 
     Raises:
-        SelectionError: If a predicate names a field the cube was not grouped on. The
-            cube cannot answer it, so the caller must fall back to the sidecar.
+        SelectionError: If a predicate names a field the cube was not grouped on.
     """
     table = cube.table
     n_rows = table.num_rows
     weight = np.ones(n_rows, dtype=np.float64)
-    documents = table.column("n_documents").to_numpy(zero_copy_only=False).astype(np.float64)
-    tokens = table.column("n_tokens").to_numpy(zero_copy_only=False).astype(np.float64)
     result_exact = True
     approximations: list[str] = []
 
@@ -479,15 +609,48 @@ def evaluate_on_cube(cube: Cube, dataset: DatasetSelection, missing_policy: Miss
             )
             weight *= factor
 
+    return weight, result_exact, approximations
+
+
+def evaluate_on_cube(cube: Cube, dataset: DatasetSelection, missing_policy: MissingPolicy) -> DatasetResult:
+    """Evaluates a dataset's rule against its cube.
+
+    Args:
+        cube (Cube): The dataset's cube.
+        dataset (DatasetSelection): The rule to apply.
+        missing_policy (MissingPolicy): Policy for unannotated documents.
+
+    Returns:
+        DatasetResult: Kept documents and tokens, flagged as exact or interpolated, plus the
+            solved curve when the dataset uses one.
+
+    Raises:
+        SelectionError: If a predicate names a field the cube was not grouped on, or if a
+            curve cannot be solved for the dataset.
+    """
+    weight, result_exact, approximations = _cube_weights(cube, dataset, missing_policy)
+    table = cube.table
+    documents = table.column("n_documents").to_numpy(zero_copy_only=False).astype(np.float64)
+    tokens = table.column("n_tokens").to_numpy(zero_copy_only=False).astype(np.float64)
+
+    plan: Optional[UpsamplingPlan] = None
+    if dataset.upsampling is not None:
+        buckets = quality_buckets_from_cube(cube, dataset.upsampling.quality_field, weight)
+        try:
+            plan = solve_curve(buckets, dataset.upsampling)
+        except UpsamplingError as e:
+            raise SelectionError(f"dataset {dataset.name!r}: {e}") from e
+
     return DatasetResult(
         name=dataset.name,
         n_documents_total=int(documents.sum()),
-        n_documents_kept=int(round(float((documents * weight).sum()))),
+        n_documents_kept=plan.documents_kept if plan else int(round(float((documents * weight).sum()))),
         tokens_total=int(tokens.sum()),
         tokens_kept=int(round(float((tokens * weight).sum()))),
         ratio=dataset.ratio,
         exact=result_exact,
         approximations=approximations,
+        plan=plan,
     )
 
 
@@ -685,21 +848,28 @@ def format_blend_report(result: BlendResult, datasets_in_order: Optional[Iterabl
     width = max([len(d.name) for d in rows] + [len("dataset")])
     header = (
         f"{'dataset':<{width}}  {'docs kept':>11}  {'row%':>6}  {'tokens kept':>12}  "
-        f"{'tok%':>6}  {'ratio':>6}  {'effective':>12}  {'share':>6}"
+        f"{'tok%':>6}  {'ratio':>11}  {'effective':>12}  {'share':>6}"
     )
     lines = [header, "-" * len(header)]
     for d in rows:
         marker = "" if d.exact else " ~"
         lines.append(
             f"{d.name:<{width}}  {humanise(d.n_documents_kept):>11}  {d.row_retention:>5.1%}  "
-            f"{humanise(d.tokens_kept):>12}  {d.token_retention:>5.1%}  {d.ratio:>6.2f}  "
+            f"{humanise(d.tokens_kept):>12}  {d.token_retention:>5.1%}  {d.ratio_label:>11}  "
             f"{humanise(d.effective_tokens):>12}{marker:<2}  {result.share_of(d):>5.1%}"
         )
     lines.append("-" * len(header))
     total = result.total_effective_tokens
     lines.append(
-        f"{'TOTAL':<{width}}  {'':>11}  {'':>6}  {'':>12}  {'':>6}  {'':>6}  {humanise(total):>12}  {1.0:>5.1%}"
+        f"{'TOTAL':<{width}}  {'':>11}  {'':>6}  {'':>12}  {'':>6}  {'':>11}  {humanise(total):>12}  {1.0:>5.1%}"
     )
+
+    curved = [d for d in rows if d.plan is not None]
+    if curved:
+        lines.append("\nquality-aware upsampling curves")
+        for d in curved:
+            lines.append(f"\n  {d.name}")
+            lines.append(d.plan.describe())
 
     if result.target_tokens:
         gap = total - result.target_tokens
