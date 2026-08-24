@@ -895,3 +895,27 @@ Peak still sits close to the limit, so the deeper fix is the bucket layout: 1024
 shard-task was chosen so a bucket could be loaded whole, a constraint filter pushdown
 removed. 65,536 files per split is now actively harmful, and re-bucketing at lower fanout
 would help every future re-join.
+
+
+## PR #XXX Pack many configs per process
+
+`modalities data pack_encoded_data` rebuilds its components, tokenizer included, from the
+config on every call. Measured on a compute node that startup is 24.7 s, against ~3 s of
+real work for a Dolmino file. The blend renders 54,738 configs -- one per source file, of
+which 40,003 are Dolmino -- so driving the CLI per file spends roughly 375 core-hours
+loading the tokenizer to do about 48 core-hours of tokenising.
+
+`slurm/pack_many.py` loads the tokenizer once per process and constructs a
+`PackedDataGenerator` per config, which is what `pack_encoded_data` does internally. Inside
+the driver the load costs 1.2 s and is paid once. Everything else still comes from the
+rendered config, so the output is identical.
+
+Two details that matter at this scale: the slice is strided rather than contiguous, because
+the config list is grouped by dataset and contiguous slices would hand one task all 40,003
+Dolmino files and another all 15 FineWiki ones; and a failing config logs and continues
+rather than killing its 854 siblings, with `--skip_existing` making reruns resumable.
+
+Measured on the real blend: 250 GB/h of packed output across 10 concurrent 32-core tasks,
+with `num_cpus` confirmed resolving to 32. That is about 54k tokens/s per core, well below
+what a fast tokenizer manages, which points at the per-document seeks the filtered index
+implies rather than at tokenisation.
