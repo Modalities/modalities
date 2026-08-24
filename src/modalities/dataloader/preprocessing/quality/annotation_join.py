@@ -571,21 +571,25 @@ def join_annotations(
         )
 
         # One scan over the split with the key filter pushed into it, instead of a read and
-        # an is_in per bucket file. The split is partitioned into a thousand files of a few
-        # hundred kilobytes, so opening and scanning them individually cost more than the
-        # data itself: 22 s of reads and 14 s of a thousand separate is_in calls, against
-        # 47 s total. Arrow applies the filter per row group while scanning and reads the
-        # files in parallel, so memory stays bounded by the rows that match rather than by
-        # the size of the split.
+        # an is_in per bucket file: opening a thousand files of a few hundred kilobytes cost
+        # more than the data itself, 36 s of 47 s.
+        #
+        # Streamed rather than collected with to_table, which buffers the whole scan. On
+        # HPLT -- 65,536 bucket files, 3.76 bn annotation rows -- that reached 167 GB and was
+        # OOM-killed against a 160 G request, even though only ~10 M rows can match. Reading
+        # in batches with bounded readahead keeps memory to the matches plus a little.
         pieces: list[pa.Table] = []
         if len(wanted_keys) > 0:
-            dataset = ds.dataset(all_bucket_files, format="parquet")
-            matched = dataset.to_table(
+            scanner = ds.dataset(all_bucket_files, format="parquet").scanner(
                 columns=["key"] + label_columns,
                 filter=ds.field("key").isin(wanted_keys),
+                batch_size=131_072,
+                batch_readahead=4,
+                fragment_readahead=2,
             )
-            if matched.num_rows:
-                pieces.append(matched)
+            batches = [batch for batch in scanner.to_batches() if batch.num_rows]
+            if batches:
+                pieces.append(pa.Table.from_batches(batches))
 
         lookup_keys: Optional[pa.Array] = None
         lookup: Optional[pa.Table] = None

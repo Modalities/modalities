@@ -13,6 +13,7 @@ independently, re-run for a single dataset, and resumed after a failure:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -394,9 +395,22 @@ def join_blend_annotations(
     report_dir = Path(work_dir) / "join_report"
     report_dir.mkdir(parents=True, exist_ok=True)
     for r in reports:
-        (report_dir / f"{r.dataset}.json").write_text(json.dumps(r.to_dict(), indent=1))
-    # Merged view, rebuilt from whatever per-dataset files exist so far.
-    merged = [json.loads(p.read_text()) for p in sorted(report_dir.glob("*.json"))]
+        # Atomic, because the merge below globs this directory while sibling array tasks are
+        # writing into it. A plain write_text let another task read a half-written file:
+        # finewiki-es died on JSONDecodeError after its own join had already succeeded.
+        target = report_dir / f"{r.dataset}.json"
+        tmp = target.with_suffix(f".tmp.{os.getpid()}")
+        tmp.write_text(json.dumps(r.to_dict(), indent=1))
+        os.replace(tmp, target)
+
+    # Merged view, rebuilt from whatever per-dataset files exist so far. Tolerant of a
+    # sibling mid-write for the same reason, and of the .tmp files that implies.
+    merged = []
+    for path in sorted(report_dir.glob("*.json")):
+        try:
+            merged.append(json.loads(path.read_text()))
+        except (OSError, json.JSONDecodeError):
+            continue
     (Path(work_dir) / "join_report.json").write_text(json.dumps(merged, indent=1))
     return reports
 

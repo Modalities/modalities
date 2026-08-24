@@ -83,10 +83,14 @@ datasets:
   # not unique -- roughly 4% recur -- so the join keeps the first occurrence. This is not
   # specific to this split: finewiki measured 868,586 duplicate keys in 43.1 M rows (2.0%)
   # on a real run, so expect the join to report duplicates for most splits.
+  # The 2026-08 delivery renamed `warc_record_id` to `id`, keeping the same bare UUIDs.
+  # The old name silently produced a null join key for every document and 0% coverage.
+  # Both subdirectories -- high_actual and high_diverse_qa_pairs -- are covered by the
+  # high-actual annotation split; 400/400 sampled ids from each were found in it.
   - name: nemotron-cc
     jsonl_root: /data/annealing/english/Nemotron-CC
     annotation_split: nemotron-cc/high-actual
-    key: {kind: field, field: warc_record_id}
+    key: {kind: field, field: id}
 
   # ---------------------------------------------------------------- ClimbMix
   # No identifier of any kind; the annotation key is the SHA-256 of the exact text.
@@ -105,7 +109,7 @@ datasets:
     key:
       kind: source_pointer
       field: id
-      source_root: /data/annealing/Nemotron-ClimbMix
+      source_root: /data/annealing_unused/Nemotron-ClimbMix
       source_line_offset: 0
     native_metrics:
       - {name: proxy_score, jq_pattern: .proxy_score}

@@ -841,3 +841,31 @@ basic` on `klettermix-de` (matches 100.0% of tokens, 425 marginal).
 * `_cube_weights` tested the cumulative exactness flag when recording which predicates were
   interpolated, so once any predicate was interpolated every later one was reported as
   interpolated too. Now per predicate.
+
+
+## PR #XXX Fixes found by the first full production run
+
+Three failures on the real blend, two of them silent-failure bugs of the same shape as the
+ones fixed earlier this week, and one schema drift in the delivered data.
+
+**Pointer resolution destroyed the pointers it could not resolve.** `Nemotron-ClimbMix`, the
+English corpus KletterMix's `source_pointer` keys resolve into, was moved to
+`/data/annealing_unused/`. `resolve_source_pointers` resolved nothing, wrote 225 M nulls over
+the pointers, logged `resolved 0 of 4,463,748 pointers` as INFO, and carried on -- surfacing
+two hours later as 0% join coverage, by which point the pointers were gone and only a full
+sidecar rebuild could recover them. It now refuses to write a part that resolved nothing.
+
+**The join scan was not bounded by matches.** The comment claimed memory "stays bounded by
+the rows that match"; `to_table` buffers the whole scan. On HPLT -- 65,536 bucket files,
+3.76 bn annotation rows -- that reached 167 GB and was OOM-killed against a 160 G request,
+though only ~10 M rows can match. Now streamed via `Scanner.to_batches()` with bounded
+readahead.
+
+**The join report merge raced.** Each array task writes its own report then re-reads the
+directory to rebuild a merged view. Non-atomic writes meant a sibling could read a
+half-written file: `finewiki-es` died on `JSONDecodeError` *after* its own join had succeeded
+at 100%. Same fix as the bucket metadata: `os.replace` plus a tolerant reader.
+
+**Delivered data changed shape.** Nemotron-CC renamed `warc_record_id` to `id` and re-chunked
+from 1.70 bn documents of ~1 KB to 504 M of ~12 KB in the same 1.8 TB. Registry key updated;
+a spot check matches 400/400 ids in both `high_actual` and `high_diverse_qa_pairs`.

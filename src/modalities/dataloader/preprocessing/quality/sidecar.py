@@ -383,7 +383,22 @@ def resolve_source_pointers(
         for start in range(0, len(unique_pointers), batch_size):
             mapping.update(resolver.resolve(unique_pointers[start : start + batch_size]))
         resolved = [mapping.get(p) if p is not None else None for p in table.column("join_key").to_pylist()]
-        n_resolved += sum(1 for r in resolved if r is not None)
+        n_part = sum(1 for r in resolved if r is not None)
+        if n_part == 0:
+            # Refuse before writing. The write-back replaces the pointer with the resolved
+            # key, so writing nulls destroys the only copy of the pointer and makes a retry
+            # impossible without rebuilding the whole sidecar -- which is what happened when
+            # the source corpus was moved to /data/annealing_unused: 225 M pointers were
+            # overwritten with nulls, logged as an INFO line, and the failure only surfaced
+            # as 0% join coverage two hours later.
+            raise SidecarWriteError(
+                f"dataset {dataset.name!r}: none of {len(unique_pointers):,} distinct pointers in "
+                f"{part.name} resolved against {dataset.key.source_root}. Check that the source "
+                f"corpus is there and that its files match the pointers "
+                f"(e.g. {unique_pointers[0]!r}). Refusing to write, because the write-back would "
+                f"replace the pointers with nulls and a retry would need a full rebuild."
+            )
+        n_resolved += n_part
         table = table.set_column(
             table.schema.get_field_index("join_key"),
             pa.field("join_key", pa.large_string()),
