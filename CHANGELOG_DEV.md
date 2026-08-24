@@ -869,3 +869,29 @@ at 100%. Same fix as the bucket metadata: `os.replace` plus a tolerant reader.
 **Delivered data changed shape.** Nemotron-CC renamed `warc_record_id` to `id` and re-chunked
 from 1.70 bn documents of ~1 KB to 504 M of ~12 KB in the same 1.8 TB. Registry key updated;
 a spot check matches 400/400 ids in both `high_actual` and `high_diverse_qa_pairs`.
+
+
+## PR #XXX Fix: join memory scales with fragment count, not data volume
+
+The streamed scan in the previous change fixed the wrong layer. HPLT still exceeded the
+160 GiB limit, and the measurements show why -- peak memory tracks how many bucket *files* a
+split has, not how much data:
+
+| split | files | documents | peak RSS |
+|---|---|---|---|
+| nemotron-cc | 16,384 | 504 M | 81.6 GB |
+| nemotron-climbmix | 12,288 | 226 M | 95.0 GB |
+| hplt (each) | 65,536 | 10.7 M | OOM > 160 GB |
+
+Four times the files and one forty-seventh of the documents, and HPLT is the one that dies.
+A dataset holds a fragment per file with that file's parquet metadata, so the scan machinery
+scales with the fragment count. Batching the record batches never touched that.
+
+The split is now scanned in groups of `SCAN_FILE_GROUP` files, bounding the fragment
+metadata held at once. All three HPLT splits then completed in 42-45 minutes, and `hplt-it`
+-- which had succeeded before the change -- returns byte-identical coverage.
+
+Peak still sits close to the limit, so the deeper fix is the bucket layout: 1024 buckets per
+shard-task was chosen so a bucket could be loaded whole, a constraint filter pushdown
+removed. 65,536 files per split is now actively harmful, and re-bucketing at lower fanout
+would help every future re-join.

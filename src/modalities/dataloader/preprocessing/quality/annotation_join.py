@@ -47,6 +47,11 @@ DEFAULT_LABEL_COLUMNS: tuple[str, ...] = (
 KEY_COLUMN = "id"
 
 
+# Files per dataset scan. This bounds how much parquet fragment metadata is held at once,
+# which is what actually drives the join's peak memory -- see the note in ``flush``.
+SCAN_FILE_GROUP = 2048
+
+
 class AnnotationJoinError(RuntimeError):
     """Raised when a join cannot be carried out as specified."""
 
@@ -570,24 +575,28 @@ def join_annotations(
             else pa.array([], type=pa.large_string())
         )
 
-        # One scan over the split with the key filter pushed into it, instead of a read and
-        # an is_in per bucket file: opening a thousand files of a few hundred kilobytes cost
-        # more than the data itself, 36 s of 47 s.
+        # Scanned in groups of files rather than as one dataset over the whole split.
         #
-        # Streamed rather than collected with to_table, which buffers the whole scan. On
-        # HPLT -- 65,536 bucket files, 3.76 bn annotation rows -- that reached 167 GB and was
-        # OOM-killed against a 160 G request, even though only ~10 M rows can match. Reading
-        # in batches with bounded readahead keeps memory to the matches plus a little.
+        # A dataset holds a fragment per file, with that file's parquet metadata, and the
+        # scan machinery scales with the fragment count rather than with the data. The
+        # measurements say so plainly: nemotron-cc, 16,384 files and 504 M documents, peaked
+        # at 81.6 GB; HPLT, 65,536 files but only 10.7 M documents, exceeded 160 GB and was
+        # OOM-killed. Four times the files, one fiftieth of the data, and it is the one that
+        # dies. Streaming the batches was not enough, because the fragments themselves are
+        # what costs.
         pieces: list[pa.Table] = []
         if len(wanted_keys) > 0:
-            scanner = ds.dataset(all_bucket_files, format="parquet").scanner(
-                columns=["key"] + label_columns,
-                filter=ds.field("key").isin(wanted_keys),
-                batch_size=131_072,
-                batch_readahead=4,
-                fragment_readahead=2,
-            )
-            batches = [batch for batch in scanner.to_batches() if batch.num_rows]
+            batches: list[pa.RecordBatch] = []
+            for start in range(0, len(all_bucket_files), SCAN_FILE_GROUP):
+                group = all_bucket_files[start : start + SCAN_FILE_GROUP]
+                scanner = ds.dataset(group, format="parquet").scanner(
+                    columns=["key"] + label_columns,
+                    filter=ds.field("key").isin(wanted_keys),
+                    batch_size=131_072,
+                    batch_readahead=4,
+                    fragment_readahead=2,
+                )
+                batches.extend(batch for batch in scanner.to_batches() if batch.num_rows)
             if batches:
                 pieces.append(pa.Table.from_batches(batches))
 
