@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import pickle
-from dataclasses import dataclass
+import shutil
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
 
@@ -383,10 +385,87 @@ def materialize_blend(
         Path: Path to the written ``mix_manifest.yaml``.
 
     Raises:
-        MaterializationError: If a selected dataset has no sidecar.
+        MaterializationError: If a selected dataset has no sidecar, or if the run would
+            repeat data past its declared cap and ``allow_overexposure`` is not set.
     """
     output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
+    output_root.parent.mkdir(parents=True, exist_ok=True)
+
+    # Everything is built in a sibling directory and moved into place only once the
+    # exposure check has passed and the manifest is written. Writing into the destination
+    # directly meant a rejected apply left fresh index trees next to the previous run's
+    # manifest -- a directory that still looks complete but whose manifest no longer
+    # describes the indexes beside it. A sibling keeps the move a rename on one filesystem.
+    staging = output_root.parent / f".{output_root.name}.staging.{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    try:
+        manifest_path = _materialize_into(
+            staging_root=staging,
+            published_root=output_root,
+            config=config,
+            registry=registry,
+            sidecar_root=sidecar_root,
+            show_progress=show_progress,
+            allow_overexposure=allow_overexposure,
+        )
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    # Two renames rather than one: os.replace refuses a non-empty destination directory,
+    # so the previous run steps aside first and is only deleted once the new tree is live.
+    superseded = output_root.parent / f".{output_root.name}.superseded.{os.getpid()}"
+    if output_root.exists():
+        os.replace(output_root, superseded)
+    try:
+        os.replace(staging, output_root)
+    except BaseException:
+        if superseded.exists():
+            os.replace(superseded, output_root)
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    shutil.rmtree(superseded, ignore_errors=True)
+
+    final_path = output_root / manifest_path.name
+    get_logger(name="main").info(f"Published the blend at {output_root}; manifest {final_path}.")
+    return final_path
+
+
+def _materialize_into(
+    staging_root: Path,
+    published_root: Path,
+    config: SelectionConfig,
+    registry: CorpusRegistry,
+    sidecar_root: Path,
+    show_progress: bool,
+    allow_overexposure: bool,
+) -> Path:
+    """Builds a complete blend inside ``staging_root``.
+
+    Split out from ``materialize_blend`` so that every failure path -- a missing sidecar,
+    a bad curve, the exposure cap -- leaves the caller with a directory to discard rather
+    than a half-updated destination.
+
+    Args:
+        staging_root (Path): Empty directory receiving the index trees and manifest.
+        published_root (Path): Where the staged tree will end up. Index paths are recorded
+            relative to this, not to the staging directory, which stops existing.
+        config (SelectionConfig): The blend specification.
+        registry (CorpusRegistry): Registry resolving dataset names to source files.
+        sidecar_root (Path): Directory holding one subdirectory of sidecar parts per dataset.
+        show_progress (bool): Whether to show progress bars.
+        allow_overexposure (bool): Whether to proceed despite exceeded repetition caps.
+
+    Returns:
+        Path: Path to the manifest inside ``staging_root``.
+
+    Raises:
+        MaterializationError: If a selected dataset has no sidecar, or if the run would
+            repeat data past its declared cap and ``allow_overexposure`` is not set.
+    """
+    output_root = staging_root
     materialized: list[MaterializedDataset] = []
 
     for dataset_selection in config.enabled_datasets():
@@ -411,6 +490,12 @@ def materialize_blend(
             materialized.extend(materialize_dataset_buckets(**arguments))
         else:
             materialized.append(materialize_dataset(**arguments))
+
+    # The index writers record the path they physically wrote to, which is inside the
+    # staging directory. That directory is renamed away on publication, so a manifest
+    # holding those paths would name files that no longer exist and every packing config
+    # built from it would point at nothing.
+    materialized = [_rebase_index_files(d, staging_root, published_root) for d in materialized]
 
     total_effective = sum(d.tokens_kept * d.ratio for d in materialized)
 
@@ -466,10 +551,32 @@ def materialize_blend(
         yaml.safe_dump(manifest, f, sort_keys=False)
 
     get_logger(name="main").info(
-        f"Wrote {len(materialized)} filtered index tree(s) and {manifest_path}; "
+        f"Staged {len(materialized)} filtered index tree(s); "
         f"estimated {_humanise_tokens(total_effective)} effective tokens."
     )
     return manifest_path
+
+
+def _rebase_index_files(
+    materialized: MaterializedDataset, staging_root: Path, published_root: Path
+) -> MaterializedDataset:
+    """Rewrites a row's index paths from where they were written to where they will live.
+
+    Args:
+        materialized (MaterializedDataset): A row carrying staging-relative index paths.
+        staging_root (Path): The directory the indexes were written under.
+        published_root (Path): The directory they will be renamed into.
+
+    Returns:
+        MaterializedDataset: The same row with index paths under ``published_root``.
+    """
+    return replace(
+        materialized,
+        index_files={
+            source: str(published_root / Path(index).relative_to(staging_root))
+            for source, index in materialized.index_files.items()
+        },
+    )
 
 
 def _humanise_tokens(n: float) -> str:

@@ -1302,3 +1302,401 @@ def test_attribution_reports_which_predicate_was_interpolated(built_sidecar: Pat
     # A threshold inside a quantile bin is interpolated; an ordinal level never is.
     assert not numeric.exact
     assert ordinal.exact
+
+
+# --------------------------------------------------------------------------- reruns
+#
+# Both stages below write into a directory that a later stage globs for work. That makes
+# leftovers dangerous rather than merely untidy: a stale index tree is packed, and a stale
+# .pbin is trained on. These tests rerun each stage and check the directory afterwards
+# describes only the current selection.
+
+
+@pytest.fixture
+def blend_inputs(tmp_path: Path, dataset_entry: DatasetEntry, built_sidecar: Path):
+    """A registry and a sidecar root laid out the way `materialize_blend` expects."""
+    import shutil
+
+    sidecar_root = tmp_path / "sidecar_root"
+    shutil.copytree(built_sidecar, sidecar_root / "toy")
+    return CorpusRegistry(datasets=[dataset_entry]), sidecar_root
+
+
+def _blend_config(**overrides):
+    from modalities.dataloader.preprocessing.quality.selection import SelectionConfig
+
+    settings = dict(datasets=[DatasetSelection(name="toy", ratio=2.0)])
+    settings.update(overrides)
+    return SelectionConfig(**settings)
+
+
+def _overexposed_config():
+    """A selection whose repetition cap the run would blow through.
+
+    Its predicate also selects a different, much smaller document set than
+    `_blend_config`. Without that the rejected run would rewrite byte-identical indexes
+    and corruption would be undetectable by comparing the directory.
+    """
+    return _blend_config(
+        datasets=[
+            DatasetSelection(
+                name="toy",
+                ratio=2.0,
+                predicates=[Predicate(field="educational_value", op=Op.AT_LEAST, value="high")],
+            )
+        ],
+        target_tokens=1e12,
+        max_total_exposure=1.0,
+    )
+
+
+def test_a_rejected_apply_leaves_the_previous_blend_exactly_as_it_was(tmp_path: Path, blend_inputs):
+    from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+
+    registry, sidecar_root = blend_inputs
+    output_root = tmp_path / "blend"
+
+    manifest_path = materialize_blend(
+        config=_blend_config(),
+        registry=registry,
+        sidecar_root=sidecar_root,
+        output_root=output_root,
+        show_progress=False,
+    )
+    before = {p.relative_to(output_root): p.read_bytes() for p in sorted(output_root.rglob("*")) if p.is_file()}
+    assert before, "the first apply must have written something to compare against"
+
+    # The exposure guard fires only after every index has been written, so this is the
+    # case where a destination-in-place apply would leave new indexes beside an old
+    # manifest: a directory that still looks complete but no longer agrees with itself.
+    with pytest.raises(MaterializationError, match="past its declared cap"):
+        materialize_blend(
+            config=_overexposed_config(),
+            registry=registry,
+            sidecar_root=sidecar_root,
+            output_root=output_root,
+            show_progress=False,
+        )
+
+    after = {p.relative_to(output_root): p.read_bytes() for p in sorted(output_root.rglob("*")) if p.is_file()}
+    assert after == before, "a rejected apply must not touch the blend that is already published"
+    assert manifest_path.exists()
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".blend.")]
+    assert leftovers == [], f"staging directories must be cleaned up, found {leftovers}"
+
+
+def test_a_rejected_first_apply_publishes_nothing_at_all(tmp_path: Path, blend_inputs):
+    from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+
+    registry, sidecar_root = blend_inputs
+    output_root = tmp_path / "blend"
+
+    with pytest.raises(MaterializationError):
+        materialize_blend(
+            config=_overexposed_config(),
+            registry=registry,
+            sidecar_root=sidecar_root,
+            output_root=output_root,
+            show_progress=False,
+        )
+
+    assert not output_root.exists(), "a failed apply must not leave a half-built blend behind"
+    assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".blend.")] == []
+
+
+def test_a_successful_apply_replaces_the_previous_blend_rather_than_merging_into_it(tmp_path: Path, blend_inputs):
+    from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+
+    registry, sidecar_root = blend_inputs
+    output_root = tmp_path / "blend"
+    arguments = dict(registry=registry, sidecar_root=sidecar_root, output_root=output_root, show_progress=False)
+
+    materialize_blend(config=_blend_config(), **arguments)
+    stale = output_root / "dropped-dataset" / "shard_0.idx"
+    stale.parent.mkdir(parents=True)
+    stale.write_bytes(b"from an earlier selection")
+
+    materialize_blend(config=_blend_config(datasets=[DatasetSelection(name="toy", ratio=3.0)]), **arguments)
+
+    assert not stale.exists(), "index trees the new selection does not name must not survive the rerun"
+    assert (output_root / "toy").is_dir()
+
+
+def test_the_published_manifest_names_index_files_that_actually_exist(tmp_path: Path, blend_inputs):
+    # The indexes are written under a staging directory that is renamed away on
+    # publication. If the manifest kept the paths the writers physically used, every path
+    # in it would point inside a directory that no longer exists, and every packing config
+    # built from it would name a missing index.
+    import yaml
+
+    from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+
+    registry, sidecar_root = blend_inputs
+    output_root = tmp_path / "blend"
+
+    manifest_path = materialize_blend(
+        config=_blend_config(),
+        registry=registry,
+        sidecar_root=sidecar_root,
+        output_root=output_root,
+        show_progress=False,
+    )
+    manifest = yaml.safe_load(manifest_path.read_text())
+
+    indexes = [Path(index) for dataset in manifest["datasets"] for index in dataset["index_files"].values()]
+    assert indexes, "the manifest must name at least one index"
+    missing = [str(index) for index in indexes if not index.exists()]
+    assert missing == [], f"the manifest names index files that are not on disk: {missing[:3]}"
+    for index in indexes:
+        assert output_root in index.parents, f"{index} is not under the published blend"
+
+
+def test_a_curved_blend_also_publishes_usable_index_paths(tmp_path: Path, blend_inputs):
+    # Curves take a different code path, writing one index tree per quality bucket, so the
+    # rebasing has to hold there too.
+    import yaml
+
+    from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
+
+    registry, sidecar_root = blend_inputs
+    output_root = tmp_path / "blend"
+
+    manifest_path = materialize_blend(
+        config=_blend_config(
+            datasets=[
+                DatasetSelection(
+                    name="toy",
+                    upsampling=UpsamplingSpec(quality_field="educational_value", target_ratio=1.5),
+                )
+            ]
+        ),
+        registry=registry,
+        sidecar_root=sidecar_root,
+        output_root=output_root,
+        show_progress=False,
+    )
+    manifest = yaml.safe_load(manifest_path.read_text())
+
+    assert len(manifest["datasets"]) > 1, "a curve must split the dataset into per-bucket rows"
+    for dataset in manifest["datasets"]:
+        for index in dataset["index_files"].values():
+            assert Path(index).exists(), f"{dataset['name']} names a missing index {index}"
+
+
+def _packing_inputs(tmp_path: Path, dataset_entry: DatasetEntry, names: list[str]) -> tuple[Path, Path, Path]:
+    """A manifest naming `names`, plus a registry, a template and real index files."""
+    import yaml
+
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text(
+        yaml.safe_dump(
+            {
+                "datasets": [
+                    {
+                        "name": "toy",
+                        "jsonl_root": str(dataset_entry.jsonl_root),
+                        "glob": "*.jsonl",
+                        "annotation_split": "toy",
+                        "key": {"kind": "field", "field": "id"},
+                    }
+                ]
+            }
+        )
+    )
+    template_path = tmp_path / "template.yaml"
+    template_path.write_text(
+        yaml.safe_dump({"settings": {"jq_pattern": ".text"}, "tokenizer": {"config": {"name": "whitespace"}}})
+    )
+
+    for name in names:
+        index_path = tmp_path / f"{name}_0.idx"
+        if not index_path.exists():
+            index_path.write_bytes(pickle.dumps([(0, 10), (10, 10)]))
+
+    manifest_path = tmp_path / f"manifest_{'_'.join(names)}.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(
+            {
+                "datasets": [
+                    {
+                        "name": name,
+                        "source_dataset": "toy",
+                        "index_files": {
+                            str(dataset_entry.jsonl_root / "shard_0.jsonl"): str(tmp_path / f"{name}_0.idx")
+                        },
+                    }
+                    for name in names
+                ]
+            }
+        )
+    )
+    return manifest_path, registry_path, template_path
+
+
+def _fake_pack(config_path: Path) -> Path:
+    """Stands in for the packing stage: writes an output and records its fingerprint.
+
+    Mirrors `pack_many.py`, which writes the marker only after `run()` returns.
+    """
+    destination = config_path.with_suffix(".pbin")
+    destination.write_bytes(b"packed")
+    destination.with_name(destination.name + ".fingerprint").write_text(
+        config_path.with_suffix(".fingerprint").read_text()
+    )
+    return destination
+
+
+def test_rerunning_packing_configs_removes_the_jobs_the_new_manifest_dropped(tmp_path: Path, dataset_entry):
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    wide, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy__high", "toy__low"])
+    narrow, _, _ = _packing_inputs(tmp_path, dataset_entry, ["toy__high"])
+    arguments = dict(registry_path=registry_path, template_path=template_path, output_dir=output_dir)
+
+    written = quality_pipeline.write_packing_configs(manifest_path=wide, **arguments)
+    assert len(written) == 2
+    for config_path in written:
+        _fake_pack(config_path)
+
+    quality_pipeline.write_packing_configs(manifest_path=narrow, **arguments)
+
+    assert (output_dir / "toy__high" / "shard_0.yaml").exists()
+    assert (output_dir / "toy__high" / "shard_0.pbin").exists(), "an unchanged dataset must not be repacked"
+    assert not (output_dir / "toy__low").exists(), "the dropped dataset's config and .pbin must both be gone"
+    assert sorted(p.name for p in output_dir.rglob("*.pbin")) == ["shard_0.pbin"]
+
+
+def test_a_changed_selection_discards_the_output_packed_from_the_old_index(tmp_path: Path, dataset_entry):
+    # The dangerous case, and the reason a name-based check is not enough: the index is
+    # rewritten under the same path, so the .pbin beside it keeps its name while holding
+    # the previous selection's documents. Packing skips already-present outputs, so
+    # leaving it would train on tokens no current predicate chose.
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy"])
+    arguments = dict(manifest_path=manifest_path, registry_path=registry_path, template_path=template_path)
+
+    written = quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+    destination = _fake_pack(written[0])
+    assert destination.exists()
+
+    # A changed predicate keeps the index path and changes its contents.
+    (tmp_path / "toy_0.idx").write_bytes(pickle.dumps([(0, 10)]))
+    quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+
+    assert not destination.exists(), "the output packed from the superseded index must be deleted"
+    assert not destination.with_name(destination.name + ".fingerprint").exists()
+    assert written[0].exists(), "the config itself is still current and must be rewritten, not removed"
+
+
+def test_an_unchanged_selection_keeps_its_packed_output(tmp_path: Path, dataset_entry):
+    # The other half of the contract: fingerprinting must not force a full repack of a
+    # blend that has not changed, which on the real corpus is hours of tokenisation.
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy"])
+    arguments = dict(manifest_path=manifest_path, registry_path=registry_path, template_path=template_path)
+
+    written = quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+    destination = _fake_pack(written[0])
+    stamp = destination.stat().st_mtime_ns
+
+    quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+
+    assert destination.exists() and destination.stat().st_mtime_ns == stamp
+
+
+def test_an_output_with_no_fingerprint_record_is_not_trusted(tmp_path: Path, dataset_entry):
+    # Outputs packed before fingerprinting existed, and outputs from a pack that died
+    # before writing its marker. Neither can be shown to match the current index.
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy"])
+    arguments = dict(manifest_path=manifest_path, registry_path=registry_path, template_path=template_path)
+
+    written = quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+    unmarked = written[0].with_suffix(".pbin")
+    unmarked.write_bytes(b"packed by an older run")
+
+    quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+
+    assert not unmarked.exists()
+
+
+def test_packing_configs_refuse_a_manifest_whose_indexes_are_gone(tmp_path: Path, dataset_entry):
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy"])
+    (tmp_path / "toy_0.idx").unlink()
+
+    with pytest.raises(MaterializationError, match="not on disk"):
+        quality_pipeline.write_packing_configs(
+            manifest_path=manifest_path,
+            registry_path=registry_path,
+            template_path=template_path,
+            output_dir=tmp_path / "packcfg",
+        )
+
+
+def test_packing_config_pruning_can_be_turned_off(tmp_path: Path, dataset_entry):
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    wide, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy__high", "toy__low"])
+    narrow, _, _ = _packing_inputs(tmp_path, dataset_entry, ["toy__high"])
+    arguments = dict(registry_path=registry_path, template_path=template_path, output_dir=output_dir)
+
+    quality_pipeline.write_packing_configs(manifest_path=wide, **arguments)
+    quality_pipeline.write_packing_configs(manifest_path=narrow, prune=False, **arguments)
+
+    assert (output_dir / "toy__low" / "shard_0.yaml").exists(), "--no_prune must leave the old jobs in place"
+
+
+def test_pruning_leaves_files_it_does_not_own_alone(tmp_path: Path, dataset_entry):
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy__high"])
+    output_dir.mkdir()
+    note = output_dir / "NOTES.md"
+    note.write_text("why this blend exists")
+
+    quality_pipeline.write_packing_configs(
+        manifest_path=manifest_path,
+        registry_path=registry_path,
+        template_path=template_path,
+        output_dir=output_dir,
+    )
+
+    assert note.exists(), "pruning is limited to .yaml, .pbin and .fingerprint, so anything else survives"
+
+
+def test_adopt_existing_accepts_unfingerprinted_output_but_only_that(tmp_path: Path, dataset_entry):
+    # The migration path for the blend already on disk, which was packed before
+    # fingerprints existed. It must adopt an unmarked output and still refuse one whose
+    # record positively disagrees.
+    from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+
+    output_dir = tmp_path / "packcfg"
+    manifest_path, registry_path, template_path = _packing_inputs(tmp_path, dataset_entry, ["toy"])
+    arguments = dict(manifest_path=manifest_path, registry_path=registry_path, template_path=template_path)
+
+    written = quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+    legacy = written[0].with_suffix(".pbin")
+    legacy.write_bytes(b"packed before fingerprinting")
+
+    quality_pipeline.write_packing_configs(output_dir=output_dir, adopt_existing=True, **arguments)
+    assert legacy.exists(), "an unmarked output must be adoptable rather than repacked"
+
+    # Adopted, so a later run without the flag leaves it alone.
+    quality_pipeline.write_packing_configs(output_dir=output_dir, **arguments)
+    assert legacy.exists()
+
+    # A record that actively disagrees is never adopted, flag or not.
+    legacy.with_name(legacy.name + ".fingerprint").write_text("from-another-selection")
+    quality_pipeline.write_packing_configs(output_dir=output_dir, adopt_existing=True, **arguments)
+    assert not legacy.exists(), "--adopt_existing must not override a fingerprint that disagrees"

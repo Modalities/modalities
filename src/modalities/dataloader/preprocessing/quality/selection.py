@@ -502,6 +502,22 @@ def quality_buckets_from_cube(
     return buckets
 
 
+def ordered_bucket_labels(quality_field: str) -> list[str]:
+    """Bucket labels for a quality field, worst first, unannotated at the bottom.
+
+    Shared by the cube path, the exact sidecar path and materialisation: three places that
+    must agree on the axis or a curve would mean different things depending on how it was
+    evaluated.
+
+    Args:
+        quality_field (str): An ordinal annotation field.
+
+    Returns:
+        list[str]: ``UNANNOTATED_BUCKET`` followed by the field's levels in ascending order.
+    """
+    return [UNANNOTATED_BUCKET, *ordered_quality_levels(quality_field)]
+
+
 def ordered_quality_levels(quality_field: str) -> tuple[str, ...]:
     """Lists a field's levels from worst to best quality.
 
@@ -918,9 +934,23 @@ def evaluate_on_sidecar(sidecar_dir: Path, dataset: DatasetSelection, missing_po
     if not parts:
         raise SelectionError(f"no sidecar parts found in {sidecar_dir}")
 
+    spec = dataset.upsampling
+    # A curved dataset must be costed as a curve here too. Returning the flat ratio would
+    # report it at 1.0x -- the value the config validator forces when a curve is present --
+    # so an --exact preview of a curved selection would silently understate its tokens,
+    # blend share and exposure.
+    bucket_labels = ordered_bucket_labels(spec.quality_field) if spec else []
+    bucket_docs: dict[str, int] = dict.fromkeys(bucket_labels, 0)
+    bucket_tokens: dict[str, int] = dict.fromkeys(bucket_labels, 0)
+
     n_total = n_kept = tokens_total = tokens_kept = 0
     for part in parts:
         parquet_file = pq.ParquetFile(part)
+        if spec and spec.quality_field not in parquet_file.schema_arrow.names:
+            raise SelectionError(
+                f"dataset {dataset.name!r}: sidecar has no column {spec.quality_field!r} to order "
+                f"quality by; join the annotations before costing a curve"
+            )
         for group_idx in range(parquet_file.metadata.num_row_groups):
             table = parquet_file.read_row_group(group_idx)
             tokens = table.column("est_tokens").to_numpy(zero_copy_only=False).astype(np.int64)
@@ -930,6 +960,33 @@ def evaluate_on_sidecar(sidecar_dir: Path, dataset: DatasetSelection, missing_po
             tokens_total += int(tokens.sum())
             tokens_kept += int(tokens[mask].sum())
 
+            if spec:
+                levels = table.column(spec.quality_field).to_pylist()
+                for level, keep, token_count in zip(levels, mask, tokens):
+                    if not keep:
+                        continue
+                    label = level if level in bucket_docs else UNANNOTATED_BUCKET
+                    bucket_docs[label] += 1
+                    bucket_tokens[label] += int(token_count)
+
+    plan: Optional[UpsamplingPlan] = None
+    if spec:
+        buckets = [
+            QualityBucket(
+                label=label,
+                n_documents=bucket_docs[label],
+                n_tokens=bucket_tokens[label],
+                unannotated=label == UNANNOTATED_BUCKET,
+            )
+            for label in bucket_labels
+            if bucket_tokens[label] > 0
+        ]
+        try:
+            plan = solve_curve(buckets, spec)
+        except UpsamplingError as e:
+            raise SelectionError(f"dataset {dataset.name!r}: {e}") from e
+        n_kept = plan.documents_kept
+
     return DatasetResult(
         name=dataset.name,
         n_documents_total=n_total,
@@ -938,6 +995,7 @@ def evaluate_on_sidecar(sidecar_dir: Path, dataset: DatasetSelection, missing_po
         tokens_kept=tokens_kept,
         ratio=dataset.ratio,
         exact=True,
+        plan=plan,
     )
 
 

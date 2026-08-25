@@ -18,6 +18,7 @@ Takes a slice of the config list so it can run as a SLURM array.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -27,25 +28,89 @@ from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedD
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
 
 
-def _is_usable(destination: Path) -> bool:
+def _marker_for(destination: Path) -> Path:
+    """The file recording which fingerprint an output was produced from.
+
+    Returns:
+        Path: ``<destination>.fingerprint``.
+    """
+    return destination.with_name(destination.name + ".fingerprint")
+
+
+def _fingerprint_of(config_path: Path) -> str | None:
+    """The fingerprint `write-packing-configs` recorded for this job.
+
+    Returns:
+        str | None: The digest, or None when the config predates fingerprinting.
+    """
+    try:
+        return config_path.with_suffix(".fingerprint").read_text().strip()
+    except OSError:
+        return None
+
+
+def _is_usable(destination: Path, fingerprint: str | None) -> bool:
     """Whether an existing packed file can be left alone.
 
-    Existence is not health. A .pbin from an interrupted run can be megabytes on disk and
-    still report ``data_len=0``; skipping on existence alone left exactly one such file in
-    the blend, and it only surfaced during final verification.
+    Existence is not health, and health is not currency. A .pbin from an interrupted run
+    can be megabytes on disk and still report ``data_len=0``; skipping on existence alone
+    left exactly one such file in the blend, and it only surfaced during final
+    verification. Separately, a changed selection rewrites an index under the same name,
+    so a structurally fine output can hold the documents the *previous* selection chose --
+    hence the fingerprint check as well.
 
     Args:
         destination (Path): The packed file to check.
+        fingerprint (str | None): The fingerprint this job should have been packed from.
 
     Returns:
-        bool: True if the header reads and declares a non-empty data section.
+        bool: True if the header reads, declares a non-empty data section, and the
+            recorded fingerprint matches.
     """
     if not destination.exists():
         return False
+    if fingerprint is not None:
+        marker = _marker_for(destination)
+        try:
+            if marker.read_text().strip() != fingerprint:
+                return False
+        except OSError:
+            return False
     try:
         return EmbeddedStreamData(destination, load_index=False).data_len > 0
     except Exception:
         return False
+
+
+def _pack_to(destination: Path, fingerprint: str | None, run) -> None:
+    """Packs into a temporary file and publishes it, so a failure leaves nothing usable.
+
+    Two problems this avoids. `PackedDataGenerator.run` refuses a destination that already
+    exists, so a damaged .pbin could never be replaced -- every retry raised "file already
+    exists" instead of repacking it. And an interrupted rebuild used to leave the previous
+    run's still-matching fingerprint beside a half-written file, which the next run would
+    then accept: the header reads, the data length is non-zero, and the record agrees.
+
+    So the record is torn up before the attempt and rewritten only after the output is
+    fully in place.
+
+    Args:
+        destination (Path): Where the finished .pbin belongs.
+        fingerprint (str | None): The fingerprint to record on success.
+        run (Callable[[Path], None]): Packs into the path it is given.
+    """
+    marker = _marker_for(destination)
+    marker.unlink(missing_ok=True)
+    partial = destination.with_name(destination.name + ".partial")
+    partial.unlink(missing_ok=True)
+    try:
+        run(partial)
+        os.replace(partial, destination)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    if fingerprint is not None:
+        marker.write_text(fingerprint)
 
 
 def main() -> int:
@@ -82,23 +147,28 @@ def main() -> int:
     for i, config_path in enumerate(mine):
         settings = load_app_config_dict(config_path)["settings"]
         destination = Path(settings["dst_path"])
-        if args.skip_existing and _is_usable(destination):
+        fingerprint = _fingerprint_of(config_path)
+        if args.skip_existing and _is_usable(destination, fingerprint):
             skipped += 1
             continue
         try:
             # load_app_config_dict returns plain strings; the component factory normally
             # coerces these to Path via pydantic, and PackedDataGenerator calls .is_file().
-            PackedDataGenerator(
-                Path(settings["src_path"]),
-                tokenizer=tokenizer,
-                eod_token=settings["eod_token"],
-                number_of_processes=settings["num_cpus"],
-                jq_pattern=settings["jq_pattern"],
-                processing_batch_size=settings["processing_batch_size"],
-                raw_samples_queue_size=settings["raw_samples_queue_size"],
-                processed_samples_queue_size=settings["processed_samples_queue_size"],
-                index_path=Path(settings["index_path"]) if settings.get("index_path") else None,
-            ).run(destination)
+            _pack_to(
+                destination,
+                fingerprint,
+                lambda target: PackedDataGenerator(
+                    Path(settings["src_path"]),
+                    tokenizer=tokenizer,
+                    eod_token=settings["eod_token"],
+                    number_of_processes=settings["num_cpus"],
+                    jq_pattern=settings["jq_pattern"],
+                    processing_batch_size=settings["processing_batch_size"],
+                    raw_samples_queue_size=settings["raw_samples_queue_size"],
+                    processed_samples_queue_size=settings["processed_samples_queue_size"],
+                    index_path=Path(settings["index_path"]) if settings.get("index_path") else None,
+                ).run(target),
+            )
             packed += 1
         except Exception as e:  # keep going; one bad file must not lose the whole slice
             failed += 1

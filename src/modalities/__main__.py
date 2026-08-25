@@ -1209,8 +1209,25 @@ def CMD_quality_apply(
     help="Packing config to use as the template for tokenizer and jq settings.",
 )
 @click.option("--output_dir", type=Path, required=True, help="Directory receiving the rendered packing configs.")
+@click.option(
+    "--prune/--no_prune",
+    default=True,
+    help="Delete configs and .pbin files the manifest no longer names or that were packed "
+    "from a superseded index (default: prune).",
+)
+@click.option(
+    "--adopt_existing",
+    is_flag=True,
+    help="Treat packed files that carry no fingerprint record as current. For migrating a "
+    "blend packed before fingerprinting existed; do not use after changing a selection.",
+)
 def CMD_quality_write_packing_configs(
-    manifest_path: Path, registry_path: Path, template_path: Path, output_dir: Path
+    manifest_path: Path,
+    registry_path: Path,
+    template_path: Path,
+    output_dir: Path,
+    prune: bool,
+    adopt_existing: bool,
 ) -> None:
     """Renders one packing config per source file, each pointing at its filtered index.
 
@@ -1219,12 +1236,16 @@ def CMD_quality_write_packing_configs(
         registry_path (Path): Path to the corpus registry YAML.
         template_path (Path): Packing config used as the template.
         output_dir (Path): Directory receiving the rendered configs.
+        prune (bool): Whether to delete artifacts the manifest no longer names.
+        adopt_existing (bool): Whether to accept unfingerprinted outputs as current.
     """
     written = quality_pipeline.write_packing_configs(
         manifest_path=manifest_path,
         registry_path=registry_path,
         template_path=template_path,
         output_dir=output_dir,
+        prune=prune,
+        adopt_existing=adopt_existing,
     )
     print_rank_0(f"Wrote {len(written)} packing config(s) to {output_dir}")
 

@@ -135,6 +135,41 @@ find $WORK/packcfg -name '*.yaml' | sort > $WORK/packcfg_list.txt
 sbatch $QDIR/slurm/4_pack.sbatch
 ```
 
+Both steps replace rather than merge, so rerunning them with a changed selection is safe:
+
+* `apply` builds the whole blend in a sibling directory and moves it into place only once
+  the exposure check has passed and the manifest is written. A rejected apply leaves the
+  previously published blend exactly as it was. It needs room for two copies of the index
+  trees while the move happens -- 19 GB each on the current annealing blend.
+* `write-packing-configs` deletes the `.yaml` and `.pbin` files the new manifest no longer
+  names, and logs every removal. This matters because step 8 globs the directory for jobs
+  and the loader globs it for `.pbin` files: a config left over from a wider selection
+  would otherwise be packed and trained on. Pass `--no_prune` to keep them, e.g. when two
+  selections deliberately share one packing directory.
+* It also writes a `.fingerprint` beside each config, covering the source file's size and
+  mtime, the contents of the filtered index, the tokenizer and the jq/eod settings. This
+  catches the case a name check cannot: changing a predicate rewrites an index *at the
+  same path*, so the `.pbin` next to it keeps its name while holding the previous
+  selection's documents, and step 8 skips it as already done. `pack_many.py` records the
+  fingerprint it packed from and skips only an output whose record still matches.
+* `pack_many.py` packs into `<name>.pbin.partial` and moves it into place once finished,
+  tearing up any existing fingerprint record before it starts. A killed job therefore
+  leaves a `.partial` and no record, rather than a half-written `.pbin` that the previous
+  record still vouches for. Regenerating the configs clears stray `.partial` files.
+
+The blend packed before fingerprinting has no records, so the next config regeneration
+would treat all 54,738 outputs as stale and repack them -- about 1 h 40 m and 6 TB of
+rewriting. If the packed data really does come from the current manifest, adopt it once
+instead:
+
+```bash
+$MQ -m modalities quality write-packing-configs --manifest $WORK/mix/mix_manifest.yaml \
+    --registry $REG --template $TPL --output_dir $WORK/packcfg --adopt_existing
+```
+
+Only for that migration. After changing a selection it would assert something false and
+keep exactly the stale outputs the fingerprint exists to catch.
+
 Then take the `ratio` values out of `mix_manifest.yaml` into a `weighted_combined`
 dataset in the training config, as shown in the parent README.
 
