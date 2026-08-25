@@ -244,3 +244,91 @@ Two things worth carrying forward from that run:
 
 On that run token retention (62.6 %) exceeded row retention (51.5 %) on real data, which
 is the length correlation the design exists to account for.
+## Full run, as measured on the annealing blend
+
+Timings are from the complete run over `/data/annealing` (20.21 TB, 19 datasets, August
+2026). Everything long goes through SLURM: the login node has usage limits and killed two
+sessions during this run.
+
+```bash
+cd /home/richard.rutmann/repos/modalities
+source config_files/data_preparation/quality/slurm/env.sh
+REG=$QDIR/annealing_registry.yaml
+SEL=$QDIR/annealing_selection.yaml
+TPL=$QDIR/annealing_packing_template.yaml
+```
+
+### 0. Gate
+
+Do not start while the corpus is still being written. A transfer that re-shards a corpus
+after its sidecar is built invalidates every byte offset, and the only loud symptom is a
+dataset whose file count fell to zero.
+
+```bash
+find /data/annealing -name '*.jsonl' -mmin -180 | wc -l          # must be 0
+$MQ -c "
+from pathlib import Path
+from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry
+r = CorpusRegistry.from_yaml(Path('$REG'))
+[print('MISSING', d.name, d.jsonl_root) for d in r.enabled_datasets() if not d.jsonl_root.exists()]"
+```
+
+### 1-9. The pipeline
+
+```bash
+# 1. Calibrate.  48 min for 19 datasets.
+$MQ -m modalities quality calibrate --registry $REG --work_dir $WORK --tokenizer_config $TPL
+
+# 2. Sidecars.  2 h 09 m, 64 tasks, the only stage that reads all 20 TB.
+sbatch --wait --export=$EXPORTS $QDIR/slurm/1_build_sidecar.sbatch
+
+# 3. Verify the offsets before spending anything more.  143 s.
+$MQ -m modalities quality verify-sidecar --registry $REG --work_dir $WORK
+
+# 4. Buckets.  4.5 h -- SKIP if $WORK/buckets is intact and the annotations have not moved.
+# sbatch --wait --export=$EXPORTS $QDIR/slurm/2_bucket_annotations.sbatch
+
+# 5. Join.  ~6 h; nemotron-cc is the long pole at 6 h alone.  Add JOIN_RESUME=1 to continue
+#    an interrupted run -- never after re-bucketing, which would keep stale labels.
+sbatch --wait --export=$EXPORTS $QDIR/slurm/3a_join_annotations.sbatch
+
+# 6. Cubes.  12 min.
+sbatch --wait --export=$EXPORTS $QDIR/slurm/3b_build_cubes.sbatch
+
+# 7. Preview.  14 s -- edit $SEL and repeat as often as you like.
+$MQ -m modalities quality preview --selection $SEL --work_dir $WORK
+$MQ -m modalities quality preview --selection $SEL --work_dir $WORK --explain   # which predicate binds
+$MQ -m modalities quality preview --selection $SEL --work_dir $WORK --exact     # before committing
+
+# 8. Apply.  42 min, peaks near 160 GB: it holds every kept document's offsets.
+sbatch --wait --job-name=q_apply --nodes=1 --cpus-per-task=8 --mem=220G --time=12:00:00 \
+  --output=$HOME/logs/quality/apply_%j.out --error=$HOME/logs/quality/apply_%j.err \
+  --export=$EXPORTS --wrap="srun $MQ -m modalities quality apply --selection $SEL \
+    --registry $REG --work_dir $WORK --output_dir $WORK/mix"
+
+# 9. Packing configs.  12 min, one per source file.
+$MQ -m modalities quality write-packing-configs --manifest $WORK/mix/mix_manifest.yaml \
+    --registry $REG --template $TPL --output_dir $WORK/packcfg
+find $WORK/packcfg -name '*.yaml' | sort > $WORK/packcfg_list.txt
+
+# 10. Pack.  1 h 40 m for 6.0 TB.
+sbatch --wait --export=$EXPORTS,TEMPLATE=$TPL $QDIR/slurm/4_pack.sbatch
+
+# 11. Verify.  ~26 min: headers, token and document counts, and the blend load.
+sbatch --wait --export=$EXPORTS,SOURCE_ROOT=/data/annealing $QDIR/slurm/5_verify.sbatch
+```
+
+About 12 hours end to end, with the join as the long pole.
+
+### What each check catches
+
+`verify-sidecar` reads the source bytes at recorded offsets. A re-sharded corpus once left
+11 of 19 datasets with unusable sidecars and only one failed loudly.
+
+`5_verify.sbatch` reads packed file headers rather than counting files. One `.pbin` in 54,738
+was 151 MB on disk reporting `data_len=0`; counting files would have shipped that dataset
+567 M tokens short.
+
+Document counts in the verification must match **exactly**. They are not estimates -- the
+filtered index names precisely the selected documents -- so any difference is a defect in
+materialize or the index, not estimator error. Token estimates landed within -0.56% overall.

@@ -10,12 +10,20 @@ Reads each .pbin header for the exact token count, and the document index one fi
 time so 54,738 indexes are never resident together.
 """
 from __future__ import annotations
+import argparse
 import sys
 from pathlib import Path
+
 import yaml
+
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
-W = Path("/data/user/richard.rutmann/annealing_blend")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--work_dir", type=Path, required=True, help="Blend working directory.")
+parser.add_argument("--source_root", type=Path, required=True, help="Corpus root that must stay unwritten.")
+parser.add_argument("--tolerance", type=float, default=0.05, help="Allowed token estimate error.")
+args = parser.parse_args()
+W = args.work_dir
 manifest = yaml.safe_load((W / "mix/mix_manifest.yaml").read_text())
 
 print(f"{'dataset':<16} {'est tokens':>16} {'packed tokens':>16} {'err':>7} {'docs sel':>14} {'docs packed':>14}")
@@ -37,7 +45,7 @@ for rec in manifest["datasets"]:
     tot_est += est
     tot_pack += ntok
     flags = ""
-    if abs(err) > 0.05:
+    if abs(err) > args.tolerance:
         flags += "  TOKENS>5%"
         problems.append(f"{name}: tokens off {err:+.2%}")
     if ndoc != sel:
@@ -54,8 +62,9 @@ print("-" * 92)
 print(f"{'TOTAL':<16} {tot_est:>16,} {tot_pack:>16,} {(tot_pack-tot_est)/tot_est*100:>6.2f}%")
 print()
 print("source tree untouched:")
-stray = [str(p) for p in Path("/data/annealing").rglob("*") if p.is_file() and p.suffix != ".jsonl"]
-owned = [p for p in stray if Path(p).owner() == "richard.rutmann"]
+stray = [str(p) for p in args.source_root.rglob("*") if p.is_file() and p.suffix != ".jsonl"]
+me = Path.home().owner()
+owned = [p for p in stray if Path(p).owner() == me]
 print(f"  non-jsonl files: {len(stray)} (pre-existing README/.gitattributes)")
 print(f"  files owned by us: {len(owned)}")
 if owned:

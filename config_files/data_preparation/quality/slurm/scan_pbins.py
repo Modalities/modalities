@@ -4,12 +4,17 @@
 Existence is not health: a .pbin left behind by an interrupted run can be megabytes on disk
 and still report data_len=0, and --skip_existing then leaves it in place forever.
 """
+import argparse
 import sys
 from pathlib import Path
 
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
-W = Path("/data/user/richard.rutmann/annealing_blend/packcfg")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--work_dir", type=Path, required=True, help="Blend working directory.")
+parser.add_argument("--out", type=Path, default=None, help="Where to list the bad files.")
+args = parser.parse_args()
+W = args.work_dir / "packcfg"
 bad = []
 n = 0
 for p in sorted(W.rglob("*.pbin")):
@@ -27,6 +32,6 @@ for p in sorted(W.rglob("*.pbin")):
 print(f"scanned {n:,} packed files, {len(bad)} unusable")
 for path, why in bad:
     print(f"  BAD {path}  ({why})")
-Path("/data/user/richard.rutmann/pack_probe/bad_pbins.txt").write_text(
-    "\n".join(str(path) for path, _ in bad))
-sys.exit(0)
+if args.out:
+    args.out.write_text("\n".join(str(path) for path, _ in bad))
+sys.exit(1 if bad else 0)
