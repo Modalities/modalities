@@ -23,8 +23,29 @@ import time
 from pathlib import Path
 
 from modalities.config.config import load_app_config_dict
-from modalities.dataloader.create_packed_data import PackedDataGenerator
+from modalities.dataloader.create_packed_data import EmbeddedStreamData, PackedDataGenerator
 from modalities.tokenization.tokenizer_wrapper import PreTrainedHFTokenizer
+
+
+def _is_usable(destination: Path) -> bool:
+    """Whether an existing packed file can be left alone.
+
+    Existence is not health. A .pbin from an interrupted run can be megabytes on disk and
+    still report ``data_len=0``; skipping on existence alone left exactly one such file in
+    the blend, and it only surfaced during final verification.
+
+    Args:
+        destination (Path): The packed file to check.
+
+    Returns:
+        bool: True if the header reads and declares a non-empty data section.
+    """
+    if not destination.exists():
+        return False
+    try:
+        return EmbeddedStreamData(destination, load_index=False).data_len > 0
+    except Exception:
+        return False
 
 
 def main() -> int:
@@ -61,7 +82,7 @@ def main() -> int:
     for i, config_path in enumerate(mine):
         settings = load_app_config_dict(config_path)["settings"]
         destination = Path(settings["dst_path"])
-        if args.skip_existing and destination.exists():
+        if args.skip_existing and _is_usable(destination):
             skipped += 1
             continue
         try:

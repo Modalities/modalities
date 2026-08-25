@@ -919,3 +919,35 @@ Measured on the real blend: 250 GB/h of packed output across 10 concurrent 32-co
 with `num_cpus` confirmed resolving to 32. That is about 54k tokens/s per core, well below
 what a fast tokenizer manages, which points at the per-document seeks the filtered index
 implies rather than at tokenisation.
+
+
+## PR #XXX Verification for a real packed blend, and a stale-file trap
+
+The smoke checker assumes a handful of packed files and loads every document index at once.
+At 54,738 files and 6.0 TB that does not hold, so two stage-appropriate checks now exist.
+
+`slurm/scan_pbins.py` reads every packed file's header and reports any whose data section is
+empty or unreadable. On the first full run it found exactly one bad file in 54,738:
+`finewiki-it/000_00000.pbin`, 151 MB on disk and reporting `data_len=0`. It was a leftover
+from an earlier probe, and `pack_many.py --skip_existing` had skipped it because the file
+existed -- existence taken for health. Had the final check counted files rather than reading
+headers, that dataset would have gone to training 567 M tokens short. `--skip_existing` now
+reads the header and requires a non-empty data section.
+
+`slurm/verify_blend.py` compares packed tokens against the manifest's estimates per dataset,
+packed documents against documents selected, and packed files against index files, reading
+one document index at a time so 54,738 are never resident together.
+
+**Result on the real blend**, after repacking the one bad file:
+
+| | |
+|---|---|
+| datasets | 18, all document counts exact |
+| packed tokens | 1,637,755,654,948 against 1,646,919,435,199 estimated |
+| total token error | **-0.56%** |
+| worst dataset | klettermix-de at -4.39%, estimated from a rescaled native count |
+| files written into the source tree | 0 |
+
+Document counts matching exactly for all 18 -- 499,676,886 selected and packed for
+nemotron-cc -- is the stronger result: the filtered index names precisely the selected
+documents, so any difference would be a defect rather than estimator error.
