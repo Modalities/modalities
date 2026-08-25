@@ -4,8 +4,9 @@
 Existence is not health: a .pbin left behind by an interrupted run can be megabytes on disk
 and still report data_len=0, and --skip_existing then leaves it in place forever.
 """
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from modalities.dataloader.create_packed_data import EmbeddedStreamData
 
 W = Path("/data/user/richard.rutmann/annealing_blend/packcfg")
@@ -24,8 +25,8 @@ for p in sorted(W.rglob("*.pbin")):
     if n % 5000 == 0:
         print(f"  scanned {n:,} ...", flush=True)
 print(f"scanned {n:,} packed files, {len(bad)} unusable")
-for p, why in bad:
-    print(f"  BAD {p}  ({why})")
+for path, why in bad:
+    print(f"  BAD {path}  ({why})")
 Path("/data/user/richard.rutmann/pack_probe/bad_pbins.txt").write_text(
-    "\n".join(str(p) for p, _ in bad))
+    "\n".join(str(path) for path, _ in bad))
 sys.exit(0)
