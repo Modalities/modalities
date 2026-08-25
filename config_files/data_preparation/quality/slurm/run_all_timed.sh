@@ -21,7 +21,7 @@ export HF_HOME="${HF_HOME:-/data/cache/hf_cache}"
 # Overridable so a blend variant can be run without editing the shared configs.
 REGISTRY="${REGISTRY:-$QDIR/annealing_registry.yaml}"
 SELECTION="${SELECTION:-$QDIR/annealing_selection.yaml}"
-TOKENIZER_CONFIG="${TOKENIZER_CONFIG:-$QDIR/annealing_packing_template.yaml}"
+TOKENIZER_CONFIG="${TOKENIZER_CONFIG:-$QDIR/annealing_tokenizer.yaml}"
 
 SIDECAR_TASKS="${SIDECAR_TASKS:-64}"
 BUCKET_TASKS="${BUCKET_TASKS:-64}"
@@ -115,29 +115,25 @@ step 6 "apply selection (filtered indexes)" \
         --registry "$REGISTRY" \
         --work_dir "$WORK" --output_dir "$WORK/$BLEND_NAME"
 
-step 7 "write packing configs" \
-    "$MQ" -m modalities quality write-packing-configs \
-        --manifest "$WORK/$BLEND_NAME/mix_manifest.yaml" \
-        --registry "$REGISTRY" \
-        --template "$TOKENIZER_CONFIG" \
-        --output_dir "$WORK/packcfg"
-
-pack() {
-    find "$WORK/packcfg" -name '*.yaml' | sort > "$WORK/packcfg_list.txt"
-    local n
-    n=$(wc -l < "$WORK/packcfg_list.txt")
+export_jsonl() {
+    # One array task per dataset in the mix manifest. Each writes its own record; the
+    # blend-wide manifest is merged afterwards, because concurrent tasks writing one shared
+    # file would race and the last writer would erase the rest.
+    n=$("$MQ" -c "import yaml,sys; m=yaml.safe_load(open('$WORK/mix/mix_manifest.yaml')); \
+        print(len({d.get('source_dataset') or d['name'] for d in m['datasets']}))")
     if [[ "$n" -eq 0 ]]; then
-        echo "no packing configs found under $WORK/packcfg" >&2
+        echo "no datasets in $WORK/mix/mix_manifest.yaml" >&2
         return 1
     fi
-    # One task per config, capped at PACK_TASKS; each task then handles several configs.
-    local per_task=$(( (n + PACK_TASKS - 1) / PACK_TASKS ))
-    local tasks=$(( (n + per_task - 1) / per_task ))
-    echo "packing $n config(s) as $tasks task(s), $per_task per task"
-    sbatch --wait --export="$EXPORTS,CONFIG_LIST=$WORK/packcfg_list.txt,PACK_CONFIGS_PER_TASK=$per_task" \
-        --array="0-$((tasks - 1))" "$QDIR/slurm/4_pack.sbatch"
+    echo "exporting $n dataset(s) as $n task(s)"
+    sbatch --wait --export="$EXPORTS,MANIFEST=$WORK/mix/mix_manifest.yaml,OUT=$WORK/out" \
+        --array="0-$((n - 1))" "$QDIR/slurm/4_export_jsonl.sbatch"
+    "$MQ" -m modalities quality export-jsonl \
+        --manifest "$WORK/mix/mix_manifest.yaml" \
+        --registry "$REG" --output_dir "$WORK/out" --finalize_only
 }
-step 8 "pack selected documents (array)" pack
+
+step 7 "export sampled documents as jsonl (array)" export_jsonl
 
 echo
 echo "Coverage per dataset: $WORK/join_report.json"

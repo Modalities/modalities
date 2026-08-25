@@ -260,6 +260,9 @@ class SelectionConfig(BaseModel):
             change any ratio, but it is what makes a ratio mean something: if the blend
             yields fewer effective tokens than this, the loader wraps and every document is
             seen more often than its ratio says.
+        seed (int): Decides which documents receive the extra copy of a fractional repeat
+            factor when the blend is exported. Changing it redraws that choice, so a blend
+            exported twice with different seeds differs in which documents were doubled.
         max_total_exposure (Optional[float]): Refuse to materialise if any dataset -- or any
             quality bucket of one -- would be seen more times than this once wrapping is
             counted. A dataset with an upsampling curve uses its own ``max_factor`` instead,
@@ -270,6 +273,7 @@ class SelectionConfig(BaseModel):
     missing_annotation: MissingPolicy = MissingPolicy.KEEP
     target_tokens: Optional[float] = None
     max_total_exposure: Optional[float] = Field(default=None, gt=0)
+    seed: int = 42
     datasets: list[DatasetSelection]
 
     @model_validator(mode="after")

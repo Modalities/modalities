@@ -166,7 +166,7 @@ box("Corpus Registry\nannealing_registry.yaml", 82, 240, 230, 50)
 badge("R", 312, 240)
 box("Propella Annotations\n(external parquet cache)", 82, 304, 230, 50)
 badge("R", 312, 304)
-box("Packing Template\n(tokenizer: Nemotron-3-Nano)", 82, 368, 230, 50)
+box("Tokenizer Config\n(for token estimates only)", 82, 368, 230, 50)
 badge("R", 312, 368)
 
 # ------------------------------------------------- lane 1: documents (top), y = 168
@@ -210,16 +210,15 @@ arrow((638, 584), (601, 584))
 # ------------------------------------------------- tail
 for x, name, artifact in (
     (880, "7. apply", "filtered *.idx\n+ mix_manifest.yaml"),
-    (1070, "8. write-packing-\nconfigs", "one config\nper source file"),
-    (1260, "9. pack", "*.pbin\n(only kept documents)"),
+    (1070, "8. export-jsonl", "*.jsonl per dataset\n(sampling in the bytes)"),
 ):
     box(name, x, 530, 160, 58)
     badge("R", x + 152, 526)
     box(artifact, x, 608, 160, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
-box("WeightedCombinedDataset\nfloat repeat factors", 1450, 530, 175, 58)
-badge("R", 1622, 526)
-box("-> Trainings Pipeline\n(Trainings Loop)", 1450, 608, 175, 46, color=GUARD_TEXT, dashed=True, size=11)
+box("cat out/*/*.jsonl", 1260, 530, 175, 58)
+badge("R", 1432, 526)
+box("-> Trainings Pipeline\n(Trainings Loop)", 1260, 608, 175, 46, color=GUARD_TEXT, dashed=True, size=11)
 
 # ------------------------------------------------- validation
 container("Validation & Guards", 60, 560, 275, 265)
@@ -227,7 +226,7 @@ box("verify-sidecar\nbyte offsets vs source", 82, 602, 230, 50, color=GUARD_TEXT
 badge("R", 312, 602)
 box("join coverage report\nper dataset", 82, 666, 230, 46, color=GUARD_TEXT)
 badge("R", 312, 666)
-box("smoke snapshot\n+ check_smoke_run", 82, 726, 230, 50, color=GUARD_TEXT)
+box("smoke snapshot\n+ check_token_estimates", 82, 726, 230, 50, color=GUARD_TEXT)
 badge("R", 312, 726)
 text("run after any transfer,\nand before  apply", 82, 786, size=10, color=NOTE_TEXT)
 
@@ -240,9 +239,8 @@ arrow((762, 366), (856, 298))                                  # buckets -> join
 arrow((1022, 279), (1076, 279))                                # join -> cube
 arrow((1160, 378), (1160, 476), (800, 476), (800, 498))        # cube -> selection loop
 arrow((802, 570), (876, 556))                                  # preview -> apply
-arrow((1042, 559), (1068, 559))                                # apply -> write-packing-configs
-arrow((1232, 559), (1258, 559))                                # configs -> pack
-arrow((1422, 559), (1448, 559))                                # pack -> weighted dataset
+arrow((1042, 559), (1068, 559))                                # apply -> export-jsonl
+arrow((1232, 559), (1258, 559))                                # export-jsonl -> concatenation
 
 # ------------------------------------------------- legend
 container("Owner", 1680, 130, 120, 200)

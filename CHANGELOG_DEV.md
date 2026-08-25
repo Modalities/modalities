@@ -951,3 +951,57 @@ one document index at a time so 54,738 are never resident together.
 Document counts matching exactly for all 18 -- 499,676,886 selected and packed for
 nemotron-cc -- is the stronger result: the filtered index names precisely the selected
 documents, so any difference would be a defect rather than estimator error.
+
+
+## PR #XXX Feature: export sampled JSONL instead of packed tokens
+
+The pipeline no longer tokenizes. Its final stage writes the selected documents out as JSONL,
+one shard per source file under `out/<dataset>/`, and the training set is the concatenation of
+those files. `write-packing-configs` and `pack` are gone from this pipeline; the core packer
+(`pack_encoded_data`, `PackedDataGenerator`) and `WeightedCombinedDataset` are untouched, since
+they are general modalities features used well outside it.
+
+**The ratios had to move into the bytes.** They used to be metadata: `mix_manifest.yaml`
+carried them and `WeightedCombinedDataset` applied them at training time, fractional factors
+included. A concatenation carries no weights, so `export-jsonl` materialises them -- a dataset
+at 3.0 has each document written three times, one at 0.6 loses two of every five. Fractional
+factors are resolved per document rather than by truncating a list: 1.2 means every document
+once and a hash-chosen fifth of them twice, keyed on the selection's `seed` and the document's
+position via blake2b, so the choice is identical across runs and machines. That reproducibility
+is what makes the stage resumable.
+
+Copies of a document are adjacent, and the documents of a curve's quality buckets are merged
+back into one output directory in source order rather than grouped by bucket.
+
+**The footgun this introduces, and how it is closed.** `mix_manifest.yaml` still says
+`ratio: 3.0` after the repetition is already on disk; feeding that to a `weighted_combined`
+config would train the data nine times. `export_manifest.yaml` therefore reports
+`training_ratio: 1.0` and `repeat_factor_applied: true`, and says so in a `note` field.
+
+**Sizes**, measured from source bytes and per-dataset cube token totals rather than estimated:
+
+| | |
+|---|---|
+| source bytes over the 18 blended datasets | 13.70 TB |
+| effective tokens (ratios applied) | 1.695 T |
+| JSONL output | **~9.75 TB** |
+| packed `.pbin` it replaces | 6.0 TB |
+
+Verified on the real `finewiki-it` at ratio 3.0: 5,399,277 lines written, exactly
+3 x 1,799,759, 67 GB, with 2,670,579 lines replayed byte-for-byte against the corpus.
+
+**Lessons carried over rather than relearned.** A shard counts as complete only against a
+recorded line and byte count, never against merely existing -- the distinction that let a
+truncated `.pbin` reporting `data_len=0` survive into a blend. The per-dataset records are
+written one file per dataset rather than into one shared manifest, because the stage runs as an
+array and concurrent writers to one file lose each other's entries; the blend-wide manifest is
+merged afterwards by `--finalize_only`.
+
+`slurm/verify_jsonl.py` replaces `verify_blend.py`, `scan_pbins.py` and `load_blend.py`: it
+checks line counts against the records, the realised lines-per-document against the requested
+ratio, replays sampled shards byte-for-byte against the corpus, and asserts nothing was written
+into the source tree. `slurm/check_token_estimates.py` replaces `check_smoke_run.py` -- since
+nothing tokenizes any more, it tokenizes a sample of the export to keep the calibration that
+the whole token budget rests on under check. The tokenizer configs survive for exactly that
+reason, reduced to their `tokenizer:` blocks and renamed `annealing_tokenizer.yaml` and
+`smoke_tokenizer.yaml`.

@@ -12,13 +12,11 @@ independently, re-run for a single dataset, and resumed after a failure:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from pathlib import Path
 from typing import Optional
 
-import yaml
 
 from modalities.dataloader.preprocessing.quality.annotation_join import (
     JoinReport,
@@ -27,7 +25,8 @@ from modalities.dataloader.preprocessing.quality.annotation_join import (
     read_bucket_metadata,
 )
 from modalities.dataloader.preprocessing.quality.cube import Cube, build_cube
-from modalities.dataloader.preprocessing.quality.materialize import MaterializationError, materialize_blend
+from modalities.dataloader.preprocessing.quality.export import export_blend, finalize_export
+from modalities.dataloader.preprocessing.quality.materialize import materialize_blend
 from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry, KeyKind
 from modalities.dataloader.preprocessing.quality.selection import (
     BlendResult,
@@ -621,235 +620,42 @@ def apply_selection(
     )
 
 
-def write_packing_configs(
+def export_jsonl(
     manifest_path: Path,
     registry_path: Path,
-    template_path: Path,
     output_dir: Path,
-    prune: bool = True,
-    adopt_existing: bool = False,
-) -> list[Path]:
-    """Renders one packing config per source file of a materialised selection.
-
-    The written configs point ``pack_encoded_data`` at a filtered index, so packing
-    tokenizes only the selected documents. Everything else -- tokenizer, jq pattern,
-    queue sizes -- is copied from the template.
-
-    Rendering is additive on disk, so a rerun over a narrower manifest -- a dataset
-    disabled, a curve replacing a flat ratio and renaming its rows -- would otherwise
-    leave the previous run's configs behind. The packing stage globs this directory for
-    jobs and the loader globs it for ``.pbin`` files, so those leftovers would be packed
-    and trained on as if they were part of the current blend. ``prune`` deletes what the
-    new manifest does not name.
-
-    A stale output does not have to be one the manifest dropped. Changing a predicate
-    rewrites a dataset's index in place, so the ``.pbin`` beside it keeps its name while
-    holding the documents the *previous* selection chose, and the packing stage skips it
-    as already done. Each config therefore gets a ``.fingerprint`` covering the source
-    file, the index contents, the tokenizer and the packing settings; packing records the
-    fingerprint it used next to the output, and any ``.pbin`` whose record no longer
-    matches is deleted here so it gets repacked.
+    seed: Optional[int] = None,
+    only: Optional[list[str]] = None,
+    resume: bool = True,
+    show_progress: bool = True,
+    finalize: bool = True,
+) -> list:
+    """Writes a materialised selection out as JSONL, sampling baked in.
 
     Args:
         manifest_path (Path): The ``mix_manifest.yaml`` written by the apply stage.
         registry_path (Path): The corpus registry YAML.
-        template_path (Path): A packing config to use as the template.
-        output_dir (Path): Directory receiving the rendered configs.
-        prune (bool): Whether to delete configs and packed outputs that the manifest no
-            longer names or whose fingerprint has changed.
-        adopt_existing (bool): Treat an output that carries no fingerprint record as having
-            been packed from the current manifest, and write the record for it. This exists
-            for the one-time migration of blends packed before fingerprinting; it asserts
-            something that cannot be checked, so it is wrong to use it after changing a
-            selection.
+        output_dir (Path): Directory receiving one subdirectory per dataset.
+        seed (Optional[int]): Overrides the seed the selection was applied with.
+        only (Optional[list[str]]): Restrict to these dataset names.
+        resume (bool): Leave complete shards alone.
+        show_progress (bool): Whether to show progress bars.
+        finalize (bool): Merge the per-dataset records into ``export_manifest.yaml``. An
+            array task exporting a single dataset should not, since the other datasets are
+            still being written; the merge is a separate step afterwards.
 
     Returns:
-        list[Path]: The written config paths.
-
-    Raises:
-        MaterializationError: If a manifest index file is missing, which means the manifest does
-            not describe what is on disk.
+        list: One :class:`~...export.DatasetExport` per dataset written.
     """
-    with Path(manifest_path).open() as f:
-        manifest = yaml.safe_load(f)
-    with Path(template_path).open() as f:
-        template = yaml.safe_load(f)
-    registry = CorpusRegistry.from_yaml(registry_path)
-
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
-    expected: set[Path] = set()
-    superseded: list[Path] = []
-    adopted = 0
-    for dataset in manifest["datasets"]:
-        # Bucket rows are named "<dataset>__<level>", so the registry lookup uses the source.
-        entry = registry.get(dataset.get("source_dataset") or dataset["name"])
-        for source_path, index_path in dataset["index_files"].items():
-            relative = Path(source_path).relative_to(entry.jsonl_root)
-            config = dict(template)
-            config["settings"] = {
-                **template.get("settings", {}),
-                "src_path": source_path,
-                "index_path": index_path,
-                "dst_path": str(output_dir / dataset["name"] / relative.with_suffix(".pbin")),
-            }
-            config_path = output_dir / dataset["name"] / relative.with_suffix(".yaml")
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with config_path.open("w") as f:
-                yaml.safe_dump(config, f, sort_keys=False)
-            written.append(config_path)
-
-            fingerprint = _packing_fingerprint(source_path, index_path, config["settings"], template)
-            fingerprint_path = config_path.with_suffix(".fingerprint")
-            fingerprint_path.write_text(fingerprint)
-
-            destination = Path(config["settings"]["dst_path"])
-            marker = _fingerprint_marker(destination)
-            expected.update(
-                {config_path.resolve(), fingerprint_path.resolve(), destination.resolve(), marker.resolve()}
-            )
-            if destination.exists():
-                recorded = _recorded_fingerprint(destination)
-                if recorded is None and adopt_existing:
-                    marker.write_text(fingerprint)
-                    adopted += 1
-                elif recorded != fingerprint:
-                    superseded.append(destination)
-
-    if adopted:
-        get_logger(name="main").warning(
-            f"Adopted {adopted} existing packed file(s) as current without being able to verify it. "
-            f"This is only correct if they were packed from this manifest."
-        )
-    if prune:
-        _prune_packing_dir(output_dir, expected, superseded)
-    elif superseded:
-        get_logger(name="main").warning(
-            f"{len(superseded)} packed file(s) no longer match their config's fingerprint and were "
-            f"kept because pruning is off; packing will skip them and the blend will train on the "
-            f"previous selection's tokens."
-        )
-    return written
-
-
-def _fingerprint_marker(destination: Path) -> Path:
-    """The file recording which fingerprint a packed output was produced from.
-
-    Args:
-        destination (Path): The ``.pbin`` path.
-
-    Returns:
-        Path: ``<destination>.fingerprint``, a sibling of both the output and its config.
-    """
-    return destination.with_name(destination.name + ".fingerprint")
-
-
-def _recorded_fingerprint(destination: Path) -> Optional[str]:
-    """Reads the fingerprint a packed output was produced from.
-
-    Args:
-        destination (Path): The ``.pbin`` path.
-
-    Returns:
-        Optional[str]: The recorded fingerprint, or None when there is no readable record.
-            Outputs packed before fingerprinting existed have none, and are treated as
-            stale rather than trusted.
-    """
-    marker = _fingerprint_marker(destination)
-    try:
-        return marker.read_text().strip()
-    except OSError:
-        return None
-
-
-def _packing_fingerprint(source_path: str, index_path: str, settings: dict, template: dict) -> str:
-    """Identifies everything that decides the contents of one packed file.
-
-    The source is fingerprinted by size and modification time rather than by content,
-    because the corpora run to terabytes; that is the same drift check the sidecar stage
-    uses. The index is hashed in full -- it is small, and it is the thing a changed
-    selection actually rewrites.
-
-    Args:
-        source_path (str): The JSONL file to be packed.
-        index_path (str): The filtered index naming the documents to keep.
-        settings (dict): The rendered packing settings.
-        template (dict): The template, read for its tokenizer section.
-
-    Returns:
-        str: A hex digest.
-
-    Raises:
-        MaterializationError: If the index file named by the manifest does not exist.
-    """
-    digest = hashlib.sha256()
-    digest.update(str(source_path).encode())
-    try:
-        source_stat = Path(source_path).stat()
-        digest.update(f"{source_stat.st_size}:{source_stat.st_mtime_ns}".encode())
-        digest.update(hashlib.sha256(Path(index_path).read_bytes()).hexdigest().encode())
-    except OSError as e:
-        raise MaterializationError(
-            f"cannot fingerprint the packing job for {source_path}: {e}. The manifest names files "
-            f"that are not on disk, so it does not describe this blend; rerun 'quality apply'."
-        ) from e
-
-    # Only the settings that change the output. Worker counts and queue sizes do not, and
-    # including them would force a repack whenever the job shape was tuned.
-    for key in ("jq_pattern", "eod_token"):
-        digest.update(f"{key}={settings.get(key)}".encode())
-    digest.update(json.dumps(template.get("tokenizer", {}), sort_keys=True, default=str).encode())
-    return digest.hexdigest()
-
-
-def _prune_packing_dir(output_dir: Path, expected: set[Path], superseded: list[Path]) -> list[Path]:
-    """Deletes packing artifacts that the current manifest no longer describes.
-
-    Two kinds go: files the manifest does not name at all, and outputs it names whose
-    fingerprint has changed. Only ``.yaml``, ``.pbin``, ``.fingerprint`` and ``.partial``
-    files are considered, so nothing a user parked in the directory is touched. A
-    ``.partial`` is never expected, so any left by a killed packing job is always cleared. Removals are logged
-    individually because a stale ``.pbin`` can be hundreds of gigabytes and its deletion
-    should be visible in the job log rather than inferred from a shrinking disk.
-
-    Args:
-        output_dir (Path): The packing-config directory.
-        expected (set[Path]): Resolved paths the current manifest names.
-        superseded (list[Path]): Named outputs whose fingerprint no longer matches.
-
-    Returns:
-        list[Path]: The deleted paths.
-    """
-    removed: list[Path] = []
-    freed = 0
-    for destination in superseded:
-        for path in (destination, _fingerprint_marker(destination)):
-            if path.is_file():
-                freed += path.stat().st_size
-                path.unlink()
-                removed.append(path)
-    for path in sorted(output_dir.rglob("*")):
-        if not path.is_file() or path.suffix not in (".yaml", ".pbin", ".fingerprint", ".partial"):
-            continue
-        if path.resolve() in expected:
-            continue
-        freed += path.stat().st_size
-        path.unlink()
-        removed.append(path)
-
-    # Directories left behind by a dataset the manifest dropped; rmdir only ever removes
-    # empty ones, so a partially-pruned tree survives untouched.
-    for directory in sorted(output_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-        if directory.is_dir() and not any(directory.iterdir()):
-            directory.rmdir()
-
-    if removed:
-        logger = get_logger(name="main")
-        logger.warning(
-            f"Removed {len(removed)} artifact(s) the manifest no longer names "
-            f"({freed / (1 << 30):.2f} GiB) from {output_dir}:"
-        )
-        for path in removed:
-            logger.warning(f"  removed {path}")
-    return removed
+    exports = export_blend(
+        manifest_path=manifest_path,
+        registry_path=registry_path,
+        output_root=output_dir,
+        seed=seed,
+        only=only,
+        resume=resume,
+        show_progress=show_progress,
+    )
+    if finalize:
+        finalize_export(output_dir)
+    return exports

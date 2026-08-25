@@ -531,6 +531,9 @@ def _materialize_into(
     manifest = {
         "selection_fingerprint": config_fingerprint(config),
         "missing_annotation": config.missing_annotation.value,
+        # Carried so the export stage can resolve fractional repeat factors identically
+        # without being handed the selection again.
+        "seed": config.seed,
         "target_tokens": config.target_tokens,
         "est_total_effective_tokens": int(total_effective),
         "datasets": [

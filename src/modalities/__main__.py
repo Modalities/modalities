@@ -28,6 +28,7 @@ from modalities.api import (
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
+from modalities.dataloader.preprocessing.quality import export as quality_export
 from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
 from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry
 from modalities.dataloader.preprocessing.quality.verify import format_verify_report
@@ -1186,7 +1187,7 @@ def CMD_quality_apply(
     print_rank_0(f"Manifest written to {manifest_path}")
 
 
-@quality.command(name="write-packing-configs")
+@quality.command(name="export-jsonl")
 @click.option(
     "--manifest",
     "manifest_path",
@@ -1201,53 +1202,77 @@ def CMD_quality_apply(
     required=True,
     help="Path to the corpus registry YAML.",
 )
+@click.option("--output_dir", type=Path, required=True, help="Directory receiving one subdirectory per dataset.")
 @click.option(
-    "--template",
-    "template_path",
-    type=click_pathlib.Path(exists=True),
-    required=True,
-    help="Packing config to use as the template for tokenizer and jq settings.",
+    "--seed",
+    type=int,
+    default=None,
+    help="Overrides the seed the selection was applied with, which decides which documents "
+    "receive the extra copy of a fractional repeat factor.",
 )
-@click.option("--output_dir", type=Path, required=True, help="Directory receiving the rendered packing configs.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
 @click.option(
-    "--prune/--no_prune",
+    "--resume/--no_resume",
     default=True,
-    help="Delete configs and .pbin files the manifest no longer names or that were packed "
-    "from a superseded index (default: prune).",
+    help="Leave shards that are already complete alone (default: resume).",
 )
 @click.option(
-    "--adopt_existing",
-    is_flag=True,
-    help="Treat packed files that carry no fingerprint record as current. For migrating a "
-    "blend packed before fingerprinting existed; do not use after changing a selection.",
+    "--finalize/--no_finalize",
+    default=True,
+    help="Merge the per-dataset records into export_manifest.yaml. Pass --no_finalize in an "
+    "array task, then run 'export-jsonl --finalize_only' once the array has finished.",
 )
-def CMD_quality_write_packing_configs(
+@click.option(
+    "--finalize_only",
+    is_flag=True,
+    help="Write export_manifest.yaml from the per-dataset records already on disk, exporting nothing.",
+)
+def CMD_quality_export_jsonl(
     manifest_path: Path,
     registry_path: Path,
-    template_path: Path,
     output_dir: Path,
-    prune: bool,
-    adopt_existing: bool,
+    seed: Optional[int],
+    only: tuple[str, ...],
+    resume: bool,
+    finalize: bool,
+    finalize_only: bool,
 ) -> None:
-    """Renders one packing config per source file, each pointing at its filtered index.
+    """Writes the selected documents out as JSONL, with the sampling baked into the bytes.
+
+    Up- and downsampling is materialised here: a dataset at 3.0 has each of its documents
+    written three times, and one at 0.6 loses two of every five. The training set is the
+    concatenation of the resulting files, so their ratios must not be applied again.
 
     Args:
         manifest_path (Path): Path to the mix manifest.
         registry_path (Path): Path to the corpus registry YAML.
-        template_path (Path): Packing config used as the template.
-        output_dir (Path): Directory receiving the rendered configs.
-        prune (bool): Whether to delete artifacts the manifest no longer names.
-        adopt_existing (bool): Whether to accept unfingerprinted outputs as current.
+        output_dir (Path): Directory receiving the exported JSONL.
+        seed (Optional[int]): Overrides the selection's seed.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Leave complete shards alone.
+        finalize (bool): Merge the per-dataset records afterwards.
+        finalize_only (bool): Only merge the records; export nothing.
     """
-    written = quality_pipeline.write_packing_configs(
+    if finalize_only:
+        print_rank_0(f"Export manifest written to {quality_export.finalize_export(output_dir)}")
+        return
+
+    exports = quality_pipeline.export_jsonl(
         manifest_path=manifest_path,
         registry_path=registry_path,
-        template_path=template_path,
         output_dir=output_dir,
-        prune=prune,
-        adopt_existing=adopt_existing,
+        seed=seed,
+        only=list(only) or None,
+        resume=resume,
+        finalize=finalize,
     )
-    print_rank_0(f"Wrote {len(written)} packing config(s) to {output_dir}")
+    n_lines = sum(e.n_lines for e in exports)
+    n_bytes = sum(e.n_bytes for e in exports)
+    skipped = sum(1 for e in exports for s in e.shards if s.skipped)
+    print_rank_0(
+        f"Exported {len(exports)} dataset(s): {n_lines:,} lines, {n_bytes / 1e12:,.2f} TB"
+        + (f", {skipped:,} shard(s) already complete" if skipped else "")
+    )
 
 
 def _format_exception_as_json(e: Exception, environment: dict[str, Any]) -> str:

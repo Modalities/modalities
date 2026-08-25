@@ -1,0 +1,16 @@
+# The tokenizer the token estimates are measured with.
+#
+# Used by `modalities quality calibrate --tokenizer_config <this file>`, which measures
+# how many tokens each dataset's bytes are worth. Nothing here tokenizes the corpus: the
+# pipeline now exports JSONL and leaves tokenization to whatever consumes it. The estimate
+# is what makes `preview` able to cost a selection in tokens, so it should still name the
+# tokenizer the run actually trains with -- getting it wrong does not fail loudly, it
+# produces a plausible token budget for the wrong tokenizer.
+
+tokenizer:
+  component_key: tokenizer
+  variant_key: pretrained_hf_tokenizer
+  config:
+    pretrained_model_name_or_path: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+    padding: false
+    truncation: false

@@ -41,7 +41,7 @@ export HF_HOME=/data/cache/hf_cache
 
 ## Before you start
 
-Confirm the tokenizer in `annealing_packing_template.yaml`. It is set to
+Confirm the tokenizer in `annealing_tokenizer.yaml`. It is set to
 `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16`, the one the long-context pipeline uses;
 the token audit under `/data/michael.fromm` used the Super-120B variant. Every token
 figure downstream depends on this, and a wrong choice fails silently.
@@ -79,7 +79,7 @@ Nothing is written into `/data/annealing`. Indexes go to `$WORK/idx`.
 #    measured; re-run with --only to fill in the rest.
 $MQ -m modalities quality calibrate \
     --registry $QDIR/annealing_registry.yaml --work_dir $WORK \
-    --tokenizer_config $QDIR/annealing_packing_template.yaml --sample_size 2000
+    --tokenizer_config $QDIR/annealing_tokenizer.yaml --sample_size 2000
 
 # 2. Sidecar. The only stage that reads the raw data. Array of 64.
 sbatch $QDIR/slurm/1_build_sidecar.sbatch
@@ -123,55 +123,43 @@ $MQ -m modalities quality apply \
     --registry $QDIR/annealing_registry.yaml \
     --work_dir $WORK --output_dir $WORK/blend_v1
 
-# 7. One packing config per source file, each pointing at its filtered index.
-$MQ -m modalities quality write-packing-configs \
+# 7. Export the sampled documents as JSONL, one shard per source file.
+$MQ -m modalities quality export-jsonl \
     --manifest $WORK/blend_v1/mix_manifest.yaml \
     --registry $QDIR/annealing_registry.yaml \
-    --template $QDIR/annealing_packing_template.yaml \
-    --output_dir $WORK/packcfg
-
-# 8. Tokenize only the selected documents. Array over the generated configs.
-find $WORK/packcfg -name '*.yaml' | sort > $WORK/packcfg_list.txt
-sbatch $QDIR/slurm/4_pack.sbatch
+    --output_dir $WORK/out
 ```
 
-Both steps replace rather than merge, so rerunning them with a changed selection is safe:
-
-* `apply` builds the whole blend in a sibling directory and moves it into place only once
-  the exposure check has passed and the manifest is written. A rejected apply leaves the
-  previously published blend exactly as it was. It needs room for two copies of the index
-  trees while the move happens -- 19 GB each on the current annealing blend.
-* `write-packing-configs` deletes the `.yaml` and `.pbin` files the new manifest no longer
-  names, and logs every removal. This matters because step 8 globs the directory for jobs
-  and the loader globs it for `.pbin` files: a config left over from a wider selection
-  would otherwise be packed and trained on. Pass `--no_prune` to keep them, e.g. when two
-  selections deliberately share one packing directory.
-* It also writes a `.fingerprint` beside each config, covering the source file's size and
-  mtime, the contents of the filtered index, the tokenizer and the jq/eod settings. This
-  catches the case a name check cannot: changing a predicate rewrites an index *at the
-  same path*, so the `.pbin` next to it keeps its name while holding the previous
-  selection's documents, and step 8 skips it as already done. `pack_many.py` records the
-  fingerprint it packed from and skips only an output whose record still matches.
-* `pack_many.py` packs into `<name>.pbin.partial` and moves it into place once finished,
-  tearing up any existing fingerprint record before it starts. A killed job therefore
-  leaves a `.partial` and no record, rather than a half-written `.pbin` that the previous
-  record still vouches for. Regenerating the configs clears stray `.partial` files.
-
-The blend packed before fingerprinting has no records, so the next config regeneration
-would treat all 54,738 outputs as stale and repack them -- about 1 h 40 m and 6 TB of
-rewriting. If the packed data really does come from the current manifest, adopt it once
-instead:
+The output is `$WORK/out/<dataset>/<source-relative>.jsonl`, and the training set is the
+concatenation of all of it:
 
 ```bash
-$MQ -m modalities quality write-packing-configs --manifest $WORK/mix/mix_manifest.yaml \
-    --registry $REG --template $TPL --output_dir $WORK/packcfg --adopt_existing
+cat $WORK/out/*/*.jsonl > training.jsonl     # or feed the shards in directly
 ```
 
-Only for that migration. After changing a selection it would assert something false and
-keep exactly the stale outputs the fingerprint exists to catch.
+**The ratios are already in the bytes.** This is the one thing to get right about this stage.
+A dataset at 3.0 has each of its documents written three times; one at 0.6 has two of every
+five dropped. `mix_manifest.yaml` still records `ratio: 3.0`, because that is what was asked
+for -- but `export_manifest.yaml` records `training_ratio: 1.0` and
+`repeat_factor_applied: true`, and that is the number a training config must use. Carrying
+the mix manifest's ratio into a `weighted_combined` dataset after this stage would apply it a
+second time, training that data nine times rather than three.
 
-Then take the `ratio` values out of `mix_manifest.yaml` into a `weighted_combined`
-dataset in the training config, as shown in the parent README.
+Fractional factors are resolved per document, not by truncating a list: 1.2 means every
+document once and a hash-chosen fifth of them twice. The choice depends on the selection's
+`seed` and the document's position, so it is identical on every run and every machine, which
+is what makes the stage resumable.
+
+Copies of a document are written **adjacent** to each other. A sequential reader will see the
+same document several times in a row unless the training shuffle buffer is larger than the run
+of copies.
+
+Reruns skip shards that are already complete. Completeness is checked against a recorded line
+and byte count, not against the file merely existing -- the same distinction that let a
+truncated `.pbin` survive into a blend once.
+
+No `weighted_combined` dataset is needed any more: the repetition is on disk, so every
+exported file is drawn exactly once.
 
 ## Validate the token estimate before trusting a large budget
 
@@ -181,19 +169,16 @@ preview against what packing actually produced:
 ```bash
 $MQ -m modalities quality preview --selection $QDIR/annealing_selection.yaml \
     --work_dir $WORK 2>&1 | grep finewiki-it
-$MQ -c "
-from pathlib import Path
-from modalities.dataloader.dataset import PackedMemMapDatasetBase
-total = 0
-for p in Path('$WORK/packcfg/finewiki-it').rglob('*.pbin'):
-    d = PackedMemMapDatasetBase(p, sample_key='text', load_index=True)
-    total += sum(len(d[i]['text']) for i in range(len(d)))
-print('actual tokens:', total)
-"
+$MQ $QDIR/slurm/check_token_estimates.py \
+    --manifest $WORK/out/export_manifest.yaml \
+    --mix_manifest $WORK/mix/mix_manifest.yaml \
+    --tokenizer_config $QDIR/annealing_tokenizer.yaml
 ```
 
-On a synthetic end-to-end check the estimate was within 0.03%. Measure it here before
-scaling the conclusion to 43 TB.
+Nothing in the pipeline tokenizes any more, so this is the only thing that checks the
+calibration the whole token budget rests on. It tokenizes a sample of the exported JSONL and
+reports the error per dataset. A few percent is expected; tens of percent means the
+calibration is modelling something other than what the export writes.
 
 ## Resuming an interrupted join
 
@@ -249,7 +234,7 @@ $WORK/buckets/<split>/          partitioned annotations
 $WORK/cube/<dataset>.parquet    what preview reads; a few MB each
 $WORK/join_report.json          annotated fraction per dataset  <- read this
 $WORK/blend_v1/                 filtered indexes + mix_manifest.yaml
-$WORK/packcfg/                  generated packing configs and the resulting .pbin
+$WORK/out/<dataset>/            exported .jsonl shards + export_manifest.yaml
 ```
 
 Only `$WORK` is written. `/data/annealing` is read-only throughout -- verified on a real
@@ -290,7 +275,7 @@ cd /home/richard.rutmann/repos/modalities
 source config_files/data_preparation/quality/slurm/env.sh
 REG=$QDIR/annealing_registry.yaml
 SEL=$QDIR/annealing_selection.yaml
-TPL=$QDIR/annealing_packing_template.yaml
+TOK=$QDIR/annealing_tokenizer.yaml
 ```
 
 ### 0. Gate
@@ -312,7 +297,7 @@ r = CorpusRegistry.from_yaml(Path('$REG'))
 
 ```bash
 # 1. Calibrate.  48 min for 19 datasets.
-$MQ -m modalities quality calibrate --registry $REG --work_dir $WORK --tokenizer_config $TPL
+$MQ -m modalities quality calibrate --registry $REG --work_dir $WORK --tokenizer_config $TOK
 
 # 2. Sidecars.  2 h 09 m, 64 tasks, the only stage that reads all 20 TB.
 sbatch --wait --export=$EXPORTS $QDIR/slurm/1_build_sidecar.sbatch
@@ -341,28 +326,30 @@ sbatch --wait --job-name=q_apply --nodes=1 --cpus-per-task=8 --mem=220G --time=1
   --export=$EXPORTS --wrap="srun $MQ -m modalities quality apply --selection $SEL \
     --registry $REG --work_dir $WORK --output_dir $WORK/mix"
 
-# 9. Packing configs.  12 min, one per source file.
-$MQ -m modalities quality write-packing-configs --manifest $WORK/mix/mix_manifest.yaml \
-    --registry $REG --template $TPL --output_dir $WORK/packcfg
-find $WORK/packcfg -name '*.yaml' | sort > $WORK/packcfg_list.txt
+# 9. Export as JSONL.  One array task per dataset; ~9.75 TB written.
+sbatch --wait --export=$EXPORTS,MANIFEST=$WORK/mix/mix_manifest.yaml,OUT=$WORK/out \
+    --array=0-17 $QDIR/slurm/4_export_jsonl.sbatch
+$MQ -m modalities quality export-jsonl --manifest $WORK/mix/mix_manifest.yaml \
+    --registry $REG --output_dir $WORK/out --finalize_only
 
-# 10. Pack.  1 h 40 m for 6.0 TB.
-sbatch --wait --export=$EXPORTS,TEMPLATE=$TPL $QDIR/slurm/4_pack.sbatch
-
-# 11. Verify.  ~26 min: headers, token and document counts, and the blend load.
+# 10. Verify: line counts, realised ratios, a byte-for-byte replay, source tree untouched.
 sbatch --wait --export=$EXPORTS,SOURCE_ROOT=/data/annealing $QDIR/slurm/5_verify.sbatch
 ```
 
-About 12 hours end to end, with the join as the long pole.
+About 12 hours end to end, with the join as the long pole. The export replaces what was
+1 h 40 m of packing; it writes more bytes but does no tokenization.
 
 ### What each check catches
 
 `verify-sidecar` reads the source bytes at recorded offsets. A re-sharded corpus once left
 11 of 19 datasets with unusable sidecars and only one failed loudly.
 
-`5_verify.sbatch` reads packed file headers rather than counting files. One `.pbin` in 54,738
-was 151 MB on disk reporting `data_len=0`; counting files would have shipped that dataset
-567 M tokens short.
+`5_verify.sbatch` replays sampled shards against the corpus: it recomputes which documents the
+export should have written and how many copies of each, then compares that to the bytes on
+disk. Counting files proves nothing -- one `.pbin` in 54,738 was once 151 MB on disk reporting
+`data_len=0`, and counting would have shipped that dataset 567 M tokens short. The same trap
+exists here, which is why a shard counts as complete only against a recorded line and byte
+count.
 
 Document counts in the verification must match **exactly**. They are not estimates -- the
 filtered index names precisely the selected documents -- so any difference is a defect in
