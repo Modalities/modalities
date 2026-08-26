@@ -3,6 +3,12 @@
 # downsampling materialised in the bytes. One array task per dataset: the datasets are
 # independent, so wall time is the largest one rather than the sum.
 #
+# NUM_FILE_SHARDS splits each dataset's source files across several tasks, striding rather
+# than slicing contiguously. One task per dataset is fine until one dataset holds far more
+# files than the rest: dolmino has 40,003 against a median near 500, and at ~1.1 s per file
+# that is 12.2 h against 20 minutes -- past this script's own wall limit. With it set, the
+# array is (datasets x NUM_FILE_SHARDS) tasks and the task index is decomposed below.
+#
 # Set the array upper bound to (number of datasets in the mix manifest) - 1. Print the list:
 #   $MQ -c "import yaml,sys; m=yaml.safe_load(open('$WORK/mix/mix_manifest.yaml')); \
 #           print(sorted({d.get('source_dataset') or d['name'] for d in m['datasets']}))"
@@ -35,18 +41,22 @@ WORK="${WORK:?WORK is not set}"
 REGISTRY="${REGISTRY:-$QDIR/annealing_registry.yaml}"
 MANIFEST="${MANIFEST:-$WORK/mix/mix_manifest.yaml}"
 OUT="${OUT:-$WORK/out}"
+NUM_FILE_SHARDS="${NUM_FILE_SHARDS:-1}"
 
 unset SLURM_MEM_PER_CPU || true
 unset SLURM_MEM_PER_GPU || true
 
 # Resolved from the manifest rather than a hand-maintained list, so the mapping cannot drift
 # from what was actually materialised. Curve buckets collapse to their source dataset.
-DATASET=$("$MQ" - "$MANIFEST" "$SLURM_ARRAY_TASK_ID" <<'PY'
+DATASET=$("$MQ" - "$MANIFEST" "$SLURM_ARRAY_TASK_ID" "$NUM_FILE_SHARDS" <<'PY'
 import sys, yaml
 m = yaml.safe_load(open(sys.argv[1]))
 names = sorted({d.get("source_dataset") or d["name"] for d in m["datasets"]})
-idx = int(sys.argv[2])
-print(names[idx] if idx < len(names) else "")
+# With file sharding the array covers datasets x shards, so the flat task index splits into
+# a dataset and a shard within it.
+idx, n_shards = int(sys.argv[2]), int(sys.argv[3])
+dataset_idx, shard_idx = divmod(idx, n_shards)
+print(f"{names[dataset_idx]} {shard_idx}" if dataset_idx < len(names) else "")
 PY
 )
 
@@ -54,9 +64,12 @@ if [[ -z "$DATASET" ]]; then
     echo "array index $SLURM_ARRAY_TASK_ID is past the last dataset; nothing to do"
     exit 0
 fi
+SHARD_ID="${DATASET##* }"
+DATASET="${DATASET%% *}"
 
-echo "START $(date) dataset=$DATASET"
+echo "START $(date) dataset=$DATASET shard=$SHARD_ID/$NUM_FILE_SHARDS"
 srun "$MQ" -m modalities quality export-jsonl \
     --manifest "$MANIFEST" --registry "$REGISTRY" --output_dir "$OUT" \
-    --only "$DATASET" --no_finalize
+    --only "$DATASET" --no_finalize \
+    --shard_id "$SHARD_ID" --num_shards "$NUM_FILE_SHARDS"
 echo "END $(date)"

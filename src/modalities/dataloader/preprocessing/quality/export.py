@@ -322,6 +322,8 @@ def export_blend(
     only: Optional[list[str]] = None,
     resume: bool = True,
     show_progress: bool = True,
+    shard_id: int = 0,
+    num_shards: int = 1,
 ) -> list[DatasetExport]:
     """Writes every dataset of a materialised selection out as JSONL.
 
@@ -334,13 +336,21 @@ def export_blend(
         only (Optional[list[str]]): Restrict to these dataset names.
         resume (bool): Leave complete shards alone.
         show_progress (bool): Whether to show progress bars.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): Total tasks splitting each dataset's source files between them.
+            A dataset is one array task by default, which is fine until one of them holds
+            far more files than the rest: `dolmino` has 40,003 against a median of about
+            500, and at a second per file that is twelve hours against twenty minutes.
 
     Returns:
         list[DatasetExport]: What each dataset contributed.
 
     Raises:
         ExportError: If the manifest names an index that is not on disk.
+        ValueError: If ``shard_id`` is out of range.
     """
+    if not 0 <= shard_id < num_shards:
+        raise ValueError(f"shard_id {shard_id} is not in [0, {num_shards})")
     with Path(manifest_path).open() as f:
         manifest = yaml.safe_load(f)
     registry = CorpusRegistry.from_yaml(registry_path)
@@ -358,7 +368,11 @@ def export_blend(
             continue
         entry = registry.get(name)
         export = DatasetExport(name=name, factors=factors[name])
-        sources = sorted(grouped[name])
+        # Strided rather than contiguous: a dataset's files are ordered by shard name and
+        # sizes run in streaks, so contiguous slices hand one task all the large files.
+        sources = sorted(grouped[name])[shard_id::num_shards]
+        if not sources:
+            continue
         for source_path in tqdm(sources, desc=f"export {name}", disable=not show_progress):
             relative = source_path.relative_to(entry.jsonl_root).with_suffix(".jsonl")
             export.shards.append(
@@ -370,7 +384,7 @@ def export_blend(
                     resume=resume,
                 )
             )
-        _write_dataset_record(output_root, export, seed)
+        _write_dataset_record(output_root, export, seed, shard_id, num_shards)
         exports.append(export)
         get_logger(name="main").info(
             f"{name}: {export.n_lines:,} lines from {export.n_documents:,} documents "
@@ -379,20 +393,27 @@ def export_blend(
     return exports
 
 
-def _write_dataset_record(output_root: Path, export: DatasetExport, seed: int) -> Path:
-    """Records what one dataset's export produced.
+def _write_dataset_record(
+    output_root: Path, export: DatasetExport, seed: int, shard_id: int = 0, num_shards: int = 1
+) -> Path:
+    """Records what one task produced for one dataset.
 
     Args:
         output_root (Path): The export root.
         export (DatasetExport): The dataset's result.
         seed (int): The seed used.
+        shard_id (int): This task's index.
+        num_shards (int): Total tasks splitting the dataset.
 
     Returns:
         Path: The written record.
     """
     directory = output_root / export.name
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / DATASET_RECORD
+    # One record per task when a dataset is split, merged by finalize_export. Writing to a
+    # shared name instead would have concurrent tasks overwrite each other's counts, which
+    # is the same race the per-dataset split already avoids at the blend level.
+    path = directory / (DATASET_RECORD if num_shards == 1 else f"_export.{shard_id:05d}.yaml")
     scratch = path.with_suffix(f".yaml.{os.getpid()}.tmp")
     scratch.write_text(
         yaml.safe_dump(
@@ -428,11 +449,23 @@ def finalize_export(output_root: Path) -> Path:
         ExportError: If no dataset records are present.
     """
     output_root = Path(output_root)
-    records = sorted(output_root.glob(f"*/{DATASET_RECORD}"))
+    records = sorted(output_root.glob("*/_export*.yaml"))
     if not records:
         raise ExportError(f"no dataset records under {output_root}; nothing has been exported yet")
 
-    datasets = [yaml.safe_load(p.read_text()) for p in records]
+    # A dataset split across tasks leaves one record per task; they describe disjoint sets of
+    # source files, so merging is a sum.
+    merged: dict[str, dict] = {}
+    for path in records:
+        record = yaml.safe_load(path.read_text())
+        existing = merged.get(record["name"])
+        if existing is None:
+            merged[record["name"]] = record
+            continue
+        for key in ("n_documents", "n_lines", "n_bytes", "n_shards"):
+            existing[key] += record[key]
+        existing["factors_applied"].update(record["factors_applied"])
+    datasets = [merged[name] for name in sorted(merged)]
     manifest = {
         # The ratios are already in the bytes. Anyone carrying the mix manifest's ratio into a
         # 'weighted_combined' training config after this stage would apply it a second time --

@@ -386,3 +386,56 @@ def test_finalizing_without_any_export_is_an_error(tmp_path: Path):
     (tmp_path / "empty").mkdir()
     with pytest.raises(ExportError, match="nothing has been exported"):
         finalize_export(tmp_path / "empty")
+
+
+# --------------------------------------------------------------------------- sharding
+#
+# One array task per dataset is fine until one dataset holds far more files than the rest.
+# On the real blend dolmino has 40,003 source files against a median near 500, which at a
+# second per file is twelve hours against twenty minutes -- past the wall limit.
+
+
+def test_shards_split_the_files_and_together_cover_everything(tmp_path: Path, entry: DatasetEntry, blend):
+    manifest = blend(DatasetSelection(name="toy", ratio=2.0))
+
+    for shard_id in range(2):
+        _export(tmp_path, entry, manifest, shard_id=shard_id, num_shards=2)
+
+    # Two source files, one per task, and between them the whole dataset.
+    assert len(sorted((tmp_path / "out" / "toy").rglob("*.jsonl"))) == 2
+    exported = yaml.safe_load((tmp_path / "out" / EXPORT_MANIFEST).read_text())
+    assert exported["n_lines"] == 2 * N_DOCS
+    assert len(_lines(tmp_path / "out")) == 2 * N_DOCS
+
+
+def test_a_sharded_export_matches_an_unsharded_one(tmp_path: Path, entry: DatasetEntry, blend):
+    manifest = blend(DatasetSelection(name="toy", ratio=1.5))
+
+    _export(tmp_path, entry, manifest, out="whole")
+    for shard_id in range(3):
+        _export(tmp_path, entry, manifest, out="split", shard_id=shard_id, num_shards=3)
+
+    assert _lines(tmp_path / "split") == _lines(tmp_path / "whole")
+    whole = yaml.safe_load((tmp_path / "whole" / EXPORT_MANIFEST).read_text())
+    split = yaml.safe_load((tmp_path / "split" / EXPORT_MANIFEST).read_text())
+    for key in ("n_lines", "n_documents", "n_bytes"):
+        assert split[key] == whole[key], key
+    assert split["datasets"][0]["n_shards"] == whole["datasets"][0]["n_shards"]
+
+
+def test_each_task_records_its_own_counts(tmp_path: Path, entry: DatasetEntry, blend):
+    # A shared record would have concurrent tasks overwrite each other's counts, which is the
+    # race the per-dataset split already avoids at the blend level.
+    manifest = blend(DatasetSelection(name="toy"))
+    for shard_id in range(2):
+        _export(tmp_path, entry, manifest, shard_id=shard_id, num_shards=2)
+
+    records = sorted((tmp_path / "out" / "toy").glob("_export*.yaml"))
+    assert len(records) == 2, "one record per task"
+    assert sum(yaml.safe_load(p.read_text())["n_lines"] for p in records) == N_DOCS
+
+
+def test_a_shard_id_outside_the_range_is_refused(tmp_path: Path, entry: DatasetEntry, blend):
+    manifest = blend(DatasetSelection(name="toy"))
+    with pytest.raises(ValueError, match="not in"):
+        _export(tmp_path, entry, manifest, shard_id=3, num_shards=3)

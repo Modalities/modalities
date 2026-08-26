@@ -74,8 +74,7 @@ def main() -> int:
         "--source_root",
         type=Path,
         default=None,
-        help="If given, assert the corpus holds nothing but .jsonl files -- i.e. that no stage "
-        "wrote indexes or outputs into the source tree.",
+        help="If given, assert that no pipeline artifact was written into the source tree.",
     )
     args = parser.parse_args()
 
@@ -200,15 +199,28 @@ def main() -> int:
     if args.source_root is not None:
         print(f"checking that nothing was written into {args.source_root}")
         print("-" * 92)
+        # Only artifacts this pipeline could have produced. Flagging every non-.jsonl file
+        # instead reported the corpus's own 44 .gitattributes files, delivered with the data
+        # eleven days before the export -- a check that cries wolf gets ignored, and then it
+        # is worth nothing on the day something really is written here.
+        artifacts = (".idx", ".pbin", ".meta.json", ".partial", ".fingerprint")
         stray = [
-            str(p) for p in args.source_root.rglob("*") if p.is_file() and p.suffix != ".jsonl"
+            str(p)
+            for p in args.source_root.rglob("*")
+            if p.is_file() and (p.suffix in artifacts or p.name.endswith(".jsonl.meta.json"))
         ]
+        others = sum(
+            1 for p in args.source_root.rglob("*") if p.is_file() and p.suffix != ".jsonl"
+        ) - len(stray)
         if stray:
-            problems.append(f"{len(stray):,} non-.jsonl file(s) under the source root")
+            problems.append(f"{len(stray):,} pipeline artifact(s) written into the source root")
             for path in stray[:10]:
                 print(f"  STRAY {path}")
         else:
-            print("  clean: the corpus holds only .jsonl files")
+            print("  clean: no pipeline artifact under the source root")
+            if others:
+                print(f"  ({others:,} other non-.jsonl file(s) present, e.g. .gitattributes -- "
+                      f"delivered with the corpus, not written by us)")
         print()
 
     if problems:

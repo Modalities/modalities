@@ -629,6 +629,8 @@ def export_jsonl(
     resume: bool = True,
     show_progress: bool = True,
     finalize: bool = True,
+    shard_id: int = 0,
+    num_shards: int = 1,
 ) -> list:
     """Writes a materialised selection out as JSONL, sampling baked in.
 
@@ -643,6 +645,8 @@ def export_jsonl(
         finalize (bool): Merge the per-dataset records into ``export_manifest.yaml``. An
             array task exporting a single dataset should not, since the other datasets are
             still being written; the merge is a separate step afterwards.
+        shard_id (int): This task's index in ``[0, num_shards)``.
+        num_shards (int): Tasks splitting each dataset's source files between them.
 
     Returns:
         list: One :class:`~...export.DatasetExport` per dataset written.
@@ -655,6 +659,8 @@ def export_jsonl(
         only=only,
         resume=resume,
         show_progress=show_progress,
+        shard_id=shard_id,
+        num_shards=num_shards,
     )
     if finalize:
         finalize_export(output_dir)

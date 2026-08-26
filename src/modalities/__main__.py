@@ -1227,6 +1227,15 @@ def CMD_quality_apply(
     is_flag=True,
     help="Write export_manifest.yaml from the per-dataset records already on disk, exporting nothing.",
 )
+@click.option("--shard_id", type=int, default=0, show_default=True, help="This task's index in [0, num_shards).")
+@click.option(
+    "--num_shards",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Split each dataset's source files across this many tasks. One task per dataset is fine "
+    "until one dataset holds far more files than the rest.",
+)
 def CMD_quality_export_jsonl(
     manifest_path: Path,
     registry_path: Path,
@@ -1236,6 +1245,8 @@ def CMD_quality_export_jsonl(
     resume: bool,
     finalize: bool,
     finalize_only: bool,
+    shard_id: int,
+    num_shards: int,
 ) -> None:
     """Writes the selected documents out as JSONL, with the sampling baked into the bytes.
 
@@ -1252,6 +1263,8 @@ def CMD_quality_export_jsonl(
         resume (bool): Leave complete shards alone.
         finalize (bool): Merge the per-dataset records afterwards.
         finalize_only (bool): Only merge the records; export nothing.
+        shard_id (int): This task's index.
+        num_shards (int): Tasks splitting each dataset's files.
     """
     if finalize_only:
         print_rank_0(f"Export manifest written to {quality_export.finalize_export(output_dir)}")
@@ -1265,6 +1278,8 @@ def CMD_quality_export_jsonl(
         only=list(only) or None,
         resume=resume,
         finalize=finalize,
+        shard_id=shard_id,
+        num_shards=num_shards,
     )
     n_lines = sum(e.n_lines for e in exports)
     n_bytes = sum(e.n_bytes for e in exports)
