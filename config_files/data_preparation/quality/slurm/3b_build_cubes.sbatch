@@ -21,6 +21,13 @@ unset SLURM_MEM_PER_CPU || true
 unset SLURM_MEM_PER_GPU || true
 
 echo "START $(date)"
-srun "$MQ" -m modalities quality build-cube --registry "$REGISTRY" --work_dir "$WORK"
+# ONLY_DATASETS restricts the run to a space-separated list of names, so adding datasets to
+# an existing work directory does not rebuild cubes that are already good.
+ONLY_ARGS=""
+if [[ -n "${ONLY_DATASETS:-}" ]]; then
+    for _d in $ONLY_DATASETS; do ONLY_ARGS="$ONLY_ARGS --only $_d"; done
+fi
+
+srun "$MQ" -m modalities quality build-cube --registry "$REGISTRY" --work_dir "$WORK" $ONLY_ARGS
 echo "Coverage per dataset: $WORK/join_report.json -- read it before trusting a selection."
 echo "END $(date)"

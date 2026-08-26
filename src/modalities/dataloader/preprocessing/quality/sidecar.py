@@ -293,6 +293,7 @@ class SidecarBuilder:
         self,
         output_dir: Path,
         file_ids: Optional[list[int]] = None,
+        resume: bool = False,
         show_progress: bool = True,
     ) -> dict[str, int]:
         """Builds sidecar parts for the dataset's files.
@@ -301,6 +302,12 @@ class SidecarBuilder:
             output_dir (Path): Directory receiving one parquet part per file.
             file_ids (Optional[list[int]]): Restrict the build to these file ids, for
                 sharding the work across tasks. None builds every file.
+            resume (bool): Skip files whose part is already a readable parquet. Parquet
+                writes its footer last, so a part left behind by a killed task fails to
+                open and is rebuilt -- unlike existence, which proves nothing. Off by
+                default: after changing a native metric the existing parts are stale and
+                must be rewritten, and silently keeping them would be worse than the cost
+                of redoing them.
             show_progress (bool): Whether to show a progress bar.
 
         Returns:
@@ -326,10 +333,35 @@ class SidecarBuilder:
         # happens to be unchanged.
         FileManifest.from_entry(self._dataset).write(output_dir)
         written: dict[str, int] = {}
+        n_empty = n_resumed = 0
         iterator = tqdm(selected, desc=f"sidecar {self._dataset.name}", disable=not show_progress)
         for file_id, jsonl_path in iterator:
+            # A zero-byte file holds no documents, and indexing one raises
+            # `ValueError: faulty line "b''"` from the index generator rather than yielding
+            # nothing -- which failed a whole array task and everything after it in that
+            # task. The annealing tree has 530 such files, all in the sft-posttraining
+            # deliveries. The file keeps its id, so the manifest and every part written by
+            # another shard stay consistent; there is simply no part for it.
+            if jsonl_path.stat().st_size == 0:
+                n_empty += 1
+                continue
             part_name = f"part-{file_id:06d}.parquet"
+            if resume:
+                try:
+                    written[part_name] = pq.ParquetFile(output_dir / part_name).metadata.num_rows
+                    n_resumed += 1
+                    continue
+                except (OSError, pa.ArrowInvalid):
+                    pass
             written[part_name] = self.build_file(jsonl_path, file_id, output_dir / part_name)
+        if n_resumed:
+            get_logger(name="main").info(
+                f"{self._dataset.name}: reused {n_resumed:,} part(s) that were already complete"
+            )
+        if n_empty:
+            get_logger(name="main").warning(
+                f"{self._dataset.name}: skipped {n_empty:,} zero-byte file(s); they hold no documents"
+            )
         return written
 
 

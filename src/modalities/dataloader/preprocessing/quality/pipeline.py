@@ -198,6 +198,7 @@ def build_sidecars(
     work_dir: Path,
     only: Optional[list[str]] = None,
     index_root: Optional[Path] = None,
+    resume: bool = False,
     file_ids: Optional[list[int]] = None,
     shard_id: int = 0,
     num_shards: int = 1,
@@ -210,6 +211,7 @@ def build_sidecars(
         work_dir (Path): Working directory receiving ``sidecar/<dataset>/``.
         only (Optional[list[str]]): Restrict to these dataset names.
         index_root (Optional[Path]): Where JSONL index files live or should be created.
+        resume (bool): Skip files whose sidecar part already reads as valid parquet.
             Defaults to ``work_dir/idx``, never the source tree. Source corpora are
             typically shared and read-only, and an index written beside a JSONL file is a
             modification of somebody else's data; pass an explicit path to override.
@@ -258,6 +260,7 @@ def build_sidecars(
         parts = builder.build(
             sidecar_dir(work_dir, dataset.name),
             file_ids=assignment[dataset.name],
+            resume=resume,
             show_progress=show_progress,
         )
         written[dataset.name] = sum(parts.values())

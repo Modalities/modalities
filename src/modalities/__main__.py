@@ -777,6 +777,7 @@ def CMD_quality_calibrate(
         tokenizer_config (Path): Packing config supplying the tokenizer.
         sample_size (int): Documents tokenized per dataset.
         only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Skip files whose part already reads as valid parquet.
     """
     from modalities.config.component_factory import ComponentFactory
     from modalities.config.instantiation_models import TokenizerInstantiationModel
@@ -831,6 +832,13 @@ def CMD_quality_calibrate(
     help="How many tasks share the work. Files are divided across all selected datasets, "
     "so one array covers the whole blend.",
 )
+@click.option(
+    "--resume/--no_resume",
+    default=False,
+    help="Skip files whose sidecar part already reads as valid parquet. Parquet writes its "
+    "footer last, so a part left by a killed task fails to open and is rebuilt. Off by "
+    "default: after changing a native metric the existing parts are stale and must be redone.",
+)
 def CMD_quality_build_sidecar(
     registry_path: Path,
     work_dir: Path,
@@ -838,6 +846,7 @@ def CMD_quality_build_sidecar(
     index_root: Optional[Path],
     shard_id: int,
     num_shards: int,
+    resume: bool,
 ) -> None:
     """Records one row per document: position, estimated tokens, key and native metrics.
 
@@ -859,6 +868,7 @@ def CMD_quality_build_sidecar(
         index_root=index_root,
         shard_id=shard_id,
         num_shards=num_shards,
+        resume=resume,
     )
     for name, n_documents in written.items():
         print_rank_0(f"{name}: {n_documents:,} documents")

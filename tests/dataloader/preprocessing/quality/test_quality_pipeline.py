@@ -1482,3 +1482,36 @@ def test_a_curved_blend_also_publishes_usable_index_paths(tmp_path: Path, blend_
         for index in dataset["index_files"].values():
             assert Path(index).exists(), f"{dataset['name']} names a missing index {index}"
 
+
+
+def test_a_zero_byte_source_file_is_skipped_not_fatal(tmp_path: Path):
+    """The annealing tree holds 530 empty .jsonl files, all in the sft-posttraining
+    deliveries. Indexing one raises `ValueError: faulty line "b''"` from the index
+    generator instead of yielding nothing, which killed an array task and every file
+    queued behind it in that task."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "a.jsonl").write_text(json.dumps({"id": "d0", "text": "hello world"}) + "\n")
+    (corpus / "b.jsonl").write_bytes(b"")  # the empty delivery
+    (corpus / "c.jsonl").write_text(json.dumps({"id": "d1", "text": "another one"}) + "\n")
+
+    entry = DatasetEntry(
+        name="toy", jsonl_root=corpus, glob="*.jsonl", key=KeySpec(kind=KeyKind.FIELD, field="id")
+    )
+    calibration = calibrate_dataset(
+        dataset_name="toy",
+        file_paths=entry.iter_files(),
+        tokenizer=_WhitespaceTokenizer(),
+        tokenizer_name="whitespace",
+        sample_size=10,
+    )
+    written = SidecarBuilder(entry, calibration, index_root=tmp_path / "idx").build(
+        tmp_path / "sidecar", show_progress=False
+    )
+
+    # The two real files are built; the empty one contributes no part at all.
+    assert sorted(written) == ["part-000000.parquet", "part-000002.parquet"]
+    # File ids keep their positions, so part-000002 really is c.jsonl and the manifest agrees.
+    manifest = json.loads((tmp_path / "sidecar" / "_files.json").read_text())
+    names = [Path(f["path"]).name for f in manifest["files"]]
+    assert names == ["a.jsonl", "b.jsonl", "c.jsonl"], "the empty file stays in the manifest"

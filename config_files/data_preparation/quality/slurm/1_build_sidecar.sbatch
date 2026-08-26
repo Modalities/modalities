@@ -31,13 +31,28 @@ unset SLURM_MEM_PER_CPU || true
 unset SLURM_MEM_PER_GPU || true
 
 NUM_SHARDS="${SLURM_ARRAY_TASK_COUNT:-64}"
-echo "START $(date) shard ${SLURM_ARRAY_TASK_ID}/${NUM_SHARDS}"
+
+# ONLY_DATASETS restricts the run to a space-separated list of names. Unset, the stage covers
+# every enabled dataset as before. It matters when adding datasets to an existing work
+# directory: without it the array would rebuild the sidecars of datasets that already have
+# good ones, which is both hours of wasted reading and an overwrite of verified work.
+# SIDECAR_RESUME=1 skips files whose part already reads as valid parquet. Use it when
+# re-running after a partial failure; leave it unset after changing a native metric, since
+# the existing parts are then stale.
+ONLY_ARGS=""
+if [[ -n "${ONLY_DATASETS:-}" ]]; then
+    for _d in $ONLY_DATASETS; do ONLY_ARGS="$ONLY_ARGS --only $_d"; done
+fi
+
+echo "START $(date) shard ${SLURM_ARRAY_TASK_ID}/${NUM_SHARDS}${ONLY_DATASETS:+ restricted to: $ONLY_DATASETS}"
 
 srun "$MQ" -m modalities quality build-sidecar \
   --registry "${REGISTRY:-$QDIR/annealing_registry.yaml}" \
   --work_dir "$WORK" \
   --index_root "$WORK/idx" \
   --shard_id "$SLURM_ARRAY_TASK_ID" \
-  --num_shards "$NUM_SHARDS"
+  --num_shards "$NUM_SHARDS" \
+  ${SIDECAR_RESUME:+--resume} \
+  $ONLY_ARGS
 
 echo "END $(date)"

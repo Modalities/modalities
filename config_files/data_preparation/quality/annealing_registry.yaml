@@ -179,3 +179,127 @@ datasets:
     native_metrics:
       - {name: dclm_plus2, jq_pattern: '.metadata.dclm_plus2."__label__1"'}
       - {name: len_cl100k_base, jq_pattern: .metadata.len_cl100k_base}
+
+  # ==================================================================== added scope
+  # Everything in /data/annealing that was not previously registered, so the cubes cover
+  # the whole tree rather than the 20 datasets of the first blend.
+  #
+  # None of these has a propella annotation split -- the two annotation roots hold only
+  # finewiki, finepdfs, hplt-4-unfiltered, nemotron-cc, nemotron-climbmix and
+  # german-commons -- so none declares a `key`, and the join stage skips them all. Their
+  # cubes are built from native metrics where the records carry any, and 24 of the 29 carry
+  # none, so those cubes report exact document and token counts with no dimension to
+  # threshold on. That is still what a blend is budgeted from.
+  #
+  # Two directory trees are deliberately absent: `math_epoch_2` and
+  # `code/swallow-code-v2_stage5_epoch_2` are byte-identical copies of `math/` and
+  # `..._epoch_1` (one 95 GB pair confirmed by full hash), 1.94 TB in total.
+
+  - name: nemotron-code-v1
+    jsonl_root: /data/annealing/code/Nemotron-Pretraining-Code-v1
+    native_metrics: []
+  - name: nemotron-code-v2
+    jsonl_root: /data/annealing/code/Nemotron-Pretraining-Code-v2
+    native_metrics: []
+  - name: nemotron-code-v3
+    jsonl_root: /data/annealing/code/Nemotron-Pretraining-Code-v3
+    native_metrics: []
+  - name: dolmino-stackedu-fim
+    jsonl_root: /data/annealing/code/dolmino_stackedu_fim
+    native_metrics:
+      - {name: score, jq_pattern: '.metadata.score'}
+      - {name: int_score, jq_pattern: '.metadata.int_score'}
+      - {name: length_bytes, jq_pattern: '.metadata.length_bytes'}
+  - name: swallow-code-v2
+    jsonl_root: /data/annealing/code/swallow-code-v2_stage5_epoch_1
+    note: "epoch_2 alongside this is a byte-identical copy (verified by full hash) and is deliberately not registered"
+    native_metrics:
+      - {name: score, jq_pattern: '.metadata.score'}
+      - {name: star_events, jq_pattern: '.metadata.star_events_count'}
+      - {name: fork_events, jq_pattern: '.metadata.fork_events_count'}
+      - {name: length_bytes, jq_pattern: '.metadata.length_bytes'}
+  - name: nemotron-cc-v2.1
+    jsonl_root: /data/annealing/english/Nemotron-CC-v2.1
+    native_metrics: []
+  - name: nemotron-legal-v1
+    jsonl_root: /data/annealing/english/Nemotron-Pretraining-Legal-v1
+    native_metrics: []
+  - name: qa-base-en
+    jsonl_root: /data/annealing/english/QA_base
+    note: "git-lfs style checkout; carries .gitattributes files"
+    native_metrics: []
+  - name: qa-base-fr
+    jsonl_root: /data/annealing/french/QA_base
+    native_metrics: []
+  - name: nemotron-qa-fr
+    jsonl_root: /data/annealing/french/nemotron-cc-v2-translated-diverse-qa
+    native_metrics: []
+  - name: qa-base-de
+    jsonl_root: /data/annealing/german/QA_base_data
+    native_metrics: []
+  - name: soofi-think-de
+    jsonl_root: /data/annealing/german/Soofi-Think
+    native_metrics: []
+  - name: court-decisions-de
+    jsonl_root: /data/annealing/german/court-decisions-germany
+    native_metrics: []
+  - name: qa-base-it
+    jsonl_root: /data/annealing/italian/QA_base
+    native_metrics: []
+  - name: nemotron-qa-it
+    jsonl_root: /data/annealing/italian/nemotron-cc-v2-translated-diverse-qa
+    native_metrics: []
+  - name: nemotron-math-v1
+    jsonl_root: /data/annealing/math/Nemotron-CC-Math-v1
+    note: "math_epoch_2 holds a copy of the whole math/ tree and is deliberately not registered"
+    native_metrics:
+      - {name: finemath, jq_pattern: '.metadata.finemath_scores'}
+      - {name: nemocurator, jq_pattern: '.metadata.nemocurator_scores'}
+      - {name: finemath_int, jq_pattern: '.metadata.finemath_int_scores'}
+  - name: ultradata-math
+    jsonl_root: /data/annealing/math/UltraData-Math
+    native_metrics: []
+  - name: dolmino-math
+    jsonl_root: /data/annealing/math/dolmino_math
+    native_metrics: []
+  - name: mt-reasoning
+    jsonl_root: /data/annealing/reasoning/MT-Reasoning
+    native_metrics:
+      - {name: prompt_tokens, jq_pattern: '.prompt_tokens'}
+      - {name: reasoning_tokens, jq_pattern: '.reasoning_tokens'}
+      - {name: response_tokens, jq_pattern: '.response_tokens'}
+      - {name: total_tokens, jq_pattern: '.total_tokens'}
+  - name: nemotron-specialized-v1
+    jsonl_root: /data/annealing/reasoning/Nemotron-Pretraining-Specialized-v1
+    native_metrics: []
+  - name: nemotron-specialized-v1.1
+    jsonl_root: /data/annealing/reasoning/Nemotron-Pretraining-Specialized-v1.1
+    native_metrics: []
+  - name: nemotron-specialized-v1.2
+    jsonl_root: /data/annealing/reasoning/Nemotron-Pretraining-Specialized-v1.2
+    native_metrics: []
+  - name: dolmino-reasoning
+    jsonl_root: /data/annealing/reasoning/dolmino_pool_reasoning
+    native_metrics: []
+  - name: acereason
+    jsonl_root: /data/annealing/sft/AceReason
+    native_metrics: []
+  - name: nemotron-sft-v1
+    jsonl_root: /data/annealing/sft/Nemotron-Pretraining-SFT-v1
+    native_metrics: []
+  - name: dolmino-sft
+    jsonl_root: /data/annealing/sft/dolmino
+    native_metrics: []
+  - name: sft-posttraining
+    jsonl_root: /data/annealing/sft/sft-posttraining_2
+    note: "the _2 delivery; sft-posttraining/ shares 710 of its 715 files by name and size and is not registered"
+    native_metrics:
+      - {name: lang_conf, jq_pattern: '.lang_conf'}
+      - {name: est_tokens_native, jq_pattern: '.est_tokens'}
+      - {name: fertility_factor, jq_pattern: '.fertility_factor'}
+  - name: qa-base-es
+    jsonl_root: /data/annealing/spanish/QA_base
+    native_metrics: []
+  - name: nemotron-qa-es
+    jsonl_root: /data/annealing/spanish/nemotron-cc-v2-translated-diverse-qa
+    native_metrics: []
