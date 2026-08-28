@@ -69,6 +69,7 @@ from modalities.config.config import (
     StepLRSchedulerConfig,
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
+    WeightedCombinedDatasetConfig,
     WeightInitializedModelConfig,
 )
 from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
@@ -316,6 +317,12 @@ COMPONENTS = [
     ),
     ComponentEntity("dataset", "dummy_dataset", DatasetFactory.get_dummy_dataset, DummyDatasetConfig),
     ComponentEntity("dataset", "combined", DatasetFactory.get_combined_dataset, CombinedDatasetConfig),
+    ComponentEntity(
+        "dataset",
+        "weighted_combined",
+        DatasetFactory.get_weighted_combined_dataset,
+        WeightedCombinedDatasetConfig,
+    ),
     # samplers
     ComponentEntity("sampler", "sequential_sampler", SequentialSampler, SequentialSamplerConfig),
     ComponentEntity("sampler", "distributed_sampler", DistributedSampler, DistributedSamplerConfig),

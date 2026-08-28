@@ -218,3 +218,790 @@ This PR improves training monitoring and logging across runs besides some other 
 
 **Breaking Changes**
 * experiments_root_path is now exposed on an API level
+
+## PR #XXX Quality-based document selection and up/downsampling
+
+This PR adds a way to build a training blend by filtering documents on quality signals
+and choosing how heavily each dataset is sampled, plus a fast way to see the token
+budget a given selection yields before committing to a tokenization run.
+
+**Motivation**
+
+Two kinds of quality signal exist in practice: metrics a corpus already carries in its
+own records (`fw_edu_scores`, `proxy_score`, `finemath_scores`, `perplexity`, ...), and
+external per-document annotations that have to be joined on. Neither could be used to
+shape a blend, and the only way to change a dataset's share was to duplicate it on disk
+-- which is what the `_epoch_1` / `_epoch_2` directory convention did.
+
+**General changes**
+
+* New `modalities quality` command group with one subcommand per stage:
+  `calibrate`, `build-sidecar`, `join-annotations`, `build-cube`, `preview`, `apply`
+  and `write-packing-configs`.
+* New `src/modalities/dataloader/preprocessing/quality/` package:
+  * `registry` declares each dataset's source and how it joins to annotations. Four key
+    kinds are supported, covering corpora that store a plain id, an id wrapped in
+    `<urn:uuid:...>`, no id at all (keyed by a hash of the text), and a `<file>/<line>`
+    pointer into a separate source corpus.
+  * `tokens` measures per-dataset token estimators. Estimates are per document and
+    based on the text rather than the stored line, because quality correlates with
+    length and several corpora keep multiple renderings of a document in one record.
+  * `sidecar` streams each JSONL once and records one row per document: position,
+    length, estimated tokens, join key and native metrics.
+  * `annotation_join` joins annotations by bucketing both sides on a hash of the key,
+    so a split of billions of rows never needs a single hash table. Coverage,
+    duplicate keys and unmatched documents are reported rather than hidden.
+  * `cube` aggregates a sidecar into grouped document and token counts, which is what
+    makes `preview` return in microseconds. Thresholds landing on a bin edge are exact;
+    one landing inside a bin is reported as interpolated instead of silently guessed.
+  * `selection` evaluates a YAML selection over both annotation labels and native
+    metrics, with ordinal scales declared explicitly.
+  * `materialize` writes the selection out as filtered `.idx` files.
+* New `WeightedCombinedDataset` (component `dataset`/`weighted_combined`), which takes a
+  float repeat factor per dataset. A ratio of 2.5 draws a dataset two and a half times
+  per epoch and 0.3 draws three tenths of it, without duplicating anything on disk. The
+  partial pass is chosen by a seeded affine permutation, so it is deterministic across
+  ranks and restarts and spreads across the whole dataset rather than taking a prefix.
+* New `TokenizerInstantiationModel`, so a tool can reuse a packing config for its
+  tokenizer without also having to satisfy that config's `settings`.
+
+**Notes**
+
+Selection produces a filtered index rather than a filtered copy of the corpus:
+`PackedDataGenerator` already tokenizes exactly the documents its index lists, so
+`pack_encoded_data` consumes the output unchanged and no packing code was touched. An
+ablation therefore costs megabytes of index rather than a second copy of the data, and
+the source tree is never written to.
+
+**Breaking Changes**
+
+None. `CombinedDataset` and every existing config keep working as before.
+
+
+## PR #XXX Quality selection: performance and sharding
+
+Follow-up to the quality-selection PR, from profiling the pipeline against the real
+43 TB blend rather than a fixture. Three of the four stages were far slower than they
+needed to be, and two of them could not be parallelised at all.
+
+**General changes**
+
+* Native metrics declared as a plain field path (`.fw_edu_scores`,
+  `.metadata.dclm_plus2."__label__1"`) are now read by direct dictionary lookup instead
+  of jq. `jq.compile(...).input_value(record)` re-serialises the whole document on every
+  call, which on a 21 KB record cost more than twenty times the rest of building a
+  sidecar row; the full pass measured **29 MB/s with jq against 374 MB/s without, 13x
+  end to end**. Patterns jq cannot reduce to a field chain still use jq, and
+  `build-sidecar` now warns when one does, since that pattern then dominates the stage.
+* `build_cube` groups with Arrow's C++ kernels instead of a Python loop over documents,
+  batching row groups so cardinality saturates before each grouping pass:
+  **246k -> 2.39M rows/s, 9.9x**. For the full blend that is ~50 minutes rather than
+  ~8.5 hours, and the stage was not shardable, so it was a hard floor.
+* `build-sidecar` takes `--shard_id`/`--num_shards`. Work is divided per JSONL file
+  across every selected dataset, so one array covers the whole blend however unevenly
+  the file counts fall. Previously the only split was per dataset, leaving a floor of
+  the slowest dataset -- ~71 h for `finepdfs-en`.
+* Annotation bucketing moved out of `join-annotations` into its own shardable
+  `bucket-annotations` stage. Each task writes its own file per bucket and the join
+  reads all of them, so the result is identical to a single-task run. Bucketing 13.9 bn
+  annotation rows was ~32 h serial, with a ~8.7 h floor from the largest single split.
+* `join-annotations` refuses to run against an incomplete bucketing run rather than
+  silently dropping the annotations a missing task was carrying, which would have looked
+  exactly like a corpus that was never annotated.
+
+**Notes**
+
+Measured on this cluster: sequential read from `/data` is ~282 MB/s per stream and
+~3.8 GB/s aggregate. With the jq fix the sidecar pass is I/O-bound, so beyond ~16
+concurrent tasks the storage is the limit rather than the code. End to end the one-time
+setup goes from ~88 h to ~4 h on two nodes; previewing a selection is unaffected at
+~10 s for the whole blend, because it only ever reads the cubes.
+
+**Breaking Changes**
+
+* `modalities quality build-sidecar` no longer takes `--file_id`; use
+  `--shard_id`/`--num_shards`.
+* `modalities quality join-annotations` no longer buckets. Run
+  `modalities quality bucket-annotations` first. Its `--num_buckets` and
+  `--rebuild_buckets` options moved to that command (`--rebuild_buckets` is now
+  `--force`).
+
+
+## PR #XXX Fix: calibration read scaled with file count
+
+`quality calibrate` read a fixed 20,000 lines from *every* file of a dataset to collect a
+2,000-document sample, so its cost scaled with the file count rather than the sample size.
+Over the real blend that came to **30.3 TB and ~30 hours** -- `dolmino` alone, at 40,003
+files, accounted for 26 TB. Reported from a real run that was still going after an hour
+having finished 9 of 19 datasets.
+
+**General changes**
+
+* The sampler now draws from at most `max_probe_files` files (default 32), spaced evenly
+  across the dataset, reading only enough lines from each to fill the sample. Full
+  calibration of all 19 datasets: **4 minutes**, about 1 GB read. The three worst
+  datasets together (`dolmino`, `finephrase`, `hplt-de`) now take 67 s.
+* `calibration.yaml` is written after each dataset instead of once at the end, so
+  interrupting the stage keeps what it already measured. Previously an hour of work was
+  discarded on Ctrl-C.
+
+**Notes**
+
+Spread is preserved -- the probe files are spaced across the dataset, not taken from the
+front -- and the sample is still trimmed with a seeded choice, so calibration stays
+reproducible. Tests cover both: that the number of files opened stays bounded regardless
+of dataset size, and that probe files reach both ends of the file list.
+
+
+## PR #XXX Fix: bucket writer buffered the whole input when bucket count was high
+
+`bucket-annotations` OOM-killed all 64 tasks of a real run at 24 GB each. The writer
+flushed a bucket once it held `flush_rows` (100,000) rows, which bounds nothing: spread
+50 M rows over 1024 buckets and each holds ~49 k, so no bucket ever reaches the threshold
+and the entire input accumulates as Python dicts until the writer closes.
+
+**General changes**
+
+* The cap is now on the **total** rows buffered across all buckets (`max_buffered_rows`,
+  default 500,000); reaching it flushes every bucket. Measured on the shard that caused
+  the failure -- 50 M rows at 1024 buckets -- peak RSS is **2.36 GB** against the
+  previous unbounded growth, at an unchanged 121k rows/s.
+* `bucket_annotations` refuses to write into a directory holding output from a run with a
+  different `num_shards`. A sharded run cannot clear the directory, so leftovers would
+  otherwise be mixed in and a bucket would be read as rows from two incompatible runs.
+
+**Notes**
+
+The completeness guard added earlier did its job here: `join-annotations` refused to run
+against the partial buckets the OOMed array left behind ("63 of 64 bucketing tasks
+finished, missing shard id 0") rather than silently producing sidecars with no labels.
+Without it the failure would have surfaced much later as an unexplained 0 % coverage.
+
+Tests cover the bound directly: 20,000 rows over 1024 buckets with a 1,000-row cap, with
+the buffered total asserted after every row, plus that repeated flushes of one bucket
+still yield one file with every row.
+
+
+## PR #XXX Fix: metadata write/read race in bucket-annotations
+
+The guard added in the previous entry -- refusing to mix output from runs with different
+array sizes -- read every `_meta.*.json` in a split directory with a bare `json.loads`.
+The writer used `Path.write_text`, which truncates before writing, so the file is briefly
+empty; sibling tasks of the same array read those files, and 12 of 64 tasks of a real run
+died with `JSONDecodeError: Expecting value: line 1 column 1 (char 0)`.
+
+**General changes**
+
+* Metadata is written to a per-task `_meta.<shard>.json.tmp` and renamed onto the final
+  name. Rename is atomic, so a concurrent reader sees either the old file or the complete
+  new one.
+* Both readers -- the guard and `read_bucket_metadata` -- skip a file they cannot parse
+  rather than propagating the error, and both ignore `*.tmp`. Skipping is the safe
+  direction for `read_bucket_metadata`: an unread file leaves its shard id unseen, so the
+  run reports as incomplete instead of joining missing annotations. If no file at all can
+  be read it now raises a clear error rather than an `AttributeError`.
+
+**Notes**
+
+Verified on the real `finewiki` split: four sequential shards into one directory, 43.1 M
+rows, metadata reading back as a complete run with a matching row total and no `.tmp`
+left behind. Tests cover a truncated metadata file mid-run, an unreadable file making the
+run report incomplete, `.tmp` being ignored, and a thread rewriting metadata while the
+guard runs repeatedly.
+
+
+## PR #XXX Fix: the join re-read the whole annotation split per sidecar part
+
+`join_annotations` looped over sidecar parts on the outside and annotation buckets on the
+inside, so the entire bucketed split was read once per part. Because a part's documents
+hash across every bucket, that is full re-reads, not partial ones. Measured against the
+real blend after bucketing completed:
+
+```
+hplt-es        502 parts x 107.3 GB =  53.9 TB
+nemotron-cc  5,319 parts x  23.1 GB = 122.7 TB
+climbmix-en  6,543 parts x  24.6 GB = 161.3 TB
+TOTAL                                454.2 TB  = 451 h of reading
+```
+
+**General changes**
+
+* Sidecar parts are processed in batches (`max_batch_keys`, default 20 M documents) and
+  each annotation bucket is read once per batch. Read amplification drops from the part
+  count to the batch count: **454 TB to 5.9 TB**, 451 h to 5.8 h serial.
+* Within a batch each bucket is filtered with `pyarrow.compute.is_in` before anything is
+  materialised in Python, so memory is bounded by the batch rather than by the bucket -- a
+  bucket of a billion-row split holds millions of rows, of which one batch wants a few
+  thousand.
+* Bucket file lists are globbed once and cached, saving 65,536 directory scans per batch on
+  a 1024-bucket split written by 64 tasks.
+* Duplicate annotation keys are now counted once, among the keys the join actually wants.
+  The previous figure was inflated by the part count: `finewiki-it` reported 868,586 where
+  the real number is 36,747.
+* New `3a_join_annotations.sbatch` runs one array task per annotated dataset, resolving the
+  dataset from the registry so the mapping cannot drift. Wall time becomes the slowest
+  dataset (~2 h) rather than the sum. `3b_build_cubes.sbatch` follows it.
+
+**Notes**
+
+Verified on the real `finewiki-it` sidecar: 1,799,759 of 1,799,759 documents annotated,
+100 % coverage, in 48 s against 107 s for a quarter of the documents before. Tests assert
+that the batch size does not change any document's label, that a bucket is never read
+twice within a batch, and that a duplicate key is counted once rather than once per part.
+
+
+## PR #XXX Fix: resumable join, and a cube stage that fails clearly
+
+A `nemotron-cc` join reached `5319/5319` parts and was then killed by the 12-hour limit in
+`3a_join_annotations.sbatch` during its final write-back, leaving 10 of 5,319 parts without
+labels. `build-cube` then died on that inconsistency with
+`KeyError: Field "educational_value" does not exist in schema`, after building 9 cubes and
+before attempting 6 datasets that were perfectly healthy.
+
+**General changes**
+
+* `join-annotations --resume` skips sidecar parts that already carry the label columns and
+  reports the count. Finishing the interrupted run took **9 minutes rather than 12 hours**,
+  skipping 5,309 parts. Off by default: resuming after re-bucketing the annotations would
+  silently keep the old labels, so continuing has to be asked for explicitly.
+  `3a_join_annotations.sbatch` passes it when `JOIN_RESUME` is set.
+* `build_cube` reads every part's schema rather than assuming they match the first one's,
+  and raises `CubeError` naming the dataset, how many parts are missing which columns, and
+  the `--resume` command that finishes the job.
+* `build_cubes` no longer aborts the stage on one bad dataset. It builds every healthy one,
+  logs the failures together and re-raises so the job still exits non-zero.
+* Per-dataset `join_report/<dataset>.json`, plus a merged `join_report.json`. Sixteen
+  parallel `--only` tasks had been overwriting one shared file, leaving only the last
+  dataset's coverage.
+* `3a_join_annotations.sbatch` time limit 12 h -> 48 h, with the measured `nemotron-cc`
+  figure recorded next to it.
+
+**Notes**
+
+The join being CPU-bound in Python is why `nemotron-cc` took 12 h where bytes-read implied
+2 h. Resolving in Arrow with `pc.index_in` and `Table.take` instead of per-key Python dicts
+should be worth 10-50x and is worth doing, but it is a separate change and not needed to
+produce a blend.
+
+
+## PR #XXX Fix: preview refused to admit it was scanning 1.7 bn documents
+
+`evaluate_blend` caught the `SelectionError` a cube raises for a field it was not grouped
+on and quietly scanned the per-document sidecar instead. A sidecar scan is exact but reads
+every document, so a preview advertised as taking seconds ran for over ten minutes on the
+real blend: `nemotron-cc` thresholded `commercial_bias`, which the join attaches but the
+cube does not group, and `dolmino` thresholded `dclm_plus2`, which exists only under one of
+its subdirectories and was null in all of 400 sampled sidecar parts.
+
+**General changes**
+
+* The fallback is now opt-in via `--allow_fallback`. Without it every unanswerable
+  predicate is collected and reported together, naming the dataset, the field, the
+  dimensions the cube does carry, and how many documents a scan would read. The real
+  selection now fails in **16 s** with both problems named, instead of hanging.
+* `build-cube --label_dimension` (repeatable) chooses which annotation columns to group on,
+  so a field a selection needs can be added. The flag replaces the default seven rather
+  than extending it, and each field multiplies the cell count by its number of levels.
+* The example selection no longer thresholds fields the default cubes lack, with a comment
+  at each site saying why and how to re-enable it. The registry records that dolmino's
+  `dclm_plus2` is confined to `stem-heavy-crawl`.
+
+**Notes**
+
+First full preview of the real blend: 13.7 s across 19 cubes, 3.04 T effective tokens
+against a 400 B target. Coverage is 100 % for finewiki, HPLT, Nemotron-CC, ClimbMix and
+KletterMix, and 92.5-99.7 % for FinePDFs.
+
+
+## PR #XXX Fix: pin the source file list a sidecar was built against
+
+A sidecar row locates its document by `(file_id, byte_offset, byte_len)`, and `file_id`
+was a position in a file list re-derived from the filesystem at every stage. That makes
+every recorded offset depend on the source tree never changing, with nothing recording
+what it looked like.
+
+An ongoing transfer then re-sharded four corpora after their sidecars were built.
+`Nemotron-CC` went from 606 MB files to 137 MB files while keeping nearly the same file
+count, so the count comparison that existed passed and the offsets pointed past end of
+file. Eleven of nineteen datasets were unusable and only one -- whose file count fell to
+zero -- failed loudly. The rest would have packed a blend of wrong byte ranges.
+
+**General changes**
+
+* `build-sidecar` records its file list in `sidecar/<dataset>/_files.json`, written
+  atomically because a sharded build has every task describing the same list.
+* `apply` resolves ids through that manifest instead of re-globbing, so a file added to
+  the tree cannot renumber anything, and refuses to run if a recorded file changed size or
+  disappeared. Paths are relative, so moving or snapshotting a tree stays valid.
+* New `quality verify-sidecar`: seeks to recorded offsets and compares the document found
+  against the recorded text length, catching a file rewritten at the same size. Rows at
+  offset zero are skipped -- the first document of any JSONL file parses, so they succeed
+  against a completely different file, which is how the broken sidecars looked healthy.
+  `--adopt` stamps a manifest onto a pre-existing sidecar, but only one that verifies.
+* `build_sidecars` no longer defaults its index root to the source tree. `SidecarBuilder`
+  writes a `.idx` beside each JSONL when given no index root, which would modify a shared
+  read-only corpus; it now defaults to `work_dir/idx`.
+
+**Testing**
+
+* `slurm/make_smoke_snapshot.py` freezes ~1 GB of five corpora, chosen to cover all four
+  distinct join-key kinds plus the native-metrics-only path -- every branch of the join --
+  and `smoke_registry.yaml` / `smoke_selection.yaml` run the full pipeline over it in
+  minutes rather than 15 hours.
+* `slurm/check_smoke_run.py` compares packed token counts against the preview's estimates,
+  loads the output as a `WeightedCombinedDataset` including a fractional repeat factor,
+  and asserts nothing was written under the source root.
+* `test_file_manifest.py` covers the re-shard that preserves the file count, a prepended
+  file that would renumber ids, a removed file, `apply` refusing a drifted tree, and that
+  adoption is refused for a sidecar that does not verify.
+
+
+## PR #XXX Fix: a resumed join reported 0% coverage
+
+`--resume` counted only the parts it re-joined, so a run that skipped everything wrote a
+report saying 0 documents and 0.0 coverage. On the smoke run it overwrote three datasets'
+genuine coverage figures with zeros, which reads as a failed join rather than a skipped
+one. Coverage is a property of the sidecar, not of the run, so skipped parts now
+contribute their existing labels to the totals, and `n_parts_resumed` records how many
+were not redone.
+
+
+## PR #XXX Fix: the token estimator was 16-19% out, and looked stable while being wrong
+
+The end-to-end smoke run compared the preview's estimates against a real packing run for
+the first time. Document counts matched exactly, but `finewiki-de` tokens were 10.7% out,
+and chasing that found two independent defects in the calibration.
+
+**The sample was a prefix.** `_sample_documents` took the first N documents of each probe
+file. Being deterministic, it produced identical ratios across every seed, which reads as
+stability rather than as a sample that never moves. On the FineWiki snapshot the first
+2,000 documents gave 3.531 bytes per token where the whole file gives 4.214 -- 16% out,
+applied to every token figure downstream. I introduced this when bounding an earlier 30 TB
+read: I capped the read by taking a prefix and never made the within-file sample spread.
+
+**One global ratio cannot describe a corpus.** FineWiki's ratio runs from 3.571 for
+documents under a kilobyte to 34.648 for the nine documents above 256 KB -- and those nine
+hold 5.7% of all bytes. A single sum ratio is therefore hostage to whether the sample
+caught them, which is why the global estimator's error swung between -19.4% and +4.2%
+across seeds.
+
+**General changes**
+
+* Documents are sampled at offsets spread evenly across each file, and the document
+  *containing* each offset is taken rather than the one following it. That makes selection
+  proportional to length, which is what a byte-weighted ratio needs: the top stratum went
+  from 2 sampled documents per 2,000 to 44.
+* The ratio is measured per size stratum (log-spaced, six of them) and applied per document
+  from the length the sidecar already records exactly. A stratum reached by fewer than 20
+  documents falls back to the corpus-wide ratio rather than becoming an estimator of its
+  own.
+* The corpus-wide ratio now uses inverse-probability weights. Under length-proportional
+  sampling a plain sum ratio is weighted by the square of length and came out 62% low.
+* Each document's ratio is measured on a slice of at most 64 KB, taken from a random
+  position inside it. Length-proportional sampling means the multi-megabyte documents do get
+  sampled, and tokenizing them in full took calibration from 1.5 minutes to over 10; a
+  document's ratio is far more uniform within itself than across the corpus, so a slice
+  measures it well. Calibration is now ~15 s per dataset.
+* `--sample_size` default raised from 2000 to 4000, for margin.
+
+**Result on the FineWiki snapshot**, against the true token count of all 27,846 documents:
+
+| estimator | worst error over 5 seeds |
+|---|---|
+| global ratio, prefix sample (before) | 16.2% bias, invisible across seeds |
+| global ratio, spread sample | 19.4% |
+| stratified, spread sample | 0.8% |
+
+**Notes**
+
+Calibrations written before this change have no strata and fall back to the global ratio,
+so they still load; they should be re-measured. Changing a calibration changes `est_tokens`
+in the sidecars, which means rebuilding them -- worth folding into the rebuild the source
+re-shard already forces.
+
+
+## PR #XXX End-to-end validation of the estimator against a real packing run
+
+Re-ran the whole smoke pipeline after the estimator fix. Estimated against packed tokens,
+with document counts as the exact control:
+
+| dataset | est tokens | packed | error | docs selected | docs packed |
+|---|---|---|---|---|---|
+| finewiki-de | 18,506,144 | 18,438,976 | -0.36% | 20,693 | 20,693 |
+| finepdfs-es | 8,644,194 | 8,505,597 | -1.60% | 825 | 825 |
+| climbmix-en | 54,527,783 | 54,493,399 | -0.06% | 60,834 | 60,834 |
+| klettermix-de | 19,799,809 | 19,818,254 | +0.09% | 22,915 | 22,915 |
+| dolmino | 48,320,010 | 48,508,512 | +0.39% | 8,106 | 8,106 |
+| **total** | **149,797,940** | **149,764,738** | **-0.02%** | | |
+
+`finewiki-de` was -10.72% before the fix. Document counts match exactly, which is the
+stronger check: the filtered index names exactly the selected documents, so any difference
+would be a defect in materialize rather than estimator error.
+
+The blend also loads: 8 packed files combined through `WeightedCombinedDataset` with repeat
+factors 0.5/1.0/1.5/2.0, length 74,033 against 74,032 expected, samples pulled at both
+boundaries and the middle. The fractional factors exercise the partial-pass permutation,
+which no test on real data had reached. Nothing was written under the source root.
+
+
+## PR #XXX Perf: resolve the join in Arrow, and drop bucket routing
+
+The join built a `dict[key, list[(part, row)]]` over every document, a per-row dict of
+labels for every document, and a Python list comprehension per label column -- a handful of
+Python objects per document, at 1.7 bn documents for Nemotron-CC. Each part is now resolved
+with one `index_in` against the batch's lookup table and one `take` per label column, and
+the key column stays Arrow in the outer loop, where materialising it had been 1.7 bn Python
+strings before any joining began.
+
+Profiling what remained showed the next cost was not per-row work at all: 22 s of reads and
+14 s of a thousand separate `is_in` calls, out of 47 s, because a 554 MB split is
+partitioned into 1024 files of roughly 540 KB. The routing those buckets exist for also
+turned out to decide nothing -- a batch holds millions of keys, which hash across every
+bucket, so the profile recorded all 1024 files being read anyway, after a blake2b call per
+key in Python to choose them. Routing is gone, replaced by one `pyarrow.dataset` scan with
+the key filter pushed into it. Arrow applies the filter per row group and reads in parallel,
+so memory stays bounded by matching rows rather than by split size.
+
+**Measured** on `finewiki-en`, 6.6 M documents against the 43 M-row FineWiki split, both
+implementations on separate copies of the same sidecar:
+
+| | elapsed | per document |
+|---|---|---|
+| before | 88.7 s | 13.41 us |
+| after | 42.1 s | 6.36 us |
+
+Equivalence was verified twice rather than assumed: 79,375,860 label values identical across
+12 columns on the benchmark, and 1,441,584 values identical across all four join-key kinds
+on the smoke blend, with duplicate-key counts matching exactly (390 / 2 / 1,936 / 6,025).
+That check mattered because "keep the first row seen" had to survive reimplementation as
+`index_in` over unique values, which reports each value's first position.
+
+**What this does not fix, and it is the larger cost.** The annotation split is scanned once
+per batch, and batch count scales with documents:
+
+| dataset | documents | batches @ 20 M | annotation rows | row scans |
+|---|---|---|---|---|
+| finewiki-en | 6.6 M | 1 | 43 M | 43 M |
+| hplt-de | 176 M | 9 | 3.76 bn | 33.8 bn |
+| climbmix-en | 553 M | 28 | 552 M | 15.5 bn |
+| nemotron-cc | 1.70 bn | 85 | 747 M | 63.5 bn |
+
+So `nemotron-cc` reads its 22 GB split 85 times, about 1.9 TB, and that is what its twelve
+hours were mostly spent on. The benchmark above has exactly one batch, so it measures the
+overhead this commit addresses and none of the re-scanning, and it should not be read as a
+prediction for `nemotron-cc`.
+
+Reducing the scans means letting batches hold far more keys, which today is bounded by the
+batch holding a full `pa.Table` per part. Collecting only key columns for the scan and
+re-reading the parts to write back would cut that by roughly an order of magnitude, at the
+cost of reading the sidecar twice -- cheap against 85 scans of the split. Not attempted
+here; it changes the memory profile of a stage that has already been OOM-killed once.
+
+
+## PR #XXX Measured: what the join speedup actually is, on nemotron-cc
+
+Two proxy datasets failed to predict this one. Non-scan cost per document came out 6.36 us on
+`finewiki-en` (15-character keys, 1,024 split files) and 37.59 us on `climbmix-en`
+(64-character keys, 12,288 files), and the projection from the second, 21.9 h, exceeded the
+12 h actually observed with the slower pre-vectorisation code. Two points cannot separate key
+length from fragment count, so the dataset was measured directly.
+
+60 parts of the real `nemotron-cc` sidecar -- 18,748,230 documents with 36-character UUID
+keys -- against the real 746,648,080-row split in 16,384 files, at 2.51 % density against the
+2.68 % a real 20 M-key batch sees:
+
+| implementation | batches | elapsed | us/document | peak RSS |
+|---|---|---|---|---|
+| before | 1 | 772.6 s | 41.21 | 24.9 GiB |
+| after | 1 | 505.0 s | 26.94 | 51.9 GiB |
+| after | 2 | 757.5 s | 40.40 | 51.9 GiB |
+
+**1.53x on the dataset that matters**, and equivalence holds: 224,978,760 label values
+identical across 12 columns. This also settles a specific worry -- replacing bucket routing
+with one filtered dataset scan could have been a regression here, since the case that had
+degraded was the many-file, large-key-set one, and this dataset is 16,384 files at 20 M keys
+per batch. It is not a regression; it is where the gain is.
+
+**Memory doubled, and that needed acting on.** 51.9 GiB peak against the 64 G the join sbatch
+requested is 19 % headroom on a stage that has already been OOM-killed once, so the request is
+now 160 G. Holding the matched annotation rows in Arrow is what costs it.
+
+**Decomposition**, from the one- to two-batch delta: one scan of this split costs 252.5 s, and
+non-scan work is 13.47 us/document. Extrapolated to all 1,696,565,570 documents:
+
+| batches | scan | per-document | total |
+|---|---|---|---|
+| 85 (today's 20 M default) | 6.0 h | 6.3 h | 12.3 h |
+| 17 | 1.2 h | 6.3 h | 7.5 h |
+| 9 | 0.6 h | 6.3 h | 7.0 h |
+
+Treat these as order-of-magnitude. The same method applied to the old code projects 19 h
+where 12 h was observed, so the extrapolation carries roughly 60 % error; what it does
+establish is the shape. Per-document work is the floor at about 6 h, so no amount of batching
+gets `nemotron-cc` below that, and larger batches are worth roughly 1.8x rather than the 10x
+the original vectorisation estimate implied.
+
+Reducing batch count needs the batch to stop holding a full table per part -- which would cut
+peak memory as well, the two being the same constraint seen from different sides.
+
+
+## PR #XXX Feature: quality-aware upsampling curves
+
+A `ratio` gives every surviving document of a dataset the same repeat factor, so a dataset
+filtered to "content quality at least adequate" repeats its barely-adequate documents exactly
+as often as its excellent ones. `upsampling` replaces the scalar with a curve whose factor
+rises with quality.
+
+Method and functional form from Dolma 3 / Olmo 3 (arXiv:2512.13961 §3.4.4, appendix A.2.4),
+which measured it against flat quality filtering on 1B models and found it better at every
+matched repetition factor -- 0.740 against 0.843-0.870 bits-per-byte on their maths suite.
+Quality is placed on a [0, 1] axis where a bucket's width is its share of the dataset's
+tokens; the factor is `C * (x - a)**p` above the discard threshold, with the integral pinned
+to the token target, no bucket above `max_factor`, and monotone.
+
+Reproducing their published example -- twenty vigintiles, discard the bottom 40%, cap 7x,
+draw one pool's worth of tokens -- returns exactly their figure: bottom eight buckets dropped,
+top at 7.00x, monotone between.
+
+**Deliberate departures from the paper**
+
+* Their family carries an extra `exp(lam * (x - a))`. Fixing `lam = 0` makes the solution
+  unique instead of a feasible region, and every integral analytic, so no quadrature is
+  needed. The remaining degree of freedom is spent pushing the top bucket to exactly
+  `max_factor`, which is where their own figure sits.
+* The exponent is capped at 8. Steepest-admissible is right when the cap binds, but when the
+  target is a small fraction of the pool -- the regime of any blend that draws far fewer
+  tokens than it holds -- no exponent violates the cap, "steepest" is unbounded, and the
+  budget collapses onto the top bucket: the hard top-k filtering the curve exists to beat.
+  A first attempt did exactly that, solving to exponent 512 with one surviving bucket.
+* Unannotated documents cannot be ordered, so they form an explicit `<unannotated>` bucket at
+  the bottom of the axis. Named in the report rather than folded in, because for a dataset
+  with partial coverage this decides the fate of the majority.
+
+**Downstream**
+
+`apply` writes one index tree per bucket, since the packer emits one file per source file and
+factors only mean anything if documents carrying different ones are in different indexes. Each
+bucket becomes a manifest row named `<dataset>__<level>` carrying `source_dataset`, so the
+registry lookup in `write-packing-configs` still resolves, and lands as its own repeat factor
+in `WeightedCombinedDataset`. The curve is re-solved from the exact counts `apply` observes
+rather than from the cube's interpolated ones.
+
+**Limits**
+
+Ordinal fields only; a numeric axis needs the cube's quantile edges carried into
+materialisation, and a non-ordinal `quality_field` is refused at config load rather than after
+a preview has succeeded. And the axis is only as fine as the field: propella labels have about
+five levels, unevenly filled -- `climbmix-en` holds 81.9% of its tokens in `moderate` -- so a
+curve cannot express a finer preference than the levels allow, where Dolma 3 cuts twenty
+vigintiles from a continuous score.
+
+Not ablated. The cluster was busy, so this is verified against the paper's published example
+and by unit tests, not by a training run.
+
+
+## PR #XXX Repetition accounting, and per-predicate attribution
+
+Two ideas taken from a colleague's TokenFabric design, which applies routing policy at
+training time rather than offline. Most of that architecture does not transfer -- chunk-boundary
+activation, shard servers, live telemetry solve problems an offline pipeline does not have --
+but two of its principles apply directly.
+
+**Repetition is per pass, and nothing was checking it.** `target_tokens` was documented as
+"only used to report the gap", and that is all it did. A ratio is relative to one pass over the
+blend, so if the run consumes more tokens than the blend yields, the loader wraps and every
+factor is multiplied. The upsampling curves added in the previous change can assign 7x, which
+two passes turn into 14x -- past the point where repetition pays, and silently.
+
+`target_tokens` now means what the run consumes. `max_total_exposure` caps how often anything
+may be seen; a dataset with a curve uses its own `max_factor` instead. `preview` reports the
+accounting, `apply` refuses, `--allow_overexposure` overrides. Caps apply to the requested
+factor even with no target declared -- a ratio of 9 against a cap of 2 is a violation at any
+number of passes -- and the report says the wrapping multiplier is unknown rather than assuming
+one pass.
+
+On the smoke blend, declaring a 300 M run against its 151 M yield: `climbmix-en / high` asked
+for 2.53x and would be seen **5.01x** against its own declared 4x cap.
+
+**`preview --explain` attributes retention to individual predicates.** The per-dataset figure
+says nothing about which condition caused it. This reports, per predicate, what it matches
+alone and its *marginal* effect -- how many more tokens the dataset would keep with that
+predicate dropped and the others left in place -- plus a pairwise overlap matrix. It is
+milliseconds: the per-cell weights are the whole computation.
+
+It found two redundant predicates on the smoke blend at once: `content_integrity at_least
+mostly_complete` on `finepdfs-es` (21 k marginal out of 65 M) and `educational_value at_least
+basic` on `klettermix-de` (matches 100.0% of tokens, 425 marginal).
+
+**Two bugs found while building it**
+
+* The overlap diagonal computed each predicate's factor times itself. For an interpolated
+  predicate the factors are fractional, so squaring them undercounts -- it read 8.19 M where
+  the predicate matched 9.75 M. The diagonal is now the match count.
+* `_cube_weights` tested the cumulative exactness flag when recording which predicates were
+  interpolated, so once any predicate was interpolated every later one was reported as
+  interpolated too. Now per predicate.
+
+
+## PR #XXX Fixes found by the first full production run
+
+Three failures on the real blend, two of them silent-failure bugs of the same shape as the
+ones fixed earlier this week, and one schema drift in the delivered data.
+
+**Pointer resolution destroyed the pointers it could not resolve.** `Nemotron-ClimbMix`, the
+English corpus KletterMix's `source_pointer` keys resolve into, was moved to
+`/data/annealing_unused/`. `resolve_source_pointers` resolved nothing, wrote 225 M nulls over
+the pointers, logged `resolved 0 of 4,463,748 pointers` as INFO, and carried on -- surfacing
+two hours later as 0% join coverage, by which point the pointers were gone and only a full
+sidecar rebuild could recover them. It now refuses to write a part that resolved nothing.
+
+**The join scan was not bounded by matches.** The comment claimed memory "stays bounded by
+the rows that match"; `to_table` buffers the whole scan. On HPLT -- 65,536 bucket files,
+3.76 bn annotation rows -- that reached 167 GB and was OOM-killed against a 160 G request,
+though only ~10 M rows can match. Now streamed via `Scanner.to_batches()` with bounded
+readahead.
+
+**The join report merge raced.** Each array task writes its own report then re-reads the
+directory to rebuild a merged view. Non-atomic writes meant a sibling could read a
+half-written file: `finewiki-es` died on `JSONDecodeError` *after* its own join had succeeded
+at 100%. Same fix as the bucket metadata: `os.replace` plus a tolerant reader.
+
+**Delivered data changed shape.** Nemotron-CC renamed `warc_record_id` to `id` and re-chunked
+from 1.70 bn documents of ~1 KB to 504 M of ~12 KB in the same 1.8 TB. Registry key updated;
+a spot check matches 400/400 ids in both `high_actual` and `high_diverse_qa_pairs`.
+
+
+## PR #XXX Fix: join memory scales with fragment count, not data volume
+
+The streamed scan in the previous change fixed the wrong layer. HPLT still exceeded the
+160 GiB limit, and the measurements show why -- peak memory tracks how many bucket *files* a
+split has, not how much data:
+
+| split | files | documents | peak RSS |
+|---|---|---|---|
+| nemotron-cc | 16,384 | 504 M | 81.6 GB |
+| nemotron-climbmix | 12,288 | 226 M | 95.0 GB |
+| hplt (each) | 65,536 | 10.7 M | OOM > 160 GB |
+
+Four times the files and one forty-seventh of the documents, and HPLT is the one that dies.
+A dataset holds a fragment per file with that file's parquet metadata, so the scan machinery
+scales with the fragment count. Batching the record batches never touched that.
+
+The split is now scanned in groups of `SCAN_FILE_GROUP` files, bounding the fragment
+metadata held at once. All three HPLT splits then completed in 42-45 minutes, and `hplt-it`
+-- which had succeeded before the change -- returns byte-identical coverage.
+
+Peak still sits close to the limit, so the deeper fix is the bucket layout: 1024 buckets per
+shard-task was chosen so a bucket could be loaded whole, a constraint filter pushdown
+removed. 65,536 files per split is now actively harmful, and re-bucketing at lower fanout
+would help every future re-join.
+
+
+## PR #XXX Pack many configs per process
+
+`modalities data pack_encoded_data` rebuilds its components, tokenizer included, from the
+config on every call. Measured on a compute node that startup is 24.7 s, against ~3 s of
+real work for a Dolmino file. The blend renders 54,738 configs -- one per source file, of
+which 40,003 are Dolmino -- so driving the CLI per file spends roughly 375 core-hours
+loading the tokenizer to do about 48 core-hours of tokenising.
+
+`slurm/pack_many.py` loads the tokenizer once per process and constructs a
+`PackedDataGenerator` per config, which is what `pack_encoded_data` does internally. Inside
+the driver the load costs 1.2 s and is paid once. Everything else still comes from the
+rendered config, so the output is identical.
+
+Two details that matter at this scale: the slice is strided rather than contiguous, because
+the config list is grouped by dataset and contiguous slices would hand one task all 40,003
+Dolmino files and another all 15 FineWiki ones; and a failing config logs and continues
+rather than killing its 854 siblings, with `--skip_existing` making reruns resumable.
+
+Measured on the real blend: 250 GB/h of packed output across 10 concurrent 32-core tasks,
+with `num_cpus` confirmed resolving to 32. That is about 54k tokens/s per core, well below
+what a fast tokenizer manages, which points at the per-document seeks the filtered index
+implies rather than at tokenisation.
+
+
+## PR #XXX Verification for a real packed blend, and a stale-file trap
+
+The smoke checker assumes a handful of packed files and loads every document index at once.
+At 54,738 files and 6.0 TB that does not hold, so two stage-appropriate checks now exist.
+
+`slurm/scan_pbins.py` reads every packed file's header and reports any whose data section is
+empty or unreadable. On the first full run it found exactly one bad file in 54,738:
+`finewiki-it/000_00000.pbin`, 151 MB on disk and reporting `data_len=0`. It was a leftover
+from an earlier probe, and `pack_many.py --skip_existing` had skipped it because the file
+existed -- existence taken for health. Had the final check counted files rather than reading
+headers, that dataset would have gone to training 567 M tokens short. `--skip_existing` now
+reads the header and requires a non-empty data section.
+
+`slurm/verify_blend.py` compares packed tokens against the manifest's estimates per dataset,
+packed documents against documents selected, and packed files against index files, reading
+one document index at a time so 54,738 are never resident together.
+
+**Result on the real blend**, after repacking the one bad file:
+
+| | |
+|---|---|
+| datasets | 18, all document counts exact |
+| packed tokens | 1,637,755,654,948 against 1,646,919,435,199 estimated |
+| total token error | **-0.56%** |
+| worst dataset | klettermix-de at -4.39%, estimated from a rescaled native count |
+| files written into the source tree | 0 |
+
+Document counts matching exactly for all 18 -- 499,676,886 selected and packed for
+nemotron-cc -- is the stronger result: the filtered index names precisely the selected
+documents, so any difference would be a defect rather than estimator error.
+
+
+## PR #XXX Feature: export sampled JSONL instead of packed tokens
+
+The pipeline no longer tokenizes. Its final stage writes the selected documents out as JSONL,
+one shard per source file under `out/<dataset>/`, and the training set is the concatenation of
+those files. `write-packing-configs` and `pack` are gone from this pipeline; the core packer
+(`pack_encoded_data`, `PackedDataGenerator`) and `WeightedCombinedDataset` are untouched, since
+they are general modalities features used well outside it.
+
+**The ratios had to move into the bytes.** They used to be metadata: `mix_manifest.yaml`
+carried them and `WeightedCombinedDataset` applied them at training time, fractional factors
+included. A concatenation carries no weights, so `export-jsonl` materialises them -- a dataset
+at 3.0 has each document written three times, one at 0.6 loses two of every five. Fractional
+factors are resolved per document rather than by truncating a list: 1.2 means every document
+once and a hash-chosen fifth of them twice, keyed on the selection's `seed` and the document's
+position via blake2b, so the choice is identical across runs and machines. That reproducibility
+is what makes the stage resumable.
+
+Copies of a document are adjacent, and the documents of a curve's quality buckets are merged
+back into one output directory in source order rather than grouped by bucket.
+
+**The footgun this introduces, and how it is closed.** `mix_manifest.yaml` still says
+`ratio: 3.0` after the repetition is already on disk; feeding that to a `weighted_combined`
+config would train the data nine times. `export_manifest.yaml` therefore reports
+`training_ratio: 1.0` and `repeat_factor_applied: true`, and says so in a `note` field.
+
+**Sizes**, measured from source bytes and per-dataset cube token totals rather than estimated:
+
+| | |
+|---|---|
+| source bytes over the 18 blended datasets | 13.70 TB |
+| effective tokens (ratios applied) | 1.695 T |
+| JSONL output | **~9.75 TB** |
+| packed `.pbin` it replaces | 6.0 TB |
+
+Verified on the real `finewiki-it` at ratio 3.0: 5,399,277 lines written, exactly
+3 x 1,799,759, 67 GB, with 2,670,579 lines replayed byte-for-byte against the corpus.
+
+**Lessons carried over rather than relearned.** A shard counts as complete only against a
+recorded line and byte count, never against merely existing -- the distinction that let a
+truncated `.pbin` reporting `data_len=0` survive into a blend. The per-dataset records are
+written one file per dataset rather than into one shared manifest, because the stage runs as an
+array and concurrent writers to one file lose each other's entries; the blend-wide manifest is
+merged afterwards by `--finalize_only`.
+
+`slurm/verify_jsonl.py` replaces `verify_blend.py`, `scan_pbins.py` and `load_blend.py`: it
+checks line counts against the records, the realised lines-per-document against the requested
+ratio, replays sampled shards byte-for-byte against the corpus, and asserts nothing was written
+into the source tree. `slurm/check_token_estimates.py` replaces `check_smoke_run.py` -- since
+nothing tokenizes any more, it tokenizes a sample of the export to keep the calibration that
+the whole token budget rests on under check. The tokenizer configs survive for exactly that
+reason, reduced to their `tokenizer:` blocks and renamed `annealing_tokenizer.yaml` and
+`smoke_tokenizer.yaml`.
