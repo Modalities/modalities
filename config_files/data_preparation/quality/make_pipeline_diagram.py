@@ -160,7 +160,7 @@ text("=" * 34, 60, 82, size=18)
 
 # --------------------------------------------------------------------------- inputs
 container("Inputs", 60, 130, 275, 320)
-box("Source Corpora\n/data/annealing  (19 subsets)", 82, 172, 230, 54)
+box("Source Corpora\n/data/annealing  (18 datasets)", 82, 172, 230, 54)
 badge("R", 312, 172)
 box("Corpus Registry\nannealing_registry.yaml", 82, 240, 230, 50)
 badge("R", 312, 240)
@@ -172,29 +172,29 @@ badge("R", 312, 368)
 # ------------------------------------------------- lane 1: documents (top), y = 168
 box("1. calibrate", 400, 168, 160, 58)
 badge("R", 552, 164)
-text("~15 s / dataset", 402, 232, size=10, color=NOTE_TEXT)
+text("~48 min, 19 datasets", 402, 232, size=10, color=NOTE_TEXT)
 box("calibration.yaml\nstratified ratios", 400, 262, 160, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
 box("2. build-sidecar", 590, 168, 160, 58)
 badge("R", 742, 164)
-text("~15 h  (SLURM array)", 592, 232, size=10, color=NOTE_TEXT)
+text("~2 h 09 m, 64 tasks", 592, 232, size=10, color=NOTE_TEXT)
 box("sidecar/*.parquet\n+ _files.json", 590, 262, 160, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
 # ------------------------------------------------- lane 2: annotations (below), y = 340
 box("3. bucket-annotations", 590, 340, 170, 58)
 badge("R", 752, 336)
-text("~4.5 h  (SLURM array)", 592, 404, size=10, color=NOTE_TEXT)
+text("~4.5 h  (skip if unchanged)", 592, 404, size=10, color=NOTE_TEXT)
 box("buckets/  (key-hashed)", 590, 418, 170, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
 # ------------------------------------------------- lanes converge
 box("4. join-annotations", 860, 250, 160, 58)
 badge("R", 1012, 246)
-text("hours;  --resume", 862, 314, size=10, color=NOTE_TEXT)
+text("~6 h;  --resume", 862, 314, size=10, color=NOTE_TEXT)
 box("labelled sidecar\n100% coverage", 860, 330, 160, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
 box("5. build-cube", 1080, 250, 160, 58)
 badge("R", 1232, 246)
-text("~20 min", 1082, 314, size=10, color=NOTE_TEXT)
+text("~12 min", 1082, 314, size=10, color=NOTE_TEXT)
 box("cube/*.parquet\ncontingency table", 1080, 330, 160, 46, color=ARTIFACT_TEXT, dashed=True, size=11)
 
 # ------------------------------------------------- selection loop
@@ -221,14 +221,20 @@ badge("R", 1432, 526)
 box("-> Trainings Pipeline\n(Trainings Loop)", 1260, 608, 175, 46, color=GUARD_TEXT, dashed=True, size=11)
 
 # ------------------------------------------------- validation
-container("Validation & Guards", 60, 560, 275, 265)
+# Four guards now rather than three: packing used to be checked by scan_pbins /
+# verify_blend / load_blend, all deleted along with the packing stage. verify_jsonl.py
+# and check_token_estimates.py are their replacements -- a byte-for-byte replay against
+# the corpus, and a real tokenization of a sample, since nothing in the production path
+# tokenizes any more.
+container("Validation & Guards", 60, 560, 275, 310)
 box("verify-sidecar\nbyte offsets vs source", 82, 602, 230, 50, color=GUARD_TEXT)
 badge("R", 312, 602)
 box("join coverage report\nper dataset", 82, 666, 230, 46, color=GUARD_TEXT)
 badge("R", 312, 666)
-box("smoke snapshot\n+ check_token_estimates", 82, 726, 230, 50, color=GUARD_TEXT)
+box("verify-jsonl\nreplay + ratios + untouched", 82, 726, 230, 50, color=GUARD_TEXT)
 badge("R", 312, 726)
-text("run after any transfer,\nand before  apply", 82, 786, size=10, color=NOTE_TEXT)
+box("check-token-estimates\nsampled tokenize vs calibration", 82, 790, 230, 46, color=GUARD_TEXT)
+badge("R", 312, 790)
 
 # ------------------------------------------------- flow arrows (routed to avoid boxes)
 arrow((314, 198), (396, 192))                                  # corpora -> calibrate
