@@ -44,6 +44,29 @@ def test_rotary_transform():
         assert torch.equal(comp_rot_expected, comp_rot)
 
 
+def test_rotary_transform_computes_frequencies_in_fp32_for_bf16_inputs(monkeypatch):
+    operand_and_result_dtypes = []
+    original_einsum = torch.einsum
+
+    def recording_einsum(equation, *operands):
+        result = original_einsum(equation, *operands)
+        operand_and_result_dtypes.append((*[operand.dtype for operand in operands], result.dtype))
+        return result
+
+    monkeypatch.setattr(torch, "einsum", recording_einsum)
+
+    rotary_transform = RotaryTransform(n_embd=128, n_head=2)
+    q = torch.randn(1, 2, 16, 64, dtype=torch.bfloat16)
+    k = torch.randn_like(q)
+    v = torch.randn_like(q)
+
+    q_rot, k_rot, _ = rotary_transform(q=q, k=k, v=v)
+
+    assert operand_and_result_dtypes == [(torch.float32, torch.float32, torch.float32)]
+    assert q_rot.dtype == torch.bfloat16
+    assert k_rot.dtype == torch.bfloat16
+
+
 def _apply_rotary(x: torch.Tensor, cos_cached: torch.Tensor, sin_cached: torch.Tensor) -> torch.Tensor:
     cos_local = cos_cached[:, :, : x.shape[-2], :]
     sin_local = sin_cached[:, :, : x.shape[-2], :]
@@ -61,7 +84,7 @@ def _assert_yarn_outputs_match_reference(
     seq_length: int,
 ) -> None:
     t = torch.arange(seq_length, device=q.device, dtype=torch.float32)
-    freqs = torch.einsum("i,j->ij", t, rotary_transform.inv_freq.to(q.dtype))
+    freqs = torch.einsum("i,j->ij", t, rotary_transform.inv_freq.float())
     emb = torch.cat((freqs, freqs), dim=-1)
     cos = (emb.cos() * rotary_transform.attention_scaling)[None, None, :, :].to(q.dtype)
     sin = (emb.sin() * rotary_transform.attention_scaling)[None, None, :, :].to(q.dtype)
