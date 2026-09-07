@@ -175,4 +175,5 @@ tutorials/scaling_up/experiments_old/*
 results/*
 tutorials/einsum_transformer/experiments/*
 tutorials/warmstart/experiments/*
-
+data/experiments/*
+soofi/*

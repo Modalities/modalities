@@ -1,0 +1,734 @@
+# Nemotron-3 Nano 30B-A3B - FULL architecture, real-data (FineWeb), WITH torch.compile.
+#
+# Identical to config_fineweb_nemotron_nano_30b_a3b_fsdp2.yaml in every respect except that the
+# transformer blocks are additionally run through torch.compile (see `compiled_model`). Diff the two
+# files to see exactly that: one new component, one changed reference in `fsdp_model`, this header.
+#
+# READ THE COMPILATION SECTION BELOW BEFORE USING THIS VARIANT. Compiling this architecture is
+# measurably close to a no-op: the two block types holding 97% of the parameters cannot be captured
+# into a single graph, so they end up as 12 and 4 fragments respectively. It is correct - all three
+# block types were verified bit-exact against eager - but the expected speedup is small and the
+# compile latency is not. The uncompiled sibling config is the recommended default; this file exists
+# for measuring whether the fragmented compile is worth anything on your hardware.
+#
+# This is the full-depth counterpart to config_fineweb_nemotron_nano_fsdp2.yaml. That file trims the
+# depth from 52 to 16 layers so it fits four GPUs; this one keeps the published architecture intact
+# and takes its data, optimizer and run plumbing from the 16-layer file:
+#
+#   architecture    identical to config_nemotron3_nano_30b_a3b_fsdp2.yaml (see DEVIATIONS below)
+#   data            the Llama-3 tokenized FineWeb slices used by config_fineweb_nemotron_nano_fsdp2.yaml
+#   kernels         ssd_backend: fused, experts_backend: grouped_mm
+#   compile         per-block torch.compile, fullgraph=false, plus the compiled CE core
+#
+# ARCHITECTURE (from the model report arXiv:2512.20848 Table 1 / Figure 2, cross-checked against the
+# Megatron-Bridge recipe `src/megatron/bridge/recipes/nemotronh/h100/nemotron_3_nano.py`, Copyright
+# (c) 2026, NVIDIA CORPORATION, licensed under the Apache License, Version 2.0, from which the
+# hyperparameter values below are adopted):
+#
+#   52 layers   pattern MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME
+#               -> 23 Mamba-2, 23 MoE, 6 attention
+#   d_model 2688, 32 Q heads / 2 KV heads of dim 128 (note: 32*128 != 2688 by design)
+#   Mamba-2: 64 heads of dim 64 (d_inner 4096), state dim 128, 8 groups, conv kernel 4
+#   MoE: 128 routed experts of dim 1856, top-6, 2 shared experts (fused into one MLP of 3712)
+#   squared ReLU, RMSNorm, no biases, no positional embeddings, untied embeddings
+#
+# Parameter counts, measured by instantiating this architecture on a meta device:
+#
+#   total                31.563B    (23 x 1297.5M MoE = 29.842B, 23 x 38.7M Mamba = 0.891B,
+#                                    6 x 23.4M attention = 0.140B, 0.690B embedding + untied lm_head)
+#   active per token      3.565B    (top-6 of 128 routed + both shared experts, all dense layers,
+#                                    and the 0.690B embedding + lm_head, per
+#                                    NemotronMFUCalculator.count_active_parameters)
+#
+# DEVIATIONS FROM config_nemotron3_nano_30b_a3b_fsdp2.yaml
+# Two settings differ, both because that file is a lorem-ipsum smoke config and this one runs on real
+# data at scale. The 52-layer pattern, d_model, every layer spec and every optimizer value are
+# byte-identical.
+#
+#   1. vocab_size 131072 -> 128256. Dictated by the data, not by the architecture: the FineWeb
+#      slices are tokenized with the Llama-3 tokenizer (128256 tokens, already a multiple of 128).
+#      Keeping 131072 would still run - no token id exceeds 128255 - but 2816 embedding rows would
+#      never receive a gradient while their lm_head rows only ever get pushed down, i.e. 15.1M dead
+#      parameters. Restore 131072 only together with data tokenized by the Nemotron tokenizer.
+#   2. ssd_backend native -> fused, matching the note in that file ("for real runs install the
+#      optional extra and switch to ssd_backend=fused"). Requires `pip install -e '.[mamba]'`. The
+#      two backends are numerically equivalent to 1e-3 (tests/models/components/test_mamba2.py).
+#
+# The step profile (gradient_accumulation_steps), schedule length (warmup_steps) and the interval /
+# checkpoint-retention settings are not architecture; they are set for this data and hardware and are
+# documented individually below.
+#
+# COMPILATION
+# Two things are compiled here: every transformer block (`compiled_model`) and the cross-entropy
+# numeric core (`compiled_clm_loss`). They are independent; only the first distinguishes this file
+# from its uncompiled sibling.
+#
+# WHAT WAS MEASURED. Each block type was probed individually on this machine (A100-SXM4-80GB, torch
+# 2.9.1+cu128, bf16, with the fused / grouped_mm backends this config selects):
+#
+#   block                     fullgraph=True             graph breaks    fullgraph=False
+#   NemotronAttentionLayer    OK                              0          OK, bit-exact
+#   NemotronMoELayer          FAILS: aten.bincount            3          OK, bit-exact
+#   Mamba2Layer (fused)       FAILS: causal_conv1d_cuda      11          OK, bit-exact
+#
+# "bit-exact" is a per-block statement: max|compiled - eager| was exactly 0 on each block's output in
+# isolation.
+#
+# IT DOES NOT COMPOSE TO A BIT-IDENTICAL MODEL, and the reason is worth understanding before you
+# compare two runs. Measured on a 7-layer "MEM*EME" scale model through the exact AC -> compile chain
+# below, compiled against eager:
+#
+#   MoE layer 0:  0 / 1024 routing slots differ
+#   MoE layer 1:  0 / 1024 routing slots differ
+#   MoE layer 2:  5 / 1024 routing slots differ      <- 0.16%
+#   -> 3 of 512 tokens with max|dlogit| > 0.1; max|dlogit| 1.03 against a logit absmax of 2.81
+#   -> mean|dlogit| 2.9e-3, aux loss delta 5.2e-9, total gradient norm delta 1.4e-5 (rel ~1.4e-4)
+#
+# Nothing is broken here. Top-k routing is a *discrete* decision, so once bf16 rounding differences
+# accumulate through a few layers, a handful of borderline tokens cross the top-6 boundary and get a
+# different expert set. Those few tokens then differ a lot, which is why max|dlogit| looks alarming
+# while every aggregate quantity - mean logit difference, aux loss, gradient norm - is unchanged to
+# 4-5 digits. The same sensitivity exists between any two numerically-different-but-equally-valid
+# execution paths of an MoE model, compile or not.
+#
+# PRACTICAL CONSEQUENCE: do not expect this config to reproduce the uncompiled one step for step, and
+# do not treat a small loss divergence between the two as evidence of a bug. Compare loss *curves*,
+# not individual steps. With 52 layers instead of 7 the flip count will be higher than measured above.
+#
+# WHY fullgraph MUST BE false. `CompiledModelConfig.fullgraph` defaults to true, which raises on this
+# architecture. The Mamba-2 block calls into the causal-conv1d pybind extension, which Dynamo refuses
+# to trace ("function marked as skipped"), and additionally reads the Triton autotuner's
+# `_state_passing_bwd_kernel.best_config.kwargs["BLOCK_SIZE"]`, an untraceable attribute lookup. The
+# MoE block calls `torch.bincount`, whose output shape is data-dependent. Both are inherent to the
+# fast kernels, not incidental.
+#
+# WHAT YOU ACTUALLY GET. With fullgraph false the breaks become fragmentation rather than errors: the
+# Mamba block becomes 12 graphs over ~46 ops and the MoE block 4 graphs, with its break landing
+# immediately before the grouped matmul that dominates its cost. The 6 attention layers compile into
+# a single clean graph but are only 0.14B of 31.563B parameters. So 46 of 52 layers - 97% of the
+# parameters - are compiled in fragments too small to fuse across the expensive operations. Expect a
+# small gain at best, against a real one-time compile latency (three distinct block classes, so
+# roughly three compilations, not 52). MEASURE IT: if `samples/s` at steady state does not beat the
+# uncompiled config on idle GPUs, use the uncompiled one.
+#
+# NOT ENABLED: `torch._dynamo.config.capture_dynamic_output_shape_ops = True` does get the MoE block
+# to fullgraph with 0 breaks, but it is a global Dynamo flag with no YAML knob (it needs a code
+# change), it does nothing for the Mamba blocks, and it perturbs the MoE block output by 5.3e-3
+# relative - no longer bit-exact.
+#
+# VERIFIED AS A PRECONDITION, because it would otherwise fail silently: the in-place
+# `router.tokens_per_expert` buffer update inside the MoE forward, which the auxiliary-loss-free
+# expert bias in the optimizer depends on, and `last_aux_loss` both survive compilation in every
+# configuration above. Compiled blocks also keep working with the initializer, which strips the
+# `_orig_mod.` and `_checkpoint_wrapped_module.` FQN prefixes before matching its per-layer regexes
+# (see initialization_routines.py and the regression guard in
+# tests/models/nemotron/test_nemotron_initialization.py).
+#
+# The compiled CE core is the one unambiguous win and is present in both configs: at 8192 x 128256
+# logits, measured peak allocation for the CE forward + backward drops from 7.83 GiB to 3.91 GiB for
+# a bit-identical loss.
+#
+# DATA
+# The same two byte-exact, provably disjoint slices of a document-shuffled FineWeb sample-10BT
+# tokenized with the Llama-3 tokenizer (vocab 128256, 4 bytes per token) as the 16-layer config:
+#
+#   role   file                                                tokens         source token range
+#   train  ..._train-head-2B-tokens.pbin                       2,000,000,000  [0, 2e9)
+#   eval   ..._eval-tail-2M-tokens.pbin                            2,000,000  [9,692,110,008, 9,694,110,008)
+#
+# The split is a head/tail cut rather than a random split, so disjointness is a property of the byte
+# offsets and needs no bookkeeping. The source file is document-shuffled (seed 42), so the head is
+# distributionally representative.
+#
+# THE TOKEN BUDGET IS THE MAIN LIMITATION OF THIS CONFIG. 2B tokens is ~0.06 tokens per parameter -
+# three orders of magnitude below a compute-optimal budget for a 31.6B / 3.6B-active model. One pass
+# over the head is a scale and plumbing validation on real data, not a convergence run. For a longer
+# run:
+#
+#   - `fineweb_sample-10BT.pbin` (38.9 GB, ~9.7B tokens) is the unshuffled full sample. The shuffled
+#     variant this head was carved from *contains* the eval tail, so either re-carve a head slice or
+#     use a held-out set from a different corpus.
+#   - `fineweb_sample-100BT.pbin` (391 GB, ~97B tokens) is the largest slice available locally.
+#     CAUTION, NOT VERIFIED HERE: FineWeb's smaller sample subsets are documented as subsets of the
+#     larger ones, so the eval tail above is most likely *inside* sample-100BT. Check for overlap or
+#     hold out a different set before quoting an eval loss against it.
+#
+# At sequence length 8192 with `reuse_last_target: true` the slices yield 244,140 train and 244 eval
+# sequences. A larger `..._eval-tail-20M-tokens.pbin` (2,441 sequences) is also available; it is a
+# superset of the 2M slice, so the two are alternatives, not independent sets. The 2M slice is wired
+# up here because it is ~8x cheaper per evaluation. Both are disjoint from the training head.
+#
+# SIZE, PARALLELISM AND MEMORY
+#
+# NOT YET RUN. Unlike config_fineweb_nemotron_nano_fsdp2.yaml, whose memory and loss figures are
+# measured, every number in this section is arithmetic from the parameter count above. Treat it as a
+# feasibility estimate and measure before trusting it.
+#
+# The model does not fit on one node. Persistent training state is 16 bytes per parameter (fp32
+# shard + fp32 grad + two fp32 Adam moments) = 470 GiB, sharded `world_size` ways by FSDP2 full
+# shard, plus per GPU roughly:
+#
+#   unsharded bf16 all-gather of the largest FSDP unit (one 1297.5M-parameter MoE layer, 2.4 GiB)
+#     plus its prefetch                                                              ~4.8 GiB
+#   checkpointed layer inputs, 52 x 8192 x 2688 x 2 B at micro batch 1               ~2.2 GiB
+#   cross-entropy over 8192 x 128256 logits, forward + backward. THIS ONE IS
+#     MEASURED on an A100: 1.96 GiB of logits plus a 1.96 GiB transient with the
+#     compiled CE core configured below, i.e. 3.91 GiB peak; 7.83 GiB eager.
+#     Largest activation term either way.                                            ~3.9 GiB
+#
+#   world size    persistent / GPU    estimated peak / GPU
+#         4           117.6 GiB           IMPOSSIBLE  -> exceeds an 80 GiB card on optimizer state
+#                                                        alone, before a single activation
+#         8            58.8 GiB            ~70 GiB    -> do not attempt on 80 GB cards
+#        16            29.4 GiB            ~40 GiB    -> minimum; fits 80 GB, tight on 64 GB
+#        32            14.7 GiB            ~26 GiB    -> recommended
+#
+# 16 GPUs is the floor and 32 is the comfortable target. `data_parallel_shard_degree: -1` shards over
+# the whole world size; do not switch to HSDP (replicate across nodes) - the memory table above
+# assumes no replication. Tensor and expert parallelism are not supported for this architecture yet.
+#
+# GLOBAL BATCH depends on the world size, since micro batch and accumulation are fixed here:
+#
+#   world size    tokens / step    steps for one pass over the 2B head
+#        16          1,048,576                 1,907
+#        32          2,097,152                   953
+#
+# `warmup_steps: 100` below is ~5% of the 16-GPU row. It is an absolute step count, so re-tune it if
+# you change the world size, the accumulation, or the token budget.
+#
+# A DCP checkpoint is ~353 GiB (fp32 params plus both fp32 Adam moments for 31.563B parameters).
+# With `k: 1` up to ~706 GiB is transiently on disk while a new one is written next to the retained
+# one. Check free space before lowering `checkpointing_interval_in_steps`.
+#
+# EXPECTED SANITY SIGNALS
+#   - initial loss ~= ln(128256) = 11.76. A different value means the vocabulary and the
+#     tokenization of the data disagree; this shows up on the very first step.
+#   - held-out loss should track the train loss at the same step. A noticeably *lower* eval loss
+#     would indicate the eval slice leaking into training.
+#
+# Run with (example: 4 nodes x 8 GPUs = 32; set MASTER_ADDR to the rank-0 host):
+#   torchrun --nnodes 4 --nproc_per_node 8 --node_rank $NODE_RANK \
+#     --master_addr $MASTER_ADDR --master_port 29555 \
+#     $(which modalities) run \
+#     --config_file_path config_files/training/config_fineweb_nemotron_nano_30b_a3b_fsdp2_compiled.yaml \
+#     --experiments_root_path data/experiments
+#
+# The W&B project is deliberately the same as the uncompiled config's, so the two runs land side by
+# side and `samples/s` is directly comparable. Expect the first few steps to be dominated by compile
+# latency; compare steady state, not step 1.
+#
+# Use one virtual environment for both `torchrun` and `modalities` - mixing them picks up a different
+# torch build and the fused Mamba kernels will be missing.
+#
+# NO THROUGHPUT OR MFU NUMBER IS QUOTED HERE because none has been measured for this configuration.
+# Measure on idle GPUs before using MFU to tune anything.
+
+settings:
+  experiment_id: ${modalities_env:experiment_id}
+  config_file_path: ${modalities_env:config_file_path}
+  referencing_keys:
+    sample_key: input_ids
+    target_key: target_ids
+    prediction_key: logits
+  cuda_env:
+    local_rank: ${cuda_env:LOCAL_RANK}
+    global_rank: ${cuda_env:RANK}
+    world_size: ${cuda_env:WORLD_SIZE}
+  paths:
+    checkpoint_saving_path: data/checkpoints
+    train_dataset_path: /raid/s3/opengptx/max_lue/repositories/training_datasets/processed/fineweb_sample-10BT-shuffled_train-head-2B-tokens.pbin
+    test_dataset_path: /raid/s3/opengptx/max_lue/repositories/training_datasets/processed/fineweb_sample-10BT-shuffled_eval-tail-2M-tokens.pbin
+    experiments_root_path: ${modalities_env:experiments_root_path}
+  intervals:
+    # Throughput, loss, MFU, LR and peak memory are printed to the console every interval by the
+    # trainer itself (not by a subscriber), so this value sets time-to-first-output. The logging
+    # block does a dist.barrier() and an all-reduce, which is negligible next to a step of this
+    # size, so 1 is kept here: at ~1M tokens per step there are only ~1,900 steps in the whole run.
+    training_log_interval_in_steps: 1
+    # ~353 GiB per checkpoint, see the header. 500 steps is ~4 checkpoints over a 16-GPU pass; each
+    # write moves a third of a terabyte, so this is an I/O decision as much as a safety one.
+    checkpointing_interval_in_steps: 500
+    evaluation_interval_in_steps: 250
+  consistency_enforcement:
+    enforce_tokens_per_step_consistency: true
+    enforce_last_step_logged: false
+    enforce_last_step_evaluated: false
+    enforce_last_step_checkpointed: false
+  step_profile:
+    # Micro batch 1 is forced by the activation and logit memory at sequence length 8192; the global
+    # batch comes entirely from accumulation and the world size (see the header table). 8 accumulation
+    # steps give 1.05M tokens per step at 16 GPUs and 2.10M at 32, both sane for a model this size.
+    gradient_accumulation_steps: 8
+    local_train_micro_batch_size: 1
+    # The published training length, unchanged from config_nemotron3_nano_30b_a3b_fsdp2.yaml. The
+    # data is continuously packed, so any value works; 8192 / chunk_size 128 = 64 Mamba scan chunks.
+    sequence_length: 8192
+    dp_degree:
+      instance_key: dp_degree
+      pass_type: BY_REFERENCE
+  training_target:
+    num_target_tokens:
+      component_key: number_conversion
+      variant_key: num_tokens_from_packed_mem_map_dataset_continuous
+      config:
+        dataset_path: ${settings.paths.train_dataset_path}
+        sequence_length: ${settings.step_profile.sequence_length}
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+    num_target_steps:
+      component_key: number_conversion
+      variant_key: num_steps_from_num_tokens
+      config:
+        dp_degree:
+          instance_key: dp_degree
+          pass_type: BY_REFERENCE
+        local_micro_batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        global_num_tokens: ${settings.training_target.num_target_tokens}
+        sequence_length: ${settings.step_profile.sequence_length}
+        gradient_accumulation_steps: ${settings.step_profile.gradient_accumulation_steps}
+  training_progress:
+    global_num_seen_tokens: 0
+    num_seen_steps: 0
+    num_seen_samples: 0
+    last_step: -1
+
+collate_fn:
+  component_key: collate_fn
+  variant_key: gpt_2_llm_collator
+  config:
+    sample_key: ${settings.referencing_keys.sample_key}
+    target_key: ${settings.referencing_keys.target_key}
+
+train_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.train_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    # Pretraining: the last target token of a sample is the first input token of the next, so no
+    # token is wasted at block boundaries.
+    reuse_last_target: true
+
+train_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: train
+    dataset:
+      instance_key: train_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        batch_size: ${settings.step_profile.local_train_micro_batch_size}
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: resumable_distributed_sampler
+          config:
+            dataset:
+              instance_key: train_dataset
+              pass_type: BY_REFERENCE
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: true
+            seed: 42
+            drop_last: true
+            skip_num_global_samples: ${settings.training_progress.num_seen_samples}
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+test_dataset:
+  component_key: dataset
+  variant_key: packed_mem_map_dataset_continuous
+  config:
+    raw_data_path: ${settings.paths.test_dataset_path}
+    sequence_length: ${settings.step_profile.sequence_length}
+    sample_key: ${settings.referencing_keys.sample_key}
+    reuse_last_target: true
+
+test_dataloader:
+  component_key: data_loader
+  variant_key: default
+  config:
+    num_workers: 2
+    pin_memory: true
+    dataloader_tag: test
+    dataset:
+      instance_key: test_dataset
+      pass_type: BY_REFERENCE
+    batch_sampler:
+      component_key: batch_sampler
+      variant_key: default
+      config:
+        # Kept at 1 even though evaluation is forward-only: at sequence length 8192 the logits, not
+        # the activations, dominate (2.0 GiB in bf16 per sequence before the fp32 upcast), so a
+        # larger eval batch is the most likely place for this config to run out of memory.
+        # 244 eval sequences with drop_last means 15 steps per pass at 16 ranks, 7 at 32; the
+        # remainder is dropped, so the exact eval subset depends on the world size.
+        batch_size: 1
+        drop_last: true
+        sampler:
+          component_key: sampler
+          variant_key: distributed_sampler
+          config:
+            rank: ${settings.cuda_env.global_rank}
+            num_replicas: ${settings.cuda_env.world_size}
+            shuffle: false
+            drop_last: true
+            dataset:
+              instance_key: test_dataset
+              pass_type: BY_REFERENCE
+    collate_fn:
+      instance_key: collate_fn
+      pass_type: BY_REFERENCE
+
+eval_dataloaders:
+  - instance_key: test_dataloader
+    pass_type: BY_REFERENCE
+
+checkpoint_saving:
+  component_key: checkpoint_saving
+  variant_key: default
+  config:
+    checkpoint_saving_strategy:
+      component_key: checkpoint_saving_strategy
+      variant_key: save_k_most_recent_checkpoints_strategy
+      config:
+        # Keep only the newest checkpoint - each is ~353 GiB. Rotation with the `dcp` execution is
+        # fixed (see tests/checkpointing/test_dcp_checkpoint_deletion.py).
+        k: 1
+    checkpoint_saving_execution:
+      component_key: checkpoint_saving_execution
+      variant_key: dcp
+      config:
+        checkpoint_path: ${settings.paths.checkpoint_saving_path}
+        global_rank: ${settings.cuda_env.global_rank}
+        experiment_id: ${settings.experiment_id}
+
+# The cross-entropy core is torch.compile'd. This is the one place in this architecture where
+# compilation pays off, and it is the largest single activation term at this sequence length: with
+# 8192 x 128256 logits, measured peak allocation for the CE forward+backward drops from 7.83 GiB to
+# 3.91 GiB (A100, torch 2.9.1, bf16 logits) for a bit-identical loss value. Only the numeric
+# tensor-in/tensor-out core is compiled, never the batch unpacking.
+#
+# NOTE: this must wrap the *inner* CE loss, not the outer `weighted_sum` - WeightedSumLoss does not
+# implement `compile` and raises NotImplementedError. See COMPILATION in the header for why the
+# model blocks themselves are deliberately left uncompiled.
+compiled_clm_loss:
+  component_key: loss
+  variant_key: compiled
+  config:
+    backend: inductor
+    loss:
+      component_key: loss
+      variant_key: clm_cross_entropy_loss
+      config:
+        target_key: ${settings.referencing_keys.target_key}
+        prediction_key: ${settings.referencing_keys.prediction_key}
+
+# Language modelling loss plus the MoE load-balancing penalty. The penalty is computed inside each
+# MoE layer (coefficient 1e-4, per the model report) and summed by the model into `moe_aux_loss`.
+# The *primary* balancing mechanism is the auxiliary-loss-free expert bias; see the optimizer.
+loss_fn:
+  component_key: loss
+  variant_key: weighted_sum
+  config:
+    weights: [1.0, 1.0]
+    losses:
+      - instance_key: compiled_clm_loss
+        pass_type: BY_REFERENCE
+      - component_key: loss
+        variant_key: moe_aux_loss
+        config:
+          prediction_key: moe_aux_loss
+
+device_mesh:
+  component_key: device_mesh
+  variant_key: default
+  config:
+    device_type: cuda
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: -1
+    world_size: ${settings.cuda_env.world_size}
+
+dp_degree:
+  component_key: number_conversion
+  variant_key: parallel_degree
+  config:
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    parallelism_methods: [dp_shard, dp_replicate]
+
+app_state:
+  component_key: app_state
+  variant_key: raw
+  config:
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    lr_scheduler:
+      instance_key: lr_scheduler
+      pass_type: BY_REFERENCE
+
+initialized_model:
+  component_key: model
+  variant_key: model_initialized
+  config:
+    model:
+      instance_key: fsdp_model
+      pass_type: BY_REFERENCE
+    model_initializer:
+      component_key: model_initialization
+      variant_key: composed
+      config:
+        model_type: nemotron
+        weight_init_type: scaled
+        mean: 0.0
+        # "auto" resolves to sqrt(2 / (5 * n_embd)) = 0.01725, which is what the reference recipe
+        # uses as init_method_std for this width.
+        std: auto
+        hidden_dim: ${model_raw.config.n_embd}
+        num_layers: ${model_raw.config.n_layer}
+
+fsdp_model:
+  component_key: model
+  variant_key: fsdp2_wrapped
+  config:
+    model:
+      instance_key: compiled_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    mixed_precision_settings:
+      param_dtype: BF_16
+      reduce_dtype: FP_32
+    # One FSDP unit per layer, so only a single 1297.5M-parameter MoE block (2.4 GiB in bf16) is
+    # unsharded at a time. Raising this multiplies that all-gather.
+    layers_per_fsdp_unit: 1
+    block_names: [Mamba2Layer, NemotronMoELayer, NemotronAttentionLayer, NemotronMLPLayer]
+
+# torch.compile, applied per transformer block AFTER activation checkpointing and BEFORE FSDP2 -
+# the TorchTitan ordering. Activation checkpointing replaces each entry of `transformer.h` with a
+# CheckpointWrapper, so the block that gets compiled here is the one *inside* the wrapper and the
+# recompute in the backward pass runs the compiled graph.
+#
+# TWO SETTINGS HERE ARE LOAD-BEARING; see COMPILATION in the header for the measurements.
+#
+#   fullgraph: false   REQUIRED. The component default is true, which CRASHES on this architecture:
+#                      the Mamba-2 blocks hit the causal-conv1d pybind extension and the MoE blocks
+#                      hit `aten.bincount`, neither of which Dynamo can trace. With false, all three
+#                      block types compile, each bit-exact against eager in isolation. The assembled
+#                      model is NOT bit-identical, because discrete top-k routing flips for a few
+#                      borderline tokens - see COMPILATION in the header.
+#
+#   block_names        MUST NOT list NemotronMLPLayer, even though `fsdp_model` above does. This
+#                      layer_pattern contains no "-" layers, so no NemotronMLPLayer instance exists,
+#                      and `get_compiled_model` raises ValueError for a block name that matches no
+#                      module (fsdp2_wrapped tolerates the same name silently). Add it back only if
+#                      you put "-" layers in the pattern.
+compiled_model:
+  component_key: model
+  variant_key: compiled
+  config:
+    model:
+      instance_key: activation_checkpointed_model
+      pass_type: BY_REFERENCE
+    block_names: [Mamba2Layer, NemotronMoELayer, NemotronAttentionLayer]
+    fullgraph: false
+    debug: false
+
+activation_checkpointed_model:
+  component_key: model
+  variant_key: activation_checkpointed
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    ac_variant: full_activation_checkpointing
+    layers_fqn: transformer.h
+    ac_fun_params: {}
+
+model_raw:
+  component_key: model
+  variant_key: nemotron
+  config:
+    use_meta_device: true
+    sample_key: ${settings.referencing_keys.sample_key}
+    prediction_key: ${settings.referencing_keys.prediction_key}
+    aux_loss_key: moe_aux_loss
+    sequence_length: ${settings.step_profile.sequence_length}
+    # Llama-3 tokenizer, matching the tokenization of the FineWeb slices above. Already a multiple
+    # of 128 (128256 = 1002 * 128), so no padding is needed. This is the one architecture value that
+    # differs from config_nemotron3_nano_30b_a3b_fsdp2.yaml (131072); see DEVIATIONS in the header.
+    vocab_size: 128256
+    # Full published depth. Keep this in sync with the length of layer_pattern - the model
+    # validates it.
+    n_layer: 52
+    n_embd: 2688
+    layer_pattern: "MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME"
+    use_weight_tying: false
+    lm_head_norm_config: &nemotron_norm_config
+      norm_type: pytorch_rms_norm
+      config:
+        normalized_shape: ${model_raw.config.n_embd}
+        eps: 1e-5
+    layer_specs:
+      "M":
+        component_key: nemotron_layer_spec
+        variant_key: mamba2
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          mamba_n_heads: 64
+          mamba_head_dim: 64
+          mamba_state_dim: 128
+          mamba_n_groups: 8
+          d_conv: 4
+          # 8192 / 128 = 64 scan chunks.
+          chunk_size: 128
+          ssd_backend: fused
+          norm_config: *nemotron_norm_config
+      "E":
+        component_key: nemotron_layer_spec
+        variant_key: moe
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          num_experts: 128
+          moe_ffn_hidden: 1856
+          top_k: 6
+          route_scale: 2.5
+          score_function: sigmoid
+          use_expert_bias: true
+          router_dtype: float32
+          num_shared_experts: 2
+          shared_expert_ffn_hidden_per_expert: 1856   # -> one fused MLP of 3712 hidden units
+          aux_loss_coeff: 1.0e-4
+          experts_backend: grouped_mm
+          norm_config: *nemotron_norm_config
+      "*":
+        component_key: nemotron_layer_spec
+        variant_key: attention
+        config:
+          n_embd: ${model_raw.config.n_embd}
+          n_head_q: 32
+          n_head_kv: 2
+          head_dim: 128
+          attention_implementation: pytorch_flash
+          norm_config: *nemotron_norm_config
+
+# Warmup then cosine decay to 10% of peak, the standard LLM pretraining schedule and what the
+# reference recipe uses. `warmup_steps` is absolute and must stay well below `total_steps`, which is
+# derived from the dataset and therefore depends on the world size: ~1,907 steps at 16 GPUs, ~953 at
+# 32. 100 is ~5% of the former and ~10% of the latter. Re-tune it if you change the world size, the
+# accumulation, or the token budget.
+lr_scheduler:
+  component_key: scheduler
+  variant_key: linear_warmup_cosine_annealing_lr
+  config:
+    optimizer:
+      instance_key: optimizer
+      pass_type: BY_REFERENCE
+    warmup_steps: 100
+    total_steps: ${settings.training_target.num_target_steps}
+    initial_lr: 4.5e-5
+    max_lr: 4.5e-4
+    final_lr: 4.5e-5
+
+# The `moe_load_balanced` decorator adds the auxiliary-loss-free expert bias update as an optimizer
+# step pre-hook. Pinning it to the optimizer step (rather than the forward pass) is what makes it
+# correct under gradient accumulation: token counts accumulate over micro-batches and are reduced
+# across data-parallel ranks exactly once per step.
+optimizer:
+  component_key: optimizer
+  variant_key: moe_load_balanced
+  config:
+    expert_bias_update_rate: 1.0e-3
+    model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+    optimizer:
+      component_key: optimizer
+      variant_key: adam_w
+      config:
+        lr: 4.5e-4
+        betas: [0.9, 0.95]
+        eps: 1e-8
+        weight_decay: 0.1
+        # The state space parameters (A_log, D, dt_bias, conv1d) parameterize the SSM dynamics and
+        # the router gate decides expert assignment; decaying either destabilizes training.
+        weight_decay_groups_excluded: [embedding, layernorm, ssm, router]
+        wrapped_model:
+          instance_key: initialized_model
+          pass_type: BY_REFERENCE
+
+gradient_clipper:
+  component_key: gradient_clipper
+  variant_key: fsdp2
+  config:
+    wrapped_model:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    norm_type: P2_NORM
+    max_norm: 1.0
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+
+progress_subscriber:
+  component_key: progress_subscriber
+  variant_key: rich
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    num_seen_steps: ${settings.training_progress.num_seen_steps}
+    num_target_steps: ${settings.training_target.num_target_steps}
+    train_dataloader_tag: ${train_dataloader.config.dataloader_tag}
+    eval_dataloaders:
+      instance_key: eval_dataloaders
+      pass_type: BY_REFERENCE
+
+# OFFLINE, since compute nodes for a run this size usually have no outbound network. Sync afterwards
+# with `wandb sync wandb_storage/<run>`.
+evaluation_subscriber:
+  component_key: results_subscriber
+  variant_key: wandb
+  config:
+    global_rank: ${settings.cuda_env.global_rank}
+    project: modalities_nemotron_nano_30b_a3b_fineweb
+    mode: OFFLINE
+    experiment_id: ${settings.experiment_id}
+    directory: wandb_storage
+    config_file_path: ${settings.config_file_path}
+
+# num_active_params is derived from the model, so it stays correct if the layer pattern changes.
+mfu_calculator:
+  component_key: mfu_calculator
+  variant_key: nemotron
+  config:
+    layer_pattern: ${model_raw.config.layer_pattern}
+    sequence_length: ${settings.step_profile.sequence_length}
+    n_embd: ${model_raw.config.n_embd}
+    n_head_q: 32
+    head_dim: 128
+    world_size: ${settings.cuda_env.world_size}
+    model_parts:
+      instance_key: initialized_model
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE

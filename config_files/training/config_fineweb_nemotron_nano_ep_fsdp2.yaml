@@ -1,8 +1,52 @@
-# Nemotron-3 Nano real-data training config for 4x A100 80GB.
+# Nemotron-3 Nano real-data training config for 4x A100 80GB, WITH EXPERT PARALLELISM.
 #
-# This is the runnable-on-real-data counterpart to config_lorem_ipsum_nemotron_nano_fsdp2.yaml.
-# Same architecture, but at production sequence length (4096) on a Llama-3 tokenized FineWeb slice,
-# with the fused Mamba-2 kernels and a proper warmup + cosine schedule.
+# Byte-identical to config_fineweb_nemotron_nano_fsdp2.yaml except for three things, so that the two
+# can be compared directly as an expert-parallelism A/B:
+#
+#   1. `expert_parallel_degree: 4` in the device_mesh component.
+#   2. A new `expert_parallelized_model` component between `model_raw` and
+#      `activation_checkpointed_model`.
+#   3. This header.
+#
+# EXPERT PARALLELISM
+# Without it, FSDP2 shards the 128 routed experts of each MoE layer over the 4 ranks and all-gathers
+# the full stack again on every forward and backward pass. Each of the 7 MoE layers of this config
+# holds 128 x (1856 x 2688 + 2688 x 1856) = 1.277B expert parameters, i.e. 2.38 GiB in bf16, so a
+# step moves ~16.7 GiB of expert weights per rank in the forward pass alone - and activation
+# checkpointing makes the forward run twice.
+#
+# With expert parallelism each rank instead *owns* 32 of the 128 experts outright and never gathers
+# the other 96. What travels instead are the tokens: each rank routes its own tokens, sends them to
+# the rank owning their expert (dispatch all-to-all), and gets the results back (combine all-to-all).
+# At micro batch 1 x 4096 tokens and top-6 routing that is 4096 x 6 x 2688 x 2 B = 126 MiB per
+# direction per layer, of which 3/4 leaves the rank - roughly an order of magnitude less traffic than
+# the weight all-gather it replaces, and on NVLink rather than competing with it.
+#
+# The trade is that the expert matmuls get *smaller* per rank in one dimension and *larger* in
+# another: each rank now evaluates 32 experts over tokens gathered from all 4 ranks, instead of 128
+# experts over its own tokens. Total expert FLOPs per rank are unchanged; the grouped matmul just
+# sees 4x more rows per expert, which on A100 is the more efficient shape.
+#
+# MEASURED, 4x A100-SXM4-80GB (NVSwitch, NV12 between every pair), torch 2.9.1+cu128, this config
+# versus config_fineweb_nemotron_nano_fsdp2.yaml, median over steps 4+ of a ~5 minute run:
+#
+#   expert_parallel_degree   samples/s   tokens/s/GPU   MFU     peak mem   speedup
+#   1 (the non-EP config)         5.40           5530   0.170   48.97 GiB   1.000x
+#   2                             5.90           6042   0.190   52.42 GiB   1.093x
+#   4 (this config)               7.10           7270   0.230   48.02 GiB   1.315x
+#
+# Per-step samples/s ranges were [5.30, 5.60], [5.80, 6.00] and [7.00, 7.30], i.e. non-overlapping.
+#
+# Two things are worth reading off this table. First, degree 2 is the worst of both worlds on memory:
+# the experts are still FSDP-sharded (over the 2 remaining data-parallel ranks) so the all-gather
+# buffer is still allocated, *and* the all-to-all buffers are added on top. Second, the speedup is
+# not the MoE math getting faster. Benchmarked in isolation without FSDP, one expert-parallel MoE
+# layer at these dimensions is 0.89x on the forward pass and 1.06x on forward+backward versus a
+# replicated one - roughly break-even, because the 1.61 ms all-to-all pair (17.5% of the layer
+# forward) costs about what the better grouped-matmul shape saves. The entire end-to-end win comes
+# from no longer all-gathering expert weights.
+#
+# See src/modalities/models/parallelism/expert_parallelism.py for the dispatch/combine implementation.
 #
 # ARCHITECTURE
 # Full width of Nemotron-3 Nano 30B-A3B (arXiv:2512.20848) - model dimension 2688, 64 Mamba-2 heads
@@ -304,6 +348,16 @@ device_mesh:
     device_type: cuda
     data_parallel_replicate_degree: 1
     data_parallel_shard_degree: -1
+    # Expert parallelism is carved out of data_parallel_shard_degree, not multiplied into the world
+    # size: the 4 ranks still each process their own data shard, they just own 32 of the 128 routed
+    # experts each and exchange tokens by all-to-all. `dp_degree` below therefore still resolves to
+    # 4, and the global batch is unchanged from the non-EP config.
+    #
+    # At expert_parallel_degree == data_parallel_shard_degree (4 here) nothing is left of the
+    # data-parallel dimension for FSDP to shard the experts over, so expert weights are never
+    # all-gathered. Set this to 2 to shard experts 2-way and FSDP-shard each half over the
+    # remaining 2 ranks.
+    expert_parallel_degree: 4
     world_size: ${settings.cuda_env.world_size}
 
 dp_degree:
@@ -366,12 +420,23 @@ fsdp_model:
     layers_per_fsdp_unit: 1
     block_names: [Mamba2Layer, NemotronMoELayer, NemotronAttentionLayer, NemotronMLPLayer]
 
+expert_parallelized_model:
+  component_key: model
+  variant_key: expert_parallelized
+  config:
+    model:
+      instance_key: model_raw
+      pass_type: BY_REFERENCE
+    device_mesh:
+      instance_key: device_mesh
+      pass_type: BY_REFERENCE
+
 activation_checkpointed_model:
   component_key: model
   variant_key: activation_checkpointed
   config:
     model:
-      instance_key: model_raw
+      instance_key: expert_parallelized_model
       pass_type: BY_REFERENCE
     ac_variant: full_activation_checkpointing
     layers_fqn: transformer.h

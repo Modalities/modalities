@@ -21,6 +21,12 @@ class DeviceMeshConfig(BaseModel):
     tensor_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     pipeline_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     context_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
+    # Expert parallelism is carved *out of* the data-parallel shard dimension rather than
+    # multiplying into the world size: EP ranks each hold a distinct slice of the experts but
+    # still process their own data shard, exchanging tokens via all-to-all. The number of
+    # distinct data shards therefore stays data_parallel_shard_degree * data_parallel_replicate_degree,
+    # which is what the dataloader's dp_degree must keep seeing.
+    expert_parallel_degree: Annotated[int, Field(strict=True, gt=0)] = 1
     enable_loss_parallel: Optional[bool] = False
     world_size: Annotated[int, Field(strict=True, gt=0)]
 
@@ -78,12 +84,38 @@ class DeviceMeshConfig(BaseModel):
             )
         if self.enable_loss_parallel and self.tensor_parallel_degree <= 1:
             raise ConfigError(f"{self.enable_loss_parallel=} requires tensor_parallel_degree > 1")
+
+        if self.expert_parallel_degree > 1:
+            if self.expert_parallel_degree > self.data_parallel_shard_degree:
+                raise ConfigError(
+                    f"expert_parallel_degree({self.expert_parallel_degree}) must not exceed "
+                    f"data_parallel_shard_degree({self.data_parallel_shard_degree}): expert parallelism "
+                    "is carved out of the data-parallel shard dimension."
+                )
+            if self.data_parallel_shard_degree % self.expert_parallel_degree != 0:
+                raise ConfigError(
+                    f"data_parallel_shard_degree({self.data_parallel_shard_degree}) must be divisible by "
+                    f"expert_parallel_degree({self.expert_parallel_degree})."
+                )
+            for degree, name in (
+                (self.tensor_parallel_degree, "tensor_parallel_degree"),
+                (self.pipeline_parallel_degree, "pipeline_parallel_degree"),
+                (self.context_parallel_degree, "context_parallel_degree"),
+            ):
+                if degree > 1:
+                    raise ConfigError(f"expert_parallel_degree > 1 is not yet supported together with {name}={degree}.")
         return self
 
 
 class ParallelismDegrees(Enum):
     DP_REPLICATE = "dp_replicate"
     DP_SHARD = "dp_shard"
+    # Only present when expert_parallel_degree > 1, where DP_SHARD is split into these two
+    # sub-dimensions and re-exposed as a flattened DP_SHARD alias. EP is the inner (fastest
+    # varying) of the two so that an all-to-all group spans consecutive global ranks, i.e. stays
+    # inside a node for the common case of expert_parallel_degree <= devices per node.
+    DP_SHARD_MOD_EP = "dp_shard_mod_ep"
+    EP = "ep"
     CP = "cp"
     TP = "tp"
     PP = "pp"
@@ -98,6 +130,7 @@ def get_device_mesh(
     context_parallel_degree: int,
     enable_loss_parallel: bool,
     world_size: int,
+    expert_parallel_degree: int = 1,
 ) -> DeviceMesh:
     """
     Gets the device mesh for the specified parallelism degrees.
@@ -111,38 +144,73 @@ def get_device_mesh(
         context_parallel_degree (int): The context parallel degree.
         enable_loss_parallel (bool): Whether to enable loss parallelism.
         world_size (int): The world size.
+        expert_parallel_degree (int): The expert parallel degree. Carved out of
+            ``data_parallel_shard_degree`` (see :class:`DeviceMeshConfig`), so a degree > 1 splits
+            the ``dp_shard`` dimension into ``dp_shard_mod_ep`` x ``ep``. The original ``dp_shard``
+            stays available as a flattened dimension, so callers that only care about data
+            parallelism need no changes.
 
     Returns:
         DeviceMesh: The device mesh.
     """
+    # With expert parallelism, dp_shard is materialized as two dimensions and flattened back
+    # afterwards; without it, the mesh is built exactly as before.
+    if expert_parallel_degree > 1:
+        dp_shard_dims = [data_parallel_shard_degree // expert_parallel_degree, expert_parallel_degree]
+        dp_shard_names = [ParallelismDegrees.DP_SHARD_MOD_EP.value, ParallelismDegrees.EP.value]
+    else:
+        dp_shard_dims = [data_parallel_shard_degree]
+        dp_shard_names = [ParallelismDegrees.DP_SHARD.value]
+
     dims = []
     names = []
     for dim, name in zip(
-        [
-            pipeline_parallel_degree,
-            data_parallel_replicate_degree,
-            data_parallel_shard_degree,
-            context_parallel_degree,
-            tensor_parallel_degree,
-        ],
-        [
-            ParallelismDegrees.PP.value,
-            ParallelismDegrees.DP_REPLICATE.value,
-            ParallelismDegrees.DP_SHARD.value,
-            ParallelismDegrees.CP.value,
-            ParallelismDegrees.TP.value,
-        ],
+        [pipeline_parallel_degree, data_parallel_replicate_degree]
+        + dp_shard_dims
+        + [context_parallel_degree, tensor_parallel_degree],
+        [ParallelismDegrees.PP.value, ParallelismDegrees.DP_REPLICATE.value]
+        + dp_shard_names
+        + [ParallelismDegrees.CP.value, ParallelismDegrees.TP.value],
         strict=True,
     ):
-        if dim > 1 or name == ParallelismDegrees.DP_SHARD.value:
+        # The dp_shard sub-dimensions are always kept, even at degree 1, because the flattening
+        # below has to address both of them by name.
+        if dim > 1 or name in dp_shard_names:
             dims.append(dim)
             names.append(name)
     names = tuple(names)
     device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
-    logger.info(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
+    if expert_parallel_degree > 1:
+        # Re-expose the full data-parallel shard group under its original name. This is a lookup
+        # alias (device_mesh["dp_shard"]); it deliberately does not appear in mesh_dim_names, which
+        # is why the helpers below resolve names through __getitem__ instead.
+        device_mesh[tuple(dp_shard_names)]._flatten(ParallelismDegrees.DP_SHARD.value)
+    logger.info(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=} | {expert_parallel_degree=}")
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
+
+
+def _resolve_sub_mesh(device_mesh: DeviceMesh | None, parallelism_method: ParallelismDegrees) -> DeviceMesh | None:
+    """Resolves a mesh dimension by name, returning None if the mesh does not have it.
+
+    Resolution goes through ``device_mesh[name]`` rather than ``mesh_dim_names`` so that flattened
+    dimensions are found too. Under expert parallelism ``dp_shard`` is such a flattened alias: it is
+    addressable but absent from ``mesh_dim_names``.
+
+    Args:
+        device_mesh (DeviceMesh | None): The device mesh.
+        parallelism_method (ParallelismDegrees): The parallelism method to resolve.
+
+    Returns:
+        DeviceMesh | None: The sub-mesh, or None if this mesh has no such dimension.
+    """
+    if device_mesh is None or device_mesh.mesh_dim_names is None:
+        return None
+    try:
+        return device_mesh[parallelism_method.value]
+    except (KeyError, RuntimeError, IndexError):
+        return None
 
 
 def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[ParallelismDegrees]) -> int:
@@ -158,9 +226,9 @@ def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[Paral
         raise ValueError("device_mesh.mesh_dim_names is None")
 
     return prod(
-        device_mesh.size(device_mesh.mesh_dim_names.index(method.value))
+        sub_mesh.size()
         for method in parallelism_methods
-        if method.value in device_mesh.mesh_dim_names
+        if (sub_mesh := _resolve_sub_mesh(device_mesh, method)) is not None
     )
 
 
@@ -174,11 +242,7 @@ def has_parallelism_method(device_mesh: DeviceMesh | None, parallelism_method: P
     Returns:
         bool: True if the device mesh has the specified parallelism method, False otherwise.
     """
-    return (
-        device_mesh is not None
-        and (mesh_dim_names := device_mesh.mesh_dim_names) is not None
-        and parallelism_method.value in mesh_dim_names
-    )
+    return _resolve_sub_mesh(device_mesh, parallelism_method) is not None
 
 
 def get_mesh_for_parallelism_method(device_mesh: DeviceMesh, parallelism_method: ParallelismDegrees) -> DeviceMesh:

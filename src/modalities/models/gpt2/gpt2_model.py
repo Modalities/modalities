@@ -1059,6 +1059,10 @@ class GPT2LLM(NNModel):
         self.n_embd = n_embd
         self.n_layer = n_layer
         self.poe_type = poe_type
+        # When True, forward returns the post-norm hidden states instead of logits so
+        # that a memory-efficient loss (e.g. ChunkedCLMCrossEntropyLoss) can apply the
+        # lm_head chunk-by-chunk. Toggled via `set_skip_lm_head`.
+        self._skip_lm_head = False
 
         assert vocab_size is not None
         assert sequence_length is not None
@@ -1120,6 +1124,17 @@ class GPT2LLM(NNModel):
             self.transformer.wte.weight = (
                 self.transformer.lm_head.weight
             )  # https://paperswithcode.com/method/weight-tying
+
+    @property
+    def lm_head(self) -> nn.Module:
+        """The language-model head. Exposed so a memory-efficient loss can apply it
+        chunk-by-chunk (see ChunkedCLMCrossEntropyLoss)."""
+        return self.transformer.lm_head
+
+    def set_skip_lm_head(self, skip: bool) -> None:
+        """Toggle whether forward returns post-norm hidden states (True) instead of
+        logits (False). Used together with a loss that owns the lm_head."""
+        self._skip_lm_head = skip
 
     @property
     def has_tied_word_embeddings(self) -> bool:
@@ -1205,6 +1220,10 @@ class GPT2LLM(NNModel):
         for layer_idx in self.transformer.h:
             h = self.transformer.h[layer_idx](h)
         h = self.transformer.lm_head_norm(h) if hasattr(self.transformer, "lm_head_norm") else h
+        # When skipping the head, return the post-norm hidden states so the loss can
+        # apply the lm_head chunk-by-chunk (memory-efficient path).
+        if self._skip_lm_head:
+            return h
         h = self.transformer.lm_head(h) if hasattr(self.transformer, "lm_head") else h
         return h
 

@@ -17,6 +17,30 @@ from modalities.running_env.fsdp.device_mesh import (
 from modalities.training.gradient_clipping.gradient_clipper import GradientClipperIF
 
 
+def _group_by_gradient_mesh(parameters: list[torch.nn.Parameter]) -> list[list[torch.nn.Parameter]]:
+    """Groups parameters by the device mesh their gradient lives on.
+
+    Both the norm reduction and the in-place rescaling of gradients are batched (``torch.stack`` and
+    ``aten._foreach_mul_`` respectively), and neither has a sharding rule for operands from different
+    meshes. Under expert parallelism the routed expert gradients are sharded over
+    ``(dp_shard_mod_ep, ep)`` while all other gradients are sharded over ``dp_shard``, so the batched
+    calls have to be made per mesh. Without expert parallelism this returns a single group and every
+    caller behaves exactly as before.
+
+    Args:
+        parameters (list[torch.nn.Parameter]): Parameters with a gradient.
+
+    Returns:
+        list[list[torch.nn.Parameter]]: One list of parameters per distinct gradient mesh.
+    """
+    groups: dict[DeviceMesh | None, list[torch.nn.Parameter]] = {}
+    for parameter in parameters:
+        # Meshes are hashable and identity-stable, so they can key the grouping directly.
+        key = parameter.grad.device_mesh if isinstance(parameter.grad, DTensor) else None
+        groups.setdefault(key, []).append(parameter)
+    return list(groups.values())
+
+
 class GradientClippingMode(LookupEnum):
     """
     Enum class representing different modes of gradient clipping.
@@ -132,6 +156,46 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         self.error_if_nonfinite = error_if_nonfinite
         self.foreach = foreach
 
+    def _get_total_norm_across_meshes(self, parameter_groups: list[list[torch.nn.Parameter]]) -> torch.Tensor:
+        """Computes one global gradient norm over gradients that may live on different device meshes.
+
+        Norms decompose over any partition of the tensors, so each group (see
+        :func:`_group_by_gradient_mesh`) is reduced to a scalar on its own mesh and the group norms
+        are then combined: ``(sum_g norm_g ** p) ** (1/p)`` for a p-norm and ``max_g norm_g`` for the
+        infinity norm. With a single group this is exactly the previous computation.
+
+        Args:
+            parameter_groups (list[list[torch.nn.Parameter]]): Parameters grouped by gradient mesh.
+
+        Returns:
+            torch.Tensor: The global gradient norm as a plain (non-DTensor) scalar tensor.
+        """
+        group_norms: list[torch.Tensor] = []
+        for parameters in parameter_groups:
+            group_norm = torch.nn.utils.get_total_norm(
+                tensors=[parameter.grad for parameter in parameters],
+                norm_type=self.norm_type.value,
+                error_if_nonfinite=self.error_if_nonfinite,
+                foreach=self.foreach,
+            )
+            # Inspired by torch titan
+            # If the norm is a DTensor, the placements must be
+            # `torch.distributed._tensor.ops.math_ops._NormPartial`. Reducing the DTensor yields the
+            # total norm over this group's process groups; converting to a local tensor then gives a
+            # value whose .item() is correct.
+            if isinstance(group_norm, DTensor):
+                # Will reach here if any non-PP parallelism is used.
+                # If only using PP, the norm will be a local tensor.
+                group_norm = group_norm.full_tensor()
+            group_norms.append(group_norm)
+
+        if len(group_norms) == 1:
+            return group_norms[0]
+        stacked = torch.stack(group_norms)
+        if math.isinf(self.norm_type.value):
+            return stacked.max()
+        return stacked.pow(self.norm_type.value).sum().pow(1.0 / self.norm_type.value)
+
     @torch.no_grad()
     def clip_gradients(self) -> torch.Tensor:
         """
@@ -140,23 +204,8 @@ class FSDP2LoggingOnlyGradientClipper(GradientClipperIF):
         Returns:
             torch.Tensor: The gradient norms.
         """
-        grads = [p.grad for model in self.models for p in model.parameters() if p.grad is not None]
-        total_norm = torch.nn.utils.get_total_norm(
-            tensors=grads,
-            norm_type=self.norm_type.value,
-            error_if_nonfinite=self.error_if_nonfinite,
-            foreach=self.foreach,
-        )
-
-        # Inspired by torch titan
-        # If total_norm is a DTensor, the placements must be `torch.distributed._tensor.ops.math_ops._NormPartial`.
-        # We can simply reduce the DTensor to get the total norm in this tensor's process group
-        # and then convert it to a local tensor.
-        # NOTE: It has the purpose to return a reduced total_norm tensor whose .item() would return the correct value
-        if isinstance(total_norm, DTensor):
-            # Will reach here if any non-PP parallelism is used.
-            # If only using PP, total_norm will be a local tensor.
-            total_norm = total_norm.full_tensor()
+        parameters = [p for model in self.models for p in model.parameters() if p.grad is not None]
+        total_norm = self._get_total_norm_across_meshes(_group_by_gradient_mesh(parameters))
 
         if has_parallelism_method(self.device_mesh, ParallelismDegrees.PP):
             pp_mesh = get_mesh_for_parallelism_method(
@@ -221,10 +270,14 @@ class FSDP2GradientClipper(FSDP2LoggingOnlyGradientClipper):
         """
         total_norm = super().clip_gradients()
         for model in self.models:
-            torch.nn.utils.clip_grads_with_norm_(
-                parameters=model.parameters(),
-                max_norm=self.max_norm,
-                total_norm=total_norm,
-                foreach=self.foreach,
-            )
+            parameters = [p for p in model.parameters() if p.grad is not None]
+            # Rescaling is batched per mesh: clip_grads_with_norm_ ends in a single
+            # aten._foreach_mul_ over all gradients, which cannot mix meshes.
+            for parameter_group in _group_by_gradient_mesh(parameters):
+                torch.nn.utils.clip_grads_with_norm_(
+                    parameters=parameter_group,
+                    max_norm=self.max_norm,
+                    total_norm=total_norm,
+                    foreach=self.foreach,
+                )
         return total_norm
