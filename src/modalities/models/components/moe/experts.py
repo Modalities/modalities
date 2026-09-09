@@ -22,6 +22,7 @@ from enum import Enum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributed.tensor import DTensor
 
 
 class ExpertsBackend(str, Enum):
@@ -137,32 +138,58 @@ class GroupedExperts(nn.Module):
             and x.dtype in (torch.bfloat16, torch.float16)
         )
 
+    def _local_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Returns the weights as plain tensors holding this rank's experts.
+
+        Under expert parallelism ``w1``/``w2`` are DTensors sharded along the expert dimension, and
+        the matmul kernels operate on the local shard. Without expert parallelism this is a no-op.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: The local ``(w1, w2)``.
+        """
+        w1, w2 = self.w1, self.w2
+        return (
+            w1.to_local() if isinstance(w1, DTensor) else w1,
+            w2.to_local() if isinstance(w2, DTensor) else w2,
+        )
+
     def forward(self, x_sorted: torch.Tensor, tokens_per_expert: torch.Tensor) -> torch.Tensor:
         """
         Applies each expert to its contiguous slice of the sorted token tensor.
 
         Args:
             x_sorted (torch.Tensor): Tokens sorted by expert, of shape ``(num_routed, n_embd)``.
-            tokens_per_expert (torch.Tensor): Token count per expert, of shape ``(num_experts,)``,
-                integer dtype. Must sum to ``num_routed``.
+            tokens_per_expert (torch.Tensor): Token count per expert, of shape ``(num_local_experts,)``,
+                integer dtype. Must sum to ``num_routed``. Under expert parallelism these are the
+                counts for the experts this rank owns, not all ``num_experts``.
 
         Returns:
             torch.Tensor: Expert outputs of shape ``(num_routed, n_embd)``.
         """
+        w1, w2 = self._local_weights()
         if self._use_grouped_mm(x_sorted):
             offsets = torch.cumsum(tokens_per_expert, dim=0, dtype=torch.int32)
-            hidden = squared_relu(torch._grouped_mm(x_sorted, self.w1.transpose(-2, -1), offs=offsets))
-            return torch._grouped_mm(hidden, self.w2.transpose(-2, -1), offs=offsets)
+            hidden = squared_relu(torch._grouped_mm(x_sorted, w1.transpose(-2, -1), offs=offsets))
+            return torch._grouped_mm(hidden, w2.transpose(-2, -1), offs=offsets)
 
-        return self._forward_looped(x_sorted, tokens_per_expert)
+        return self._forward_looped(x_sorted, tokens_per_expert, w1, w2)
 
-    def _forward_looped(self, x_sorted: torch.Tensor, tokens_per_expert: torch.Tensor) -> torch.Tensor:
+    def _forward_looped(
+        self,
+        x_sorted: torch.Tensor,
+        tokens_per_expert: torch.Tensor,
+        w1: torch.Tensor,
+        w2: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Reference implementation: loop over experts and apply each to its slice.
 
         Args:
             x_sorted (torch.Tensor): Tokens sorted by expert, of shape ``(num_routed, n_embd)``.
-            tokens_per_expert (torch.Tensor): Token count per expert, of shape ``(num_experts,)``.
+            tokens_per_expert (torch.Tensor): Token count per expert, of shape ``(num_local_experts,)``.
+            w1 (torch.Tensor): The local up-projection weights.
+            w2 (torch.Tensor): The local down-projection weights.
 
         Returns:
             torch.Tensor: Expert outputs of shape ``(num_routed, n_embd)``.
@@ -176,7 +203,7 @@ class GroupedExperts(nn.Module):
                 continue
             stop = start + count
             chunk = x_sorted[start:stop]
-            hidden = squared_relu(chunk @ self.w1[expert_idx].transpose(0, 1))
-            outputs[start:stop] = hidden @ self.w2[expert_idx].transpose(0, 1)
+            hidden = squared_relu(chunk @ w1[expert_idx].transpose(0, 1))
+            outputs[start:stop] = hidden @ w2[expert_idx].transpose(0, 1)
             start = stop
         return outputs

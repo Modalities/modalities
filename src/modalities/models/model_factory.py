@@ -31,6 +31,7 @@ from typing_extensions import deprecated
 from modalities.checkpointing.checkpoint_loading import FSDP1CheckpointLoadingIF
 from modalities.config.config import ActivationCheckpointedModelConfig
 from modalities.exceptions import ModelStateError
+from modalities.models.components.moe.moe import MoE
 from modalities.models.gpt2.gpt2_model import (
     GPT2LLM,
     AttentionConfig,
@@ -41,9 +42,14 @@ from modalities.models.gpt2.gpt2_model import (
     TransformerMLP,
 )
 from modalities.models.model import ActivationType
+from modalities.models.parallelism.expert_parallelism import ExpertParallelGroupedExperts, shard_experts_over_ep_mesh
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    has_parallelism_method,
+)
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
     ActivationCheckpointing,
@@ -166,6 +172,53 @@ class ModelFactory:
         return fsdp_model
 
     @staticmethod
+    def get_expert_parallelized_model(model: nn.Module, device_mesh: DeviceMesh) -> nn.Module:
+        """Applies expert parallelism to every mixture-of-experts layer of the model, in place.
+
+        Each MoE layer's routed expert stack is partitioned along the expert dimension over the
+        ``ep`` mesh dimension and wrapped so that tokens are dispatched to, and combined from, the
+        rank owning their expert. Shared experts, the router and all dense layers are untouched.
+
+        Must run *before* FSDP2 wrapping (which then shards what is left of the data-parallel
+        dimension on top) and while the model is still on the meta device, since the expert
+        parameters are re-created rather than redistributed.
+
+        Args:
+            model (nn.Module): The model to parallelize, expected to be on the meta device.
+            device_mesh (DeviceMesh): The device mesh. Must have an ``ep`` dimension, i.e. the
+                device mesh config must set ``expert_parallel_degree > 1``.
+
+        Raises:
+            ModelStateError: If the mesh has no ``ep`` dimension, or if the model has no MoE layer.
+
+        Returns:
+            nn.Module: The same model, with its expert stacks replaced in place.
+        """
+        if not has_parallelism_method(device_mesh, ParallelismDegrees.EP):
+            raise ModelStateError(
+                "Expert parallelism requires an `ep` dimension in the device mesh. Set "
+                "expert_parallel_degree > 1 in the device_mesh config."
+            )
+        ep_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.EP)
+
+        moe_layers = [module for module in model.modules() if isinstance(module, MoE)]
+        if not moe_layers:
+            raise ModelStateError(
+                "Expert parallelism was requested but the model contains no MoE layer. Remove the "
+                "expert-parallelized model component or set expert_parallel_degree to 1."
+            )
+        for moe in moe_layers:
+            if isinstance(moe.experts, ExpertParallelGroupedExperts):
+                continue
+            shard_experts_over_ep_mesh(moe.experts, ep_mesh)
+            moe.experts = ExpertParallelGroupedExperts(experts=moe.experts, ep_mesh=ep_mesh)
+        logger.info(
+            f"Applied expert parallelism (degree {ep_mesh.size()}) to {len(moe_layers)} MoE layer(s); "
+            f"{moe_layers[0].router.num_experts // ep_mesh.size()} local experts per rank."
+        )
+        return model
+
+    @staticmethod
     def get_fsdp2_wrapped_model(
         model: nn.Module,
         block_names: list[str],
@@ -173,6 +226,7 @@ class ModelFactory:
         mixed_precision_settings: FSDP2MixedPrecisionSettings,
         reshard_after_forward: bool,
         layers_per_fsdp_unit: int = 1,
+        separate_lm_head_fsdp_unit: bool = False,
     ) -> FSDP2:
         """Get the FSDP2-wrapped model.
 
@@ -212,6 +266,28 @@ class ModelFactory:
 
         modules = list(model.modules())
 
+        # Expert-parallel stacks must not be sharded on the full dp_shard dimension: ranks differing
+        # in their `ep` coordinate hold *different* experts, so all-gathering across them would mix
+        # unrelated weights. Give each expert stack its own FSDP unit on dp_shard_mod_ep, the part of
+        # the data-parallel dimension that expert parallelism did not consume. Nested FSDP units are
+        # skipped by the enclosing ones, so the block-level sharding below leaves them alone.
+        # At expert_parallel_degree == data_parallel_shard_degree this mesh has size 1 and the unit
+        # only exists to claim the parameters; there is nothing left to shard or reduce.
+        expert_modules = [m for m in modules if isinstance(m, ExpertParallelGroupedExperts)]
+        if expert_modules:
+            expert_fsdp_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.DP_SHARD_MOD_EP)
+            for expert_module in expert_modules:
+                fully_shard(
+                    expert_module.experts,
+                    mesh=expert_fsdp_mesh,
+                    mp_policy=mp_policy,
+                    reshard_after_forward=reshard_after_forward,
+                )
+            logger.info(
+                f"Sharded {len(expert_modules)} expert-parallel stack(s) on "
+                f"dp_shard_mod_ep (size {expert_fsdp_mesh.size()})."
+            )
+
         # we first shard all the blocks
         grouped_modules: list[nn.Module] = []
         module_id = 0
@@ -236,6 +312,16 @@ class ModelFactory:
                 **fsdp_config,
                 reshard_after_forward=reshard_block_after_forward,
             )
+
+        # Optionally shard the lm_head as its own FSDP unit. Required by the
+        # memory-efficient chunked loss (ChunkedCLMCrossEntropyLoss): it applies the
+        # head outside the model's forward, so the head needs its own gather hook to
+        # all-gather its parameters when called (and recomputed) per chunk. Without
+        # this, a resharded head would silently run on a local shard.
+        if separate_lm_head_fsdp_unit:
+            if not hasattr(model, "lm_head"):
+                raise ModelStateError("separate_lm_head_fsdp_unit=True requires the model to expose `lm_head`.")
+            fully_shard(model.lm_head, **fsdp_config, reshard_after_forward=reshard_after_forward)
 
         # finally, we shard the entire model
         fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)

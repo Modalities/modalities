@@ -24,6 +24,7 @@ from modalities.config.pydantic_if_types import (
     PydanticFSDP1ModuleType,
     PydanticFSDP2ModuleType,
     PydanticLLMDataLoaderIFType,
+    PydanticLossIFType,
     PydanticLRSchedulerIFType,
     PydanticModelInitializationIFType,
     PydanticOptimizerIFType,
@@ -41,7 +42,7 @@ from modalities.running_env.env_utils import (
     PyTorchDtypes,
     has_bfloat_support,
 )
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, has_parallelism_method
 from modalities.training.activation_checkpointing.activation_checkpointing_variants import (
     ActivationCheckpointingVariants,
 )
@@ -83,6 +84,25 @@ class ReferenceConfig(BaseModel):
 class CLMCrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
+
+
+class ChunkedCLMCrossEntropyLossConfig(BaseModel):
+    # BY_REFERENCE to the (already wrapped) model; the loss borrows its lm_head and
+    # switches the model into skip_lm_head mode. See ChunkedCLMCrossEntropyLoss.
+    model: PydanticPytorchModuleType
+    target_key: str
+    prediction_key: str
+    num_chunks: Annotated[int, Field(strict=True, ge=1)] = 8
+
+    # avoid pydantic warning about the protected 'model_' namespace
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class CompiledLossConfig(BaseModel):
+    # Wraps a raw loss (BY_REFERENCE) and compiles its tensor core in place,
+    # mirroring the CompiledModelConfig / model "compiled" variant.
+    loss: PydanticLossIFType
+    backend: str = "inductor"
 
 
 # Checkpointing
@@ -295,6 +315,9 @@ class FSDP2WrappedModelConfig(BaseModel):
     reshard_after_forward: bool = True
     device_mesh: PydanticDeviceMeshIFType
     layers_per_fsdp_unit: int = 1
+    # Shard the lm_head as its own FSDP unit. Required when the model is trained with
+    # ChunkedCLMCrossEntropyLoss (the head is applied outside the model forward).
+    separate_lm_head_fsdp_unit: bool = False
 
     @model_validator(mode="after")
     def validate_mixed_precision_settings(self):
@@ -309,8 +332,26 @@ class FSDP2WrappedModelConfig(BaseModel):
     def validate_dp_mesh_existence(self):
         if self.device_mesh.mesh_dim_names is None:
             raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
-        if ParallelismDegrees.DP_SHARD.value not in self.device_mesh.mesh_dim_names:
+        # Resolved via has_parallelism_method rather than mesh_dim_names because under expert
+        # parallelism dp_shard is a flattened dimension, which is addressable but not named.
+        if not has_parallelism_method(self.device_mesh, ParallelismDegrees.DP_SHARD):
             raise ValueError(f"Data parallelism key '{ParallelismDegrees.DP_SHARD.value}' not in {self.device_mesh=}")
+        return self
+
+
+class ExpertParallelizedModelConfig(BaseModel):
+    model: PydanticPytorchModuleOrListType
+    device_mesh: PydanticDeviceMeshIFType
+
+    @model_validator(mode="after")
+    def validate_ep_mesh_existence(self) -> "ExpertParallelizedModelConfig":
+        if self.device_mesh.mesh_dim_names is None:
+            raise ValueError(f"Device mesh {self.device_mesh=} has no defined mesh_dim_names.")
+        if not has_parallelism_method(self.device_mesh, ParallelismDegrees.EP):
+            raise ValueError(
+                f"Expert parallelism key '{ParallelismDegrees.EP.value}' not in {self.device_mesh=}. "
+                "Set expert_parallel_degree > 1 in the device_mesh config."
+            )
         return self
 
 

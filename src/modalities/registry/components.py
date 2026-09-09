@@ -24,8 +24,10 @@ from modalities.config.config import (
     AdamWOptimizerConfig,
     BatchSamplerConfig,
     CheckpointSavingConfig,
+    ChunkedCLMCrossEntropyLossConfig,
     CLMCrossEntropyLossConfig,
     CombinedDatasetConfig,
+    CompiledLossConfig,
     CompiledModelConfig,
     ConstantLRSchedulerConfig,
     CosineAnnealingLRSchedulerConfig,
@@ -37,6 +39,7 @@ from modalities.config.config import (
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
     EvaluationResultToDiscSubscriberConfig,
+    ExpertParallelizedModelConfig,
     FSDP1ActivationCheckpointedModelConfig,
     FSDP1CheckpointedModelConfig,
     FSDP1CheckpointedOptimizerConfig,
@@ -84,7 +87,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ProgressSubscriberFactory,
     ResultsSubscriberFactory,
 )
-from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.loss_functions import ChunkedCLMCrossEntropyLoss, CLMCrossEntropyLoss, LossFactory
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -225,6 +228,12 @@ COMPONENTS = [
     ),
     ComponentEntity(
         "model",
+        "expert_parallelized",
+        maybe_model_list(ModelFactory.get_expert_parallelized_model),
+        ExpertParallelizedModelConfig,
+    ),
+    ComponentEntity(
+        "model",
         "model_initialized",
         maybe_model_list(ModelFactory.get_weight_initialized_model),
         WeightInitializedModelConfig,
@@ -284,6 +293,10 @@ COMPONENTS = [
     ),
     # losses
     ComponentEntity("loss", "clm_cross_entropy_loss", CLMCrossEntropyLoss, CLMCrossEntropyLossConfig),
+    ComponentEntity(
+        "loss", "chunked_clm_cross_entropy_loss", ChunkedCLMCrossEntropyLoss, ChunkedCLMCrossEntropyLossConfig
+    ),
+    ComponentEntity("loss", "compiled", LossFactory.get_compiled_loss, CompiledLossConfig),
     ComponentEntity("loss", "moe_aux_loss", MoEAuxLoss, MoEAuxLossConfig),
     ComponentEntity("loss", "weighted_sum", WeightedSumLoss, WeightedSumLossConfig),
     # optimizers
