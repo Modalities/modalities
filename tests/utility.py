@@ -1,5 +1,4 @@
 import os
-import socket
 import time
 from multiprocessing import Queue
 from multiprocessing.managers import SyncManager
@@ -11,14 +10,6 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.multiprocessing.spawn import ProcessContext
 
 from modalities.batch import DatasetBatch
-
-
-def find_free_port():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
 
 
 def add_debugger_to_distributed_test():
@@ -77,6 +68,7 @@ def monitor_child_processes(
     manager: SyncManager,
     error_queue: Queue,
     proc_ctx: ProcessContext,
+    shutdown_manager: bool = True,
 ) -> None:
     # Normalize the return value from mp.spawn. When join=False it often
     # returns a ProcessContext-like object that may expose a `processes`
@@ -173,7 +165,8 @@ def monitor_child_processes(
             time.sleep(0.05)
     finally:
         try:
-            manager.shutdown()
+            if shutdown_manager:
+                manager.shutdown()
         except Exception:
             pass
 

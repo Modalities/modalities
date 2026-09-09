@@ -17,8 +17,8 @@ from modalities.config.pydantic_if_types import (
     PydanticPipelineType,
 )
 from modalities.models.parallelism.pipeline_parallelism import Pipeline
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_parallel_rank
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 class ComponentsInstantiationPPModel(BaseModel):
