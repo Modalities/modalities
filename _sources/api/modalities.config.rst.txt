@@ -1,0 +1,61 @@
+modalities.config package
+=========================
+
+Submodules
+----------
+
+modalities.config.component\_factory module
+-------------------------------------------
+
+.. automodule:: modalities.config.component_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.config.config module
+-------------------------------
+
+.. automodule:: modalities.config.config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.config.instantiation\_models module
+----------------------------------------------
+
+.. automodule:: modalities.config.instantiation_models
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.config.lookup\_enum module
+-------------------------------------
+
+.. automodule:: modalities.config.lookup_enum
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.config.pydantic\_if\_types module
+--------------------------------------------
+
+.. automodule:: modalities.config.pydantic_if_types
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.config.utils module
+------------------------------
+
+.. automodule:: modalities.config.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.config
+   :members:
+   :show-inheritance:
+   :undoc-members:

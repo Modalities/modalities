@@ -1,0 +1,29 @@
+modalities.inference package
+============================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.inference.text
+
+Submodules
+----------
+
+modalities.inference.inference module
+-------------------------------------
+
+.. automodule:: modalities.inference.inference
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.inference
+   :members:
+   :show-inheritance:
+   :undoc-members:
