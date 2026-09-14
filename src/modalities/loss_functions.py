@@ -48,12 +48,19 @@ class CLMCrossEntropyLoss(Loss):
         shift_logits = lm_logits.contiguous()
         shift_labels = labels.contiguous().long()
         # Flatten the tokens. We compute here, the loss per token.
-        # The up-cast to float32 is deliberate and must not be removed. Without it the log-softmax,
-        # its backward, and the mean reduction all run in the logits' own dtype -- and under mixed
-        # precision the model hands us bfloat16. FSDP2's MixedPrecisionPolicy casts *parameters*; it
-        # does not install torch.autocast, so nothing else promotes them. TorchTitan up-casts on
-        # every one of its cross-entropy paths for the same reason (torchtitan/components/loss.py),
-        # as does HF transformers (transformers/loss/loss_utils.py).
+        # The up-cast to float32 is deliberate and must not be removed. Under mixed precision the
+        # model hands us bfloat16 logits: FSDP2's MixedPrecisionPolicy casts *parameters*, it does
+        # not install torch.autocast, so nothing else promotes them on the way in.
+        #
+        # This is about *tensor* precision, not accumulation -- PyTorch's kernels already accumulate
+        # in float32 for half-precision inputs. What the cast preserves is the log-softmax output,
+        # the tensors its backward reads, and the returned loss scalar, each of which would
+        # otherwise be stored in the logits' dtype. The scalar matters most: at a loss magnitude of
+        # ~36 the bfloat16 grid is 0.25 wide, which is the whole of the ~5e-2 error measured before
+        # this cast was added.
+        #
+        # TorchTitan up-casts on every one of its cross-entropy paths for the same reason
+        # (torchtitan/components/loss.py), as does HF transformers (transformers/loss/loss_utils.py).
         loss = self.loss_fun(shift_logits.view(-1, shift_logits.size(-1)).float(), shift_labels.view(-1))
         return loss
 

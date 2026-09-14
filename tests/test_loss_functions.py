@@ -61,20 +61,23 @@ def test_clm_cross_entropy_returns_float32_for_half_precision_logits(clm_loss, d
 
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
 def test_clm_cross_entropy_is_accurate_for_half_precision_logits(clm_loss, dtype):
-    """Half-precision logits must not drag the log-softmax or the reduction down with them.
+    """Half-precision logits must not drag the loss down with them.
 
-    Two faults are guarded at once. Without the up-cast the log-softmax runs in the logits' own
-    dtype, and because the reduction is ``"mean"`` the per-token losses are accumulated in that
-    dtype too -- over a 131k-entry vocabulary the accumulator error dominates. Against a float64
-    evaluation of the identical quantized logits, the un-upcast path lands around 5e-2 and the
-    float32 path around 2e-6.
+    Not about accumulation -- the kernels already accumulate in float32 for half-precision inputs.
+    What the up-cast preserves is tensor precision: the log-softmax output and the returned scalar,
+    which would otherwise be stored in the logits' dtype. The scalar dominates; at a loss magnitude
+    of ~36 the bfloat16 grid is 0.25 wide. Against a float64 reference the un-upcast path lands
+    around 5e-2 and the float32 path around 2e-6.
+
+    The reference is computed directly rather than through ``clm_loss``: the implementation casts
+    its input to float32, so passing it a float64 tensor would silently compare the fix with itself.
     """
     torch.manual_seed(0)
     vocab_size = 131072
     logits = (torch.randn(2, 64, vocab_size) * 8.0).to(dtype)
     labels = torch.randint(0, vocab_size, (2, 64))
 
-    reference = clm_loss(logits.double(), labels)
+    reference = torch.nn.functional.cross_entropy(logits.double().reshape(-1, vocab_size), labels.reshape(-1))
     assert abs(clm_loss(logits, labels).double() - reference) < 1e-4
 
 
