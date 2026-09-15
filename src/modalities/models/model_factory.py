@@ -616,6 +616,7 @@ class GPT2ModelFactory:
         use_weight_tying: bool,
         use_meta_device: Optional[bool] = False,
         enforce_swiglu_hidden_dim_multiple_of: int = 256,
+        sub_seq_lengths_key: str | None = None,
     ) -> GPT2LLM:
         config = dict(
             sample_key=sample_key,
@@ -638,6 +639,7 @@ class GPT2ModelFactory:
             lm_head_norm_config=lm_head_norm_config,
             use_weight_tying=use_weight_tying,
             enforce_swiglu_hidden_dim_multiple_of=enforce_swiglu_hidden_dim_multiple_of,
+            sub_seq_lengths_key=sub_seq_lengths_key,
         )
         if use_meta_device and use_weight_tying:
             raise ValueError(
