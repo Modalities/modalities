@@ -7,8 +7,8 @@ import torch
 import torch.multiprocessing as mp
 
 from modalities.config.config import ProcessGroupBackendType
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.util import get_synced_experiment_id_of_run
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 @pytest.fixture

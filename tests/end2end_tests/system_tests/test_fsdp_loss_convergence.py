@@ -10,11 +10,8 @@ from modalities.batch import EvaluationResultBatch
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.logging_broker.messages import Message
-from tests.end2end_tests.custom_components import (
-    MultiProcessingCudaEnv,
-    SaveAllResultSubscriber,
-    SaveAllResultSubscriberConfig,
-)
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
+from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
 
 
 @pytest.mark.skipif(
