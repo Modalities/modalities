@@ -475,6 +475,12 @@ class CombinedDatasetConfig(BaseModel):
     datasets: list[PydanticDatasetIFType]
 
 
+class WeightedCombinedDatasetConfig(BaseModel):
+    datasets: list[PydanticDatasetIFType]
+    repeat_factors: list[Annotated[float, Field(strict=False, ge=0)]]
+    seed: Annotated[int, Field(strict=True, ge=0)] = 42
+
+
 class BatchSamplerConfig(BaseModel):
     sampler: PydanticSamplerIFType
     batch_size: Annotated[int, Field(strict=True, gt=0)]

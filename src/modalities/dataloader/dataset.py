@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -462,3 +463,127 @@ class CombinedDataset(Dataset):
         local_idx = idx - (self.cumulative_sizes[dataset_idx - 1] if dataset_idx > 0 else 0)
 
         return self.datasets[dataset_idx][local_idx]
+
+
+class WeightedCombinedDataset(Dataset):
+    """Combines multiple datasets at runtime, each contributing a chosen number of epochs.
+
+    `CombinedDataset` concatenates its datasets once each, so the only way to change a
+    dataset's share of the blend is to change how much of it is on disk. This class
+    takes a repeat factor per dataset instead: 2.5 draws a dataset two and a half times
+    per epoch, 0.3 draws three tenths of it. Nothing is duplicated on disk, fractional
+    factors work, and the blend becomes a config value.
+
+    The fractional part is realised without storing an index map, so memory stays
+    constant no matter how large the datasets are. The documents making up a partial
+    pass are picked by a seeded affine permutation of the dataset's indices, which
+    spreads them evenly across the whole dataset rather than taking a prefix, and gives
+    the same selection on every rank and every restart.
+
+    Note:
+        The partial-pass selection is evenly spread rather than statistically random.
+        That is what makes it O(1), and it is a good property here -- a prefix would
+        over-sample whatever the corpus happens to be ordered by -- but it is not a
+        substitute for shuffling, which the sampler still does.
+    """
+
+    def __init__(self, datasets: list[Dataset], repeat_factors: list[float], seed: int = 42):
+        """Initializes the WeightedCombinedDataset.
+
+        Args:
+            datasets (list[Dataset]): The datasets to combine.
+            repeat_factors (list[float]): How many times to draw each dataset per
+                epoch. Must be non-negative and align one-to-one with `datasets`.
+                A factor of 0 excludes a dataset while keeping it declared.
+            seed (int): Seed for the partial-pass selection.
+
+        Raises:
+            ValueError: If the lengths disagree or a factor is negative.
+        """
+        if len(datasets) != len(repeat_factors):
+            raise ValueError(
+                f"got {len(datasets)} datasets but {len(repeat_factors)} repeat factors; they must correspond"
+            )
+        if any(factor < 0 for factor in repeat_factors):
+            raise ValueError(f"repeat factors must be non-negative, got {repeat_factors}")
+
+        self.datasets = datasets
+        self.repeat_factors = list(repeat_factors)
+        self.seed = seed
+
+        self._full_passes: list[int] = []
+        self._num_partial: list[int] = []
+        self._permutation_params: list[tuple[int, int]] = []
+        virtual_lengths: list[int] = []
+
+        for dataset_idx, (dataset, factor) in enumerate(zip(datasets, repeat_factors)):
+            num_samples = len(dataset)
+            full_passes = int(factor)
+            num_partial = int(round((factor - full_passes) * num_samples))
+            # Rounding up to a whole extra pass is expressed as one more full pass, so
+            # `num_partial` never equals `num_samples` and the permutation stays a
+            # strict subset.
+            if num_partial >= num_samples > 0:
+                full_passes += 1
+                num_partial = 0
+            self._full_passes.append(full_passes)
+            self._num_partial.append(num_partial)
+            self._permutation_params.append(self._affine_permutation_params(num_samples, seed, dataset_idx))
+            virtual_lengths.append(full_passes * num_samples + num_partial)
+
+        self.cumulative_sizes = np.cumsum(virtual_lengths, dtype=np.int64)
+
+    @staticmethod
+    def _affine_permutation_params(num_samples: int, seed: int, dataset_idx: int) -> tuple[int, int]:
+        # `index -> (multiplier * index + offset) % num_samples` is a bijection exactly
+        # when the multiplier is coprime with num_samples, which is what makes the
+        # partial pass a subset with no repeats.
+        if num_samples <= 1:
+            return 1, 0
+        rng = np.random.default_rng([seed, dataset_idx])
+        multiplier = 1
+        for _ in range(1000):
+            candidate = int(rng.integers(1, num_samples))
+            if math.gcd(candidate, num_samples) == 1:
+                multiplier = candidate
+                break
+        return multiplier, int(rng.integers(0, num_samples))
+
+    def __len__(self) -> int:
+        """Returns the number of samples one epoch of the blend yields.
+
+        Returns:
+            int: Sum over datasets of `repeat_factor * len(dataset)`, rounded per
+                dataset.
+        """
+        return int(self.cumulative_sizes[-1]) if len(self.cumulative_sizes) else 0
+
+    def __getitem__(self, idx: int) -> dict:
+        """Retrieves a sample from the blend.
+
+        Args:
+            idx (int): Index into the blend.
+
+        Returns:
+            dict: The sample from whichever dataset the index falls in.
+
+        Raises:
+            IndexError: If `idx` is outside the blend.
+        """
+        if idx < 0:
+            idx += len(self)
+        if not 0 <= idx < len(self):
+            raise IndexError(f"index {idx} is out of range for a blend of {len(self)} samples")
+
+        dataset_idx = int(np.searchsorted(self.cumulative_sizes, idx, side="right"))
+        local_idx = idx - (self.cumulative_sizes[dataset_idx - 1] if dataset_idx > 0 else 0)
+
+        num_samples = len(self.datasets[dataset_idx])
+        num_in_full_passes = self._full_passes[dataset_idx] * num_samples
+        if local_idx < num_in_full_passes:
+            sample_idx = local_idx % num_samples
+        else:
+            multiplier, offset = self._permutation_params[dataset_idx]
+            sample_idx = (multiplier * (local_idx - num_in_full_passes) + offset) % num_samples
+
+        return self.datasets[dataset_idx][int(sample_idx)]

@@ -28,6 +28,10 @@ from modalities.api import (
 from modalities.config.config import ProcessGroupBackendType, load_app_config_dict
 from modalities.config.instantiation_models import TrainingComponentsInstantiationModel
 from modalities.dataloader.create_instruction_tuning_data import create_instruction_tuning_data
+from modalities.dataloader.preprocessing.quality import export as quality_export
+from modalities.dataloader.preprocessing.quality import pipeline as quality_pipeline
+from modalities.dataloader.preprocessing.quality.registry import CorpusRegistry
+from modalities.dataloader.preprocessing.quality.verify import format_verify_report
 from modalities.main import Main
 from modalities.models.huggingface_adapters.hf_adapter import HFModelAdapter
 from modalities.running_env.cuda_env import CudaEnv
@@ -720,6 +724,579 @@ def CMD_entry_point_run_train_step_profiler(
     ModalitiesProfilerStarter.run_distributed(
         config_file_path=config_file_path,
         experiment_root_path=experiment_root_path,
+    )
+
+
+@main.group(name="quality")
+def quality() -> None:
+    """
+    Quality-based document selection and up/downsampling of a training blend.
+
+    The stages are meant to be run in order: `calibrate` measures how records map to
+    token counts, `build-sidecar` records one row per document, `join-annotations`
+    attaches external labels, and `build-cube` aggregates the result. After that,
+    `preview` costs a selection in seconds and `apply` writes filtered index files that
+    `modalities data pack_encoded_data` consumes unchanged.
+    """
+    pass
+
+
+@quality.command(name="calibrate")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option(
+    "--tokenizer_config",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to a packing config whose tokenizer section is used for calibration.",
+)
+@click.option(
+    "--sample_size",
+    type=int,
+    default=4000,
+    show_default=True,
+    help="Documents tokenized per dataset to measure the estimator. Sampled in proportion to "
+    "document length and grouped into size strata, so the rare very long documents that "
+    "dominate a corpus's byte count are represented.",
+)
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+def CMD_quality_calibrate(
+    registry_path: Path, work_dir: Path, tokenizer_config: Path, sample_size: int, only: tuple[str, ...]
+) -> None:
+    """Measures how each dataset's records relate to the training tokenizer's counts.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        tokenizer_config (Path): Packing config supplying the tokenizer.
+        sample_size (int): Documents tokenized per dataset.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Skip files whose part already reads as valid parquet.
+    """
+    from modalities.config.component_factory import ComponentFactory
+    from modalities.config.instantiation_models import TokenizerInstantiationModel
+    from modalities.registry.components import COMPONENTS
+    from modalities.registry.registry import Registry
+
+    config_dict = load_app_config_dict(tokenizer_config)
+    factory = ComponentFactory(registry=Registry(COMPONENTS))
+    tokenizer = factory.build_components(
+        config_dict=config_dict, components_model_type=TokenizerInstantiationModel
+    ).tokenizer
+    tokenizer_name = str(config_dict["tokenizer"]["config"].get("pretrained_model_name_or_path", "unknown"))
+
+    quality_pipeline.calibrate_blend(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        tokenizer=tokenizer,
+        tokenizer_name=tokenizer_name,
+        sample_size=sample_size,
+        only=list(only) or None,
+    )
+
+
+@quality.command(name="build-sidecar")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--index_root",
+    type=Path,
+    default=None,
+    help="Where JSONL index files live or should be created. Use this when the source tree is read-only.",
+)
+@click.option(
+    "--shard_id",
+    type=int,
+    default=0,
+    show_default=True,
+    help="This task's index. Set from SLURM_ARRAY_TASK_ID to run the build as an array.",
+)
+@click.option(
+    "--num_shards",
+    type=int,
+    default=1,
+    show_default=True,
+    help="How many tasks share the work. Files are divided across all selected datasets, "
+    "so one array covers the whole blend.",
+)
+@click.option(
+    "--resume/--no_resume",
+    default=False,
+    help="Skip files whose sidecar part already reads as valid parquet. Parquet writes its "
+    "footer last, so a part left by a killed task fails to open and is rebuilt. Off by "
+    "default: after changing a native metric the existing parts are stale and must be redone.",
+)
+def CMD_quality_build_sidecar(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    index_root: Optional[Path],
+    shard_id: int,
+    num_shards: int,
+    resume: bool,
+) -> None:
+    """Records one row per document: position, estimated tokens, key and native metrics.
+
+    The only stage that reads the raw data, so the one worth running as an array. Each
+    task writes its own parquet parts, so tasks never contend.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        index_root (Optional[Path]): Where JSONL index files live or should be created.
+        shard_id (int): This task's index in [0, num_shards).
+        num_shards (int): Total number of tasks sharing the work.
+    """
+    written = quality_pipeline.build_sidecars(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        index_root=index_root,
+        shard_id=shard_id,
+        num_shards=num_shards,
+        resume=resume,
+    )
+    for name, n_documents in written.items():
+        print_rank_0(f"{name}: {n_documents:,} documents")
+
+
+@quality.command(name="bucket-annotations")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to the splits these datasets need (repeatable).")
+@click.option(
+    "--num_buckets",
+    type=int,
+    default=1024,
+    show_default=True,
+    help="Partitions per annotation split. Each is loaded whole during the join, so raise this for large splits.",
+)
+@click.option(
+    "--shard_id",
+    type=int,
+    default=0,
+    show_default=True,
+    help="This task's index. Set from SLURM_ARRAY_TASK_ID to bucket as an array.",
+)
+@click.option("--num_shards", type=int, default=1, show_default=True, help="How many tasks bucket each split.")
+@click.option("--force", is_flag=True, default=False, help="Re-bucket a split even if its output is complete.")
+def CMD_quality_bucket_annotations(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_buckets: int,
+    shard_id: int,
+    num_shards: int,
+    force: bool,
+) -> None:
+    """Partitions the annotation splits by a hash of their key, ready for joining.
+
+    The expensive half of the join, since a split can run to billions of rows. Shardable,
+    and splits shared by several datasets are bucketed only once.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to the splits these datasets need.
+        num_buckets (int): Partitions per split.
+        shard_id (int): This task's index in [0, num_shards).
+        num_shards (int): How many tasks bucket each split.
+        force (bool): Re-bucket even if the output is complete.
+    """
+    written = quality_pipeline.bucket_blend_annotations(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_buckets=num_buckets,
+        shard_id=shard_id,
+        num_shards=num_shards,
+        force=force,
+    )
+    for split, n_rows in written.items():
+        print_rank_0(f"{split}: {n_rows:,} rows bucketed by this task")
+
+
+@quality.command(name="join-annotations")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Skip sidecar parts that already carry labels, to continue an interrupted run. "
+    "Omit it after re-bucketing the annotations, or the old labels are kept.",
+)
+def CMD_quality_join_annotations(registry_path: Path, work_dir: Path, only: tuple[str, ...], resume: bool) -> None:
+    """Attaches the bucketed annotations to each dataset's sidecar and reports coverage.
+
+    Run `bucket-annotations` first. Read the reported coverage before trusting a
+    selection: on a partly downloaded split most documents may carry no label at all.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Skip parts that already carry labels.
+    """
+    reports = quality_pipeline.join_blend_annotations(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        resume=resume,
+    )
+    for report in reports:
+        print_rank_0(report.summary())
+
+
+@quality.command(name="verify-sidecar")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the sidecars.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--num_parts",
+    type=int,
+    default=8,
+    show_default=True,
+    help="Sidecar parts to sample per dataset.",
+)
+@click.option(
+    "--num_rows_per_part",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Documents to probe per sampled part. Rows at offset 0 are skipped, since the first "
+    "document of any JSONL file parses and so proves nothing.",
+)
+@click.option(
+    "--adopt",
+    is_flag=True,
+    default=False,
+    help="Write a source file manifest for verified sidecars that lack one, so later stages can "
+    "detect drift cheaply. Only sidecars that pass verification are stamped.",
+)
+def CMD_quality_verify_sidecar(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_parts: int,
+    num_rows_per_part: int,
+    adopt: bool,
+) -> None:
+    """Checks that the sidecars' byte offsets still describe the current source files.
+
+    Run this after any data transfer, and before apply on a blend whose source tree may
+    have been touched. A corpus that was re-sharded after its sidecar was built yields a
+    blend of wrong byte ranges, and this is the only check that reads the source bytes.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory holding the sidecars.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        num_parts (int): Sidecar parts to sample per dataset.
+        num_rows_per_part (int): Documents to probe per sampled part.
+        adopt (bool): Stamp a manifest onto verified sidecars that lack one.
+    """
+    reports = quality_pipeline.verify_sidecars(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_parts=num_parts,
+        n_rows_per_part=num_rows_per_part,
+        adopt=adopt,
+    )
+    print_rank_0(format_verify_report(reports))
+    if any(not r.ok for r in reports):
+        raise SystemExit(1)
+
+
+@quality.command(name="build-cube")
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory for the blend's intermediates.")
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--num_score_bins",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Quantile bins per native metric. A threshold on a bin edge stays exact.",
+)
+@click.option(
+    "--label_dimension",
+    "label_dimensions",
+    multiple=True,
+    help="Annotation column to group on, repeatable. Defaults to the seven ordinal fields; "
+    "name a field here if a selection thresholds on it, or the preview must scan the sidecar. "
+    "Each added field multiplies the cell count by its number of levels.",
+)
+def CMD_quality_build_cube(
+    registry_path: Path,
+    work_dir: Path,
+    only: tuple[str, ...],
+    num_score_bins: int,
+    label_dimensions: tuple[str, ...],
+) -> None:
+    """Aggregates the sidecars so a selection can be costed without reading them again.
+
+    Args:
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory for the blend's intermediates.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        num_score_bins (int): Quantile bins per native metric.
+        label_dimensions (tuple[str, ...]): Annotation columns to group on.
+    """
+    quality_pipeline.build_cubes(
+        registry=CorpusRegistry.from_yaml(registry_path),
+        work_dir=work_dir,
+        only=list(only) or None,
+        n_score_bins=num_score_bins,
+        label_dimensions=list(label_dimensions) or None,
+    )
+
+
+@quality.command(name="preview")
+@click.option(
+    "--selection",
+    "selection_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the selection YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the cubes and sidecars.")
+@click.option(
+    "--exact",
+    is_flag=True,
+    default=False,
+    help="Scan the per-document sidecars instead of the cubes. Slower, but exact for any threshold.",
+)
+@click.option(
+    "--allow_fallback",
+    is_flag=True,
+    default=False,
+    help="Let a dataset whose cube cannot answer a predicate be scanned from its sidecar. "
+    "That reads every document, so it costs minutes to hours rather than seconds.",
+)
+@click.option(
+    "--explain",
+    is_flag=True,
+    default=False,
+    help="Attribute each dataset's retention to its individual predicates, and show how they "
+    "overlap. Answers which condition binds and which is redundant.",
+)
+def CMD_quality_preview(
+    selection_path: Path, work_dir: Path, exact: bool, allow_fallback: bool, explain: bool
+) -> None:
+    """Reports how many documents and tokens a selection yields, per dataset and in total.
+
+    Args:
+        selection_path (Path): Path to the selection YAML.
+        work_dir (Path): Working directory holding the cubes and sidecars.
+        exact (bool): Scan the sidecars instead of the cubes.
+        allow_fallback (bool): Permit per-dataset sidecar scans where a cube falls short.
+        explain (bool): Attribute retention to individual predicates.
+    """
+    _, report = quality_pipeline.preview_selection(
+        selection_path=selection_path,
+        work_dir=work_dir,
+        force_exact=exact,
+        allow_sidecar_fallback=allow_fallback,
+        explain=explain,
+    )
+    print_rank_0(report)
+
+
+@quality.command(name="apply")
+@click.option(
+    "--selection",
+    "selection_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the selection YAML.",
+)
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--work_dir", type=Path, required=True, help="Working directory holding the sidecars.")
+@click.option(
+    "--output_dir", type=Path, required=True, help="Directory receiving the filtered index files and the mix manifest."
+)
+@click.option(
+    "--allow_overexposure",
+    is_flag=True,
+    default=False,
+    help="Materialise even when the run would repeat data past a declared cap. Off by default: "
+    "ratios are per pass, so a run that wraps multiplies every one of them.",
+)
+def CMD_quality_apply(
+    selection_path: Path,
+    registry_path: Path,
+    work_dir: Path,
+    output_dir: Path,
+    allow_overexposure: bool,
+) -> None:
+    """Writes a selection out as filtered index files plus a manifest.
+
+    The source data is not copied or modified. Point `pack_encoded_data` at a written
+    index to tokenize only the selected documents.
+
+    Args:
+        selection_path (Path): Path to the selection YAML.
+        registry_path (Path): Path to the corpus registry YAML.
+        work_dir (Path): Working directory holding the sidecars.
+        output_dir (Path): Directory receiving the index files and manifest.
+    """
+    manifest_path = quality_pipeline.apply_selection(
+        allow_overexposure=allow_overexposure,
+        selection_path=selection_path,
+        registry_path=registry_path,
+        work_dir=work_dir,
+        output_dir=output_dir,
+    )
+    print_rank_0(f"Manifest written to {manifest_path}")
+
+
+@quality.command(name="export-jsonl")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the mix_manifest.yaml written by 'apply'.",
+)
+@click.option(
+    "--registry",
+    "registry_path",
+    type=click_pathlib.Path(exists=True),
+    required=True,
+    help="Path to the corpus registry YAML.",
+)
+@click.option("--output_dir", type=Path, required=True, help="Directory receiving one subdirectory per dataset.")
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    help="Overrides the seed the selection was applied with, which decides which documents "
+    "receive the extra copy of a fractional repeat factor.",
+)
+@click.option("--only", multiple=True, help="Restrict to these dataset names (repeatable).")
+@click.option(
+    "--resume/--no_resume",
+    default=True,
+    help="Leave shards that are already complete alone (default: resume).",
+)
+@click.option(
+    "--finalize/--no_finalize",
+    default=True,
+    help="Merge the per-dataset records into export_manifest.yaml. Pass --no_finalize in an "
+    "array task, then run 'export-jsonl --finalize_only' once the array has finished.",
+)
+@click.option(
+    "--finalize_only",
+    is_flag=True,
+    help="Write export_manifest.yaml from the per-dataset records already on disk, exporting nothing.",
+)
+@click.option("--shard_id", type=int, default=0, show_default=True, help="This task's index in [0, num_shards).")
+@click.option(
+    "--num_shards",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Split each dataset's source files across this many tasks. One task per dataset is fine "
+    "until one dataset holds far more files than the rest.",
+)
+def CMD_quality_export_jsonl(
+    manifest_path: Path,
+    registry_path: Path,
+    output_dir: Path,
+    seed: Optional[int],
+    only: tuple[str, ...],
+    resume: bool,
+    finalize: bool,
+    finalize_only: bool,
+    shard_id: int,
+    num_shards: int,
+) -> None:
+    """Writes the selected documents out as JSONL, with the sampling baked into the bytes.
+
+    Up- and downsampling is materialised here: a dataset at 3.0 has each of its documents
+    written three times, and one at 0.6 loses two of every five. The training set is the
+    concatenation of the resulting files, so their ratios must not be applied again.
+
+    Args:
+        manifest_path (Path): Path to the mix manifest.
+        registry_path (Path): Path to the corpus registry YAML.
+        output_dir (Path): Directory receiving the exported JSONL.
+        seed (Optional[int]): Overrides the selection's seed.
+        only (tuple[str, ...]): Restrict to these dataset names.
+        resume (bool): Leave complete shards alone.
+        finalize (bool): Merge the per-dataset records afterwards.
+        finalize_only (bool): Only merge the records; export nothing.
+        shard_id (int): This task's index.
+        num_shards (int): Tasks splitting each dataset's files.
+    """
+    if finalize_only:
+        print_rank_0(f"Export manifest written to {quality_export.finalize_export(output_dir)}")
+        return
+
+    exports = quality_pipeline.export_jsonl(
+        manifest_path=manifest_path,
+        registry_path=registry_path,
+        output_dir=output_dir,
+        seed=seed,
+        only=list(only) or None,
+        resume=resume,
+        finalize=finalize,
+        shard_id=shard_id,
+        num_shards=num_shards,
+    )
+    n_lines = sum(e.n_lines for e in exports)
+    n_bytes = sum(e.n_bytes for e in exports)
+    skipped = sum(1 for e in exports for s in e.shards if s.skipped)
+    print_rank_0(
+        f"Exported {len(exports)} dataset(s): {n_lines:,} lines, {n_bytes / 1e12:,.2f} TB"
+        + (f", {skipped:,} shard(s) already complete" if skipped else "")
     )
 
 

@@ -1,0 +1,46 @@
+# Selection for the end-to-end smoke test.
+#
+# Chosen to exercise the machinery rather than to be a sensible blend: an ordinal
+# predicate, a native-score threshold, a dataset with both, a dataset with neither, a
+# downsample, an upsample, and a fractional ratio. The fractional one matters -- a repeat
+# factor of 1.5 is what drives `WeightedCombinedDataset` through its partial-pass
+# permutation, which no test on real data has ever reached.
+
+missing_annotation: keep
+
+# Small, so the report shows an achievable target rather than a 600 % overshoot.
+target_tokens: 40_000_000
+
+datasets:
+  # Ordinal predicate only, and a fractional upsample.
+  - name: finewiki-de
+    ratio: 1.5
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+
+  # Ordinal plus native score, on the key kind that mixes wrapped and bare UUIDs.
+  - name: finepdfs-es
+    ratio: 1.0
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+
+  # Two ordinals, on the hash-keyed dataset.
+  - name: climbmix-en
+    ratio: 0.5
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: information_density, op: at_least, value: moderate}
+
+  # Ordinal plus the corpus's own proxy score, on the pointer-keyed dataset.
+  - name: klettermix-de
+    ratio: 2.0
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: proxy_score, op: gte, value: 0.65}
+
+  # No annotations at all: native metric only, unfiltered ratio.
+  - name: dolmino
+    ratio: 1.0
+    predicates:
+      - {field: len_cl100k_base, op: gte, value: 200}

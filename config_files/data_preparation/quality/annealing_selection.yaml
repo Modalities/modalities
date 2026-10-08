@@ -1,0 +1,145 @@
+# Example selection for the annealing blend.
+#
+# Each dataset states which documents to keep and how heavily to sample what survives.
+# `modalities quality preview` costs this in documents and tokens in seconds; nothing
+# is read or written until `modalities quality apply`.
+#
+# Predicates within a dataset are combined with AND. Ordinal levels come from the
+# declared scales in `selection.py`; note that `information_density` orders
+# `moderate` *below* `adequate`, which is easy to get backwards.
+
+# What to do with documents that carry no annotation. `keep` treats a propella
+# predicate as satisfied for them, which is the safe default while FinePDFs is only
+# partly downloaded -- `drop` there would silently discard two thirds of the corpus for
+# having no label rather than for failing the filter.
+missing_annotation: keep
+
+# What the training run will consume. It adjusts no ratio, but it is what makes the ratios
+# checkable: a ratio is per pass over the blend, so if the blend yields less than this the
+# loader wraps and every factor is multiplied by the number of passes.
+target_tokens: 400_000_000_000
+
+# Refuse to materialise if any dataset would be seen more often than this once wrapping is
+# counted. Set above the largest ratio below (3.0) so it does not fire on the intended
+# design, only on an accident -- a blend trimmed too far, or a ratio raised without
+# re-checking the yield. A dataset with an `upsampling` curve uses its own `max_factor`
+# instead, since that is already a declared cap. Pass --allow_overexposure to override.
+max_total_exposure: 4.0
+
+datasets:
+  # Web text carries the most junk, so it gets the strictest filter and is downsampled.
+  - name: hplt-de
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+      - {field: content_safety, op: at_least, value: mild_concerns}
+  - name: hplt-fr
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+      - {field: content_safety, op: at_least, value: mild_concerns}
+  - name: hplt-it
+    ratio: 0.8
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+  - name: hplt-es
+    ratio: 0.6
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+
+  # Already filtered upstream to a high-quality subset, so a light touch and a mild
+  # upsample.
+  #
+  # This is the natural place to try a quality-aware curve instead of the flat ratio: a
+  # single number repeats the barely-adequate documents exactly as often as the excellent
+  # ones. Replace `ratio` with the block below to make the repeat factor rise with quality.
+  # `preview` prints the resulting per-bucket factors, and `apply` then writes one index
+  # tree per bucket so each can carry its own factor into training.
+  #
+  #   upsampling:
+  #     quality_field: content_quality        # ordinal axis, worst to best
+  #     target_tokens: 900_000_000_000        # what this dataset should contribute
+  #     max_factor: 7.0                       # no bucket repeated more than this
+  #     discard_below_percentile: 40          # drop the weakest 40% of tokens
+  #
+  # Note that `ratio` and `upsampling` are mutually exclusive: the curve already determines how much
+  # is drawn, so setting both is refused rather than silently ignoring one.
+  - name: nemotron-cc
+    ratio: 1.2
+    predicates:
+      - {field: content_quality, op: at_least, value: adequate}
+      # `commercial_bias` is joined onto the sidecar but is not one of the seven fields
+      # the cube groups on by default, so thresholding it here would force the preview to
+      # read all 1.7 bn documents. To use it, rebuild this dataset's cube with
+      #   build-cube --only nemotron-cc --label_dimension commercial_bias ...
+      # naming the other seven too, since the flag replaces the default set.
+
+  - name: climbmix-en
+    ratio: 1.0
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: information_density, op: at_least, value: moderate}
+
+  # The German pool is small relative to the English one, so what survives is upsampled.
+  # Combines a propella predicate with the corpus's own proxy score.
+  - name: klettermix-de
+    ratio: 2.0
+    predicates:
+      - {field: educational_value, op: at_least, value: basic}
+      - {field: proxy_score, op: gte, value: 0.65}
+
+  # Reference text: keep all of it, upsample the smaller languages.
+  - name: finewiki-en
+    ratio: 1.0
+  - name: finewiki-de
+    ratio: 2.0
+  - name: finewiki-fr
+    ratio: 2.0
+  - name: finewiki-it
+    ratio: 3.0
+  - name: finewiki-es
+    ratio: 3.0
+
+  # Only 10-34% annotated. `missing_annotation: keep` above means the propella
+  # predicate applies to the annotated minority and the rest passes on the native
+  # score alone -- deliberate, and worth revisiting once the fetch is finished.
+  - name: finepdfs-en
+    ratio: 1.0
+    predicates:
+      - {field: fw_edu, op: gte, value: 2.0}
+      - {field: content_integrity, op: at_least, value: mostly_complete}
+  - name: finepdfs-de
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+  - name: finepdfs-fr
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+  - name: finepdfs-es
+    ratio: 1.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 1.5}
+
+  # No propella corpus exists for these, so they are shaped by native metrics only.
+  - name: finephrase
+    ratio: 0.5
+    predicates:
+      - {field: fw_edu, op: gte, value: 2.5}
+      - {field: language_score, op: gte, value: 0.9}
+  - name: dolmino
+    ratio: 1.0
+    predicates:
+      # `dclm_plus2` only exists in the stem-heavy-crawl subdirectory -- it was null in
+      # every one of 400 sampled sidecar parts -- so it is dropped from the cube and
+      # cannot be thresholded. Length is the signal that is actually present here.
+      - {field: len_cl100k_base, op: gte, value: 200}
+
+  # Declared but excluded, so the reason is recorded rather than implied by absence.
+  - name: nemotron-cc-v2
+    ratio: 1.0
+    enabled: false

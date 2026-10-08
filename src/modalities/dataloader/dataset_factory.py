@@ -12,6 +12,7 @@ from modalities.dataloader.dataset import (
     MemMapDataset,
     PackedMemMapDatasetContinuous,
     PackedMemMapDatasetMegatron,
+    WeightedCombinedDataset,
 )
 
 
@@ -126,3 +127,19 @@ class DatasetFactory:
             Dataset: CombinedDataset object.
         """
         return CombinedDataset(datasets=datasets)
+
+    @staticmethod
+    def get_weighted_combined_dataset(datasets: list[Dataset], repeat_factors: list[float], seed: int = 42) -> Dataset:
+        """Factory method for creating a combined dataset with per-dataset epoch counts.
+
+        Args:
+            datasets (list[Dataset]): List of datasets to combine.
+            repeat_factors (list[float]): How many times each dataset is drawn per
+                epoch. Fractional values are supported, so a dataset can contribute a
+                partial pass without being duplicated on disk.
+            seed (int): Seed for selecting the documents of a partial pass.
+
+        Returns:
+            Dataset: WeightedCombinedDataset object.
+        """
+        return WeightedCombinedDataset(datasets=datasets, repeat_factors=repeat_factors, seed=seed)
