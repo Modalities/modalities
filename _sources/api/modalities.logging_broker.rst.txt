@@ -1,0 +1,53 @@
+modalities.logging\_broker package
+==================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   modalities.logging_broker.subscriber_impl
+
+Submodules
+----------
+
+modalities.logging\_broker.message\_broker module
+-------------------------------------------------
+
+.. automodule:: modalities.logging_broker.message_broker
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.logging\_broker.messages module
+------------------------------------------
+
+.. automodule:: modalities.logging_broker.messages
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.logging\_broker.publisher module
+-------------------------------------------
+
+.. automodule:: modalities.logging_broker.publisher
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.logging\_broker.subscriber module
+--------------------------------------------
+
+.. automodule:: modalities.logging_broker.subscriber
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.logging_broker
+   :members:
+   :show-inheritance:
+   :undoc-members:

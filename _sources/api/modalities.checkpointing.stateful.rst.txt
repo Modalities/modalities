@@ -1,0 +1,29 @@
+modalities.checkpointing.stateful package
+=========================================
+
+Submodules
+----------
+
+modalities.checkpointing.stateful.app\_state module
+---------------------------------------------------
+
+.. automodule:: modalities.checkpointing.stateful.app_state
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+modalities.checkpointing.stateful.app\_state\_factory module
+------------------------------------------------------------
+
+.. automodule:: modalities.checkpointing.stateful.app_state_factory
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: modalities.checkpointing.stateful
+   :members:
+   :show-inheritance:
+   :undoc-members:
