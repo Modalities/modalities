@@ -223,6 +223,18 @@ class PackedDatasetComponentsInstantiationModel(BaseModel):
     settings: PackedDatasetSettings
 
 
+class TokenizerInstantiationModel(BaseModel):
+    """Builds only the tokenizer of a config.
+
+    Lets a tool reuse a packing config for its tokenizer without also having to satisfy
+    that config's settings, which name a specific source file the tool has no interest
+    in. Building from the packing config is what guarantees the same tokenizer is used
+    for measuring token estimates and for the packing those estimates predict.
+    """
+
+    tokenizer: PydanticTokenizerIFType
+
+
 class TextGenerationInstantiationModel(BaseModel):
     class TextGenerationSettings(BaseModel):
         model_path: FilePath

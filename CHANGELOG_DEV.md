@@ -218,3 +218,16 @@ This PR improves training monitoring and logging across runs besides some other 
 
 **Breaking Changes**
 * experiments_root_path is now exposed on an API level
+
+## PR #XXX Torch-free dataloader utilities for CPU-only tooling
+
+**`TokenizerInstantiationModel`.** Lets a tool reuse a packing config for its tokenizer without
+also having to satisfy that config's settings, which name a specific source file the tool has no
+interest in.
+
+**`get_logger` no longer requires torch.** The `import torch` in `utils/logger_utils.py` is only
+there for the rank prefix, but it is the reason `dataloader/create_index.py` -- and therefore
+`IndexGenerator` -- could not be imported without torch. Since modalities declares torch in its
+`cpu`/`cu12x` extras rather than as a base dependency, that made CPU-only data-preprocessing
+tooling install a multi-gigabyte wheel it never called. The import is now guarded and the rank
+prefix is simply omitted when torch is absent; behaviour with torch installed is unchanged.
