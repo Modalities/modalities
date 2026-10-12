@@ -76,6 +76,8 @@ class ActivationCheckpointing:
         "ops.aten._scaled_dot_product_efficient_attention.default": ops.aten._scaled_dot_product_efficient_attention.default,  # noqa
         "ops.aten._scaled_dot_product_flash_attention.default": ops.aten._scaled_dot_product_flash_attention.default,
         "ops._c10d_functional.reduce_scatter_tensor.default": ops._c10d_functional.reduce_scatter_tensor.default,
+        "ops._c10d_functional.all_to_all_single.default": ops._c10d_functional.all_to_all_single.default,
+        "ops.aten._grouped_mm.default": ops.aten._grouped_mm.default,
         # for low precision training, it's useful to always save
         # the result of max, since the absolute maximum is
         # used to compute the scaling factor for quantization.

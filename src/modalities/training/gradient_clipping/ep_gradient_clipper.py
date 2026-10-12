@@ -16,7 +16,13 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper import FSDP2Gra
 
 
 class EPGradientClipper(FSDP2GradientClipper):
-    """FSDP2 clipper wrapper that handles EP DTensor gradients safely."""
+    """FSDP2 gradient clipper for models whose parameters live on different device meshes.
+
+    With expert parallelism, the dense parameters are DTensors on the data parallel mesh, while the expert
+    parameters are DTensors on the (expert FSDP x EP) mesh. Foreach ops cannot mix DTensors of different
+    meshes, so the gradients are grouped by mesh (as in TorchTitan's EP-aware clip_grad_norm_).
+    The norm of each group is reduced with a single collective, and the group norms are combined locally.
+    """
 
     def __init__(
         self,
@@ -38,52 +44,49 @@ class EPGradientClipper(FSDP2GradientClipper):
 
     @torch.no_grad()
     def clip_gradients(self) -> torch.Tensor:
-        grads = [p.grad for model in self.models for p in model.parameters() if p.grad is not None]
+        params_by_mesh: dict[Optional[DeviceMesh], list[torch.nn.Parameter]] = {}
+        for model in self.models:
+            for p in model.parameters():
+                if p.grad is None:
+                    continue
+                mesh = p.grad.device_mesh if isinstance(p.grad, DTensor) else None
+                params_by_mesh.setdefault(mesh, []).append(p)
 
-        if len(grads) == 0:
-            device = (
-                torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else torch.device("cpu")
+        norm_type = self.norm_type.value
+        group_norms: list[torch.Tensor] = []
+        for params in params_by_mesh.values():
+            group_norm = torch.nn.utils.get_total_norm(
+                tensors=[p.grad for p in params], norm_type=norm_type, foreach=self.foreach
             )
+            if isinstance(group_norm, DTensor):
+                # one collective per mesh (reduces the partial norm over all shards)
+                group_norm = group_norm.full_tensor()
+            group_norms.append(group_norm)
+
+        if len(group_norms) == 0:
+            device = torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else "cpu"
             total_norm = torch.tensor(0.0, device=device)
+        elif math.isinf(norm_type):
+            total_norm = torch.max(torch.stack(group_norms))
         else:
-            norm_type_val = self.norm_type.value
-            first_grad = grads[0]
-            first_device = first_grad.to_local().device if isinstance(first_grad, DTensor) else first_grad.device
-            norm_scalars: list[torch.Tensor] = []
-
-            for grad in grads:
-                grad_norm = torch.linalg.vector_norm(grad, ord=norm_type_val)
-                if isinstance(grad_norm, DTensor):
-                    grad_norm = grad_norm.full_tensor()
-                norm_scalars.append(grad_norm.to(first_device))
-
-            if math.isinf(norm_type_val):
-                total_norm = torch.max(torch.stack(norm_scalars))
-            else:
-                total_norm = torch.linalg.vector_norm(torch.stack(norm_scalars), ord=norm_type_val)
-
-            if self.error_if_nonfinite and (torch.isnan(total_norm) or torch.isinf(total_norm)):
-                raise RuntimeError(
-                    f"The total norm of order {norm_type_val} for gradients is non-finite: {total_norm.item()}"
-                )
+            total_norm = torch.linalg.vector_norm(torch.stack(group_norms), ord=norm_type)
 
         if has_parallelism_method(self.device_mesh, ParallelismDegrees.PP):
             pp_mesh = get_mesh_for_parallelism_method(
                 device_mesh=self.device_mesh, parallelism_method=ParallelismDegrees.PP
             )
-            if math.isinf(self.norm_type.value):
+            if math.isinf(norm_type):
                 dist.all_reduce(total_norm, op=dist.ReduceOp.MAX, group=pp_mesh.get_group())
             else:
-                total_norm **= self.norm_type.value
+                total_norm **= norm_type
                 dist.all_reduce(total_norm, op=dist.ReduceOp.SUM, group=pp_mesh.get_group())
-                total_norm **= 1.0 / self.norm_type.value
+                total_norm **= 1.0 / norm_type
 
-        # do not use torch.nn.utils.clip_grads_with_norm_ here: it batches grads with
-        # torch._foreach_mul_, which fails when the list mixes DTensors from different meshes.
-        clip_coef = self.max_norm / (total_norm + 1e-6)
-        clip_coef_clamped = torch.clamp(clip_coef, max=1.0)
+        if self.error_if_nonfinite and not torch.isfinite(total_norm):
+            raise RuntimeError(f"The total norm of order {norm_type} for gradients is non-finite: {total_norm.item()}")
 
-        for grad in grads:
-            grad_device = grad.to_local().device if isinstance(grad, DTensor) else grad.device
-            grad.mul_(clip_coef_clamped.to(grad_device))
+        for params in params_by_mesh.values():
+            torch.nn.utils.clip_grads_with_norm_(
+                parameters=params, max_norm=self.max_norm, total_norm=total_norm, foreach=self.foreach
+            )
         return total_norm

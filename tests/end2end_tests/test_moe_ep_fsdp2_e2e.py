@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 import torch
+import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch.distributed.tensor import DTensor
 
 from modalities.__main__ import Main, load_app_config_dict
 from modalities.batch import EvaluationResultBatch
@@ -46,6 +48,20 @@ class TestMoEEPFSDP2E2E:
         config_dict["train_dataloader"]["config"]["pin_memory"] = False
         config_dict["test_dataloader"]["config"]["pin_memory"] = False
 
+        # tiny model, independent of the model size in the training config
+        config_dict["model_raw"]["config"].update(
+            d_model=128,
+            n_heads=8,
+            n_kv_heads=4,
+            num_layers=2,
+            d_ff=128,
+            moe_num_experts=8,
+            moe_top_k=2,
+            moe_d_ff=128,
+        )
+
+        # the training config disables checkpointing (k: 0); this test checks saving with the tiny model
+        config_dict["checkpoint_saving"]["config"]["checkpoint_saving_strategy"]["config"]["k"] = -1
         config_dict["settings"]["paths"]["checkpoint_saving_path"] = checkpoint_root_path
         config_dict["checkpoint_saving"]["config"]["checkpoint_saving_execution"]["config"][
             "checkpoint_path"
@@ -117,6 +133,16 @@ class TestMoEEPFSDP2E2E:
         for message in result_messages:
             loss_value = message.payload.losses["train loss avg"].value
             assert torch.isfinite(loss_value), f"Found non-finite train loss: {loss_value}"
+
+        # Every rank must hold identical (unsharded) dense and expert weights after training.
+        # This fails if gradients of some parameters are not synchronized across all data parallel ranks.
+        world_size = dist.get_world_size()
+        for name, param in components.model_raw.named_parameters():
+            full = param.detach().full_tensor() if isinstance(param, DTensor) else param.detach()
+            gathered = [torch.empty_like(full) for _ in range(world_size)]
+            dist.all_gather(gathered, full.contiguous())
+            for other in gathered[1:]:
+                torch.testing.assert_close(other, gathered[0], msg=f"{name} differs across ranks")
 
         if process_id == 0:
             checkpoint_info_file_path = checkpoint_root_path / "last_checkpoint_info.json"

@@ -9,57 +9,31 @@ from torch.distributed._functional_collectives import all_to_all_single, all_to_
 from torch.distributed.tensor import DeviceMesh, Shard, distribute_module, distribute_tensor
 
 
-def _permute_tokens(
-    x: Tensor,
-    num_tokens_per_expert_group: Tensor,
-    ep_degree: int,
-    num_local_experts: int,
-) -> tuple[tuple, Tensor, Tensor, Tensor]:
+def expert_major_permutation(counts: Tensor, num_sources: int, num_local_experts: int, num_rows: int) -> Tensor:
     """
-    Reorder tokens from the post-all-to-all layout to per-local-expert contiguous layout.
+    Computes, without any host synchronization, the gather index that reorders rows from the
+    source-major layout produced by the all-to-all
+      [src0: e0 | e1 | ... , src1: e0 | e1 | ..., ...]
+    into the expert-major layout expected by the experts
+      [e0: src0 | src1 | ..., e1: src0 | src1 | ..., ...].
 
-    After the all-to-all, received tokens are ordered as:
-      [e0_from_rank0 tokens, e1_from_rank0 tokens, ..., e0_from_rank1 tokens, ...]
+    Args:
+        counts (Tensor): Number of rows per (source, local expert), flattened source-major.
+        num_sources (int): Number of sources (EP degree).
+        num_local_experts (int): Number of experts on this rank.
+        num_rows (int): Total number of rows, i.e. counts.sum(). Must be known on the host.
 
-    We reorder to:
-      [all tokens for local_expert_0, all tokens for local_expert_1, ...]
-
-    Returns (original_shape, x_permuted, permuted_indices, new_num_tokens_per_expert).
+    Returns:
+        Tensor: Index such that x[index] is in expert-major order.
     """
-    counts = num_tokens_per_expert_group.view(ep_degree, num_local_experts)  # (ep_degree, num_local_experts)
-
-    flat_counts = counts.flatten()  # length = ep_degree * num_local_experts
-
-    offsets = flat_counts.cumsum(0) - flat_counts
-
-    # build permuted_indices
-    indices_per_expert: list[Tensor] = []
-    for e in range(num_local_experts):
-        for r in range(ep_degree):
-            count = int(counts[r, e].item())
-            if count > 0:
-                start = int(offsets[r * num_local_experts + e].item())
-                indices_per_expert.append(torch.arange(start, start + count, device=x.device, dtype=torch.long))
-
-    if indices_per_expert:
-        permuted_indices = torch.cat(indices_per_expert)
-    else:
-        permuted_indices = torch.zeros(0, dtype=torch.long, device=x.device)
-
-    new_num_tokens_per_expert = counts.sum(dim=0)  # (num_local_experts,)
-    original_shape = x.shape
-    x_permuted = x[permuted_indices] if permuted_indices.numel() > 0 else x.new_zeros((0, x.shape[-1]))
-    return original_shape, x_permuted, permuted_indices, new_num_tokens_per_expert
-
-
-def _unpermute_tokens(out: Tensor, original_shape: tuple, permuted_indices: Tensor) -> Tensor:
-    """
-    Inverse of _permute_tokens: scatter expert outputs back to the all-to-all layout.
-    """
-    out_unpermuted = out.new_zeros(original_shape)
-    if permuted_indices.numel() > 0:
-        out_unpermuted[permuted_indices] = out
-    return out_unpermuted
+    counts = counts.view(num_sources, num_local_experts)
+    flat_counts = counts.reshape(-1)
+    src_start = (torch.cumsum(flat_counts, dim=0) - flat_counts).view(num_sources, num_local_experts)
+    seg_counts = counts.t().reshape(-1)
+    seg_src_start = src_start.t().reshape(-1)
+    seg_dst_start = torch.cumsum(seg_counts, dim=0) - seg_counts
+    shift = torch.repeat_interleave(seg_src_start - seg_dst_start, seg_counts, output_size=num_rows)
+    return shift + torch.arange(num_rows, device=counts.device, dtype=shift.dtype)
 
 
 class ExpertParallel:
@@ -69,15 +43,20 @@ class ExpertParallel:
     Shards GroupedExperts parameters on the expert dimension (Shard(0)) across EP ranks,
     and wraps forward() with all-to-all token dispatch/combine collectives.
 
+    The only host synchronization per forward is a single device-to-host copy of the
+    (ep_degree x num_local_experts) token count matrix, which is required to issue the
+    variable-sized token all-to-all. All index computations stay on the device.
+
     Usage:
         module.experts = ExpertParallel()._apply(module.experts, ep_mesh)
     """
 
     def __init__(self) -> None:
+        # Per-call state, written in _token_dispatch and consumed in _token_combine of the same forward call.
         self.input_splits: list[int] | None = None
         self.output_splits: list[int] | None = None
-        self.original_shape: tuple | None = None
         self.permuted_indices: Tensor | None = None
+        self.num_dropped_rows: int = 0
 
     def _partition_fn(self, name: str, mod: nn.Module, device_mesh: DeviceMesh) -> None:
         for param_name, param in mod.named_parameters(recurse=False):
@@ -86,47 +65,60 @@ class ExpertParallel:
                 nn.Parameter(distribute_tensor(param, device_mesh, [Shard(0)])),
             )
 
-    def _token_dispatch(self, mod: nn.Module, inputs: tuple, device_mesh: DeviceMesh) -> tuple[Tensor, Tensor]:
-        routed_input, num_tokens_per_expert = inputs
+    def _token_dispatch(self, mod: nn.Module, inputs: tuple, device_mesh: DeviceMesh) -> tuple:
+        routed_input, num_tokens_per_expert = inputs[0], inputs[1]
         ep_degree = device_mesh.shape[0]
         num_local_experts = num_tokens_per_expert.shape[0] // ep_degree
+        group = device_mesh.get_group()
 
         with torch.no_grad():
-            num_tokens_per_expert_group = all_to_all_single(
-                num_tokens_per_expert, None, None, group=device_mesh.get_group()
-            )
-
+            num_tokens_per_expert_group = all_to_all_single(num_tokens_per_expert, None, None, group=group)
             num_tokens_per_expert_group = torch.ops._c10d_functional.wait_tensor(num_tokens_per_expert_group)
-            input_splits = (
-                num_tokens_per_expert.view(ep_degree, -1).sum(dim=1).to(torch.device("cpu"), non_blocking=True)
+            # The single host synchronization of this layer: both count matrices in one copy.
+            counts_cpu = (
+                torch.stack([num_tokens_per_expert, num_tokens_per_expert_group])
+                .to("cpu")
+                .view(2, ep_degree, num_local_experts)
             )
+            self.input_splits = counts_cpu[0].sum(dim=1).tolist()
+            self.output_splits = counts_cpu[1].sum(dim=1).tolist()
+            num_tokens_per_local_expert_cpu = counts_cpu[1].sum(dim=0).tolist()
 
-            output_splits = (
-                num_tokens_per_expert_group.view(ep_degree, -1).sum(dim=1).to(torch.device("cpu"), non_blocking=False)
-            )
-            self.input_splits = input_splits.tolist()
-            self.output_splits = output_splits.tolist()
+        # Rows beyond sum(input_splits) are tokens dropped by a capacity limit; they are not dispatched.
+        num_valid_rows = sum(self.input_splits)
+        self.num_dropped_rows = routed_input.shape[0] - num_valid_rows
+        if self.num_dropped_rows > 0:
+            routed_input = routed_input[:num_valid_rows]
 
-        routed_input = all_to_all_single_autograd(
-            routed_input,
-            self.output_splits,
-            self.input_splits,
-            device_mesh.get_group(),
-        )
+        routed_input = all_to_all_single_autograd(routed_input, self.output_splits, self.input_splits, group)
 
-        self.original_shape, routed_input, self.permuted_indices, num_tokens_per_expert_group = _permute_tokens(
-            routed_input, num_tokens_per_expert_group, ep_degree, num_local_experts
-        )
-        return routed_input, num_tokens_per_expert_group
+        num_received_rows = sum(self.output_splits)
+        if num_local_experts > 1:
+            with torch.no_grad():
+                self.permuted_indices = expert_major_permutation(
+                    num_tokens_per_expert_group, ep_degree, num_local_experts, num_received_rows
+                )
+            routed_input = routed_input.index_select(0, self.permuted_indices)
+        else:
+            self.permuted_indices = None
+
+        num_tokens_per_local_expert = num_tokens_per_expert_group.view(ep_degree, num_local_experts).sum(dim=0)
+        return routed_input, num_tokens_per_local_expert, num_tokens_per_local_expert_cpu
 
     def _token_combine(self, mod: nn.Module, routed_output: Tensor, device_mesh: DeviceMesh) -> Tensor:
-        routed_output = _unpermute_tokens(routed_output, self.original_shape, self.permuted_indices)
+        if self.permuted_indices is not None:
+            routed_output = torch.index_copy(torch.empty_like(routed_output), 0, self.permuted_indices, routed_output)
         routed_output = all_to_all_single_autograd(
             routed_output,
             self.input_splits,
             self.output_splits,
             device_mesh.get_group(),
         )
+        if self.num_dropped_rows > 0:
+            routed_output = torch.cat(
+                [routed_output, routed_output.new_zeros(self.num_dropped_rows, routed_output.shape[-1])]
+            )
+        self.permuted_indices = None
         return routed_output
 
     def _apply(self, module: nn.Module, device_mesh: DeviceMesh) -> nn.Module:

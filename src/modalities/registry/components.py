@@ -36,7 +36,6 @@ from modalities.config.config import (
     DummyLRSchedulerConfig,
     DummyProgressSubscriberConfig,
     DummyResultSubscriberConfig,
-    EPAdamWConfig,
     EPWrappedModelConfig,
     EvaluationResultToDiscSubscriberConfig,
     FSDP1ActivationCheckpointedModelConfig,
@@ -54,6 +53,7 @@ from modalities.config.config import (
     LLMDataLoaderConfig,
     MemMapDatasetConfig,
     MoECrossEntropyLossConfig,
+    MoEMFUCalculatorConfig,
     OneCycleLRSchedulerConfig,
     PackedMemMapDatasetContinuousConfig,
     PackedMemMapDatasetMegatronConfig,
@@ -113,7 +113,6 @@ from modalities.nn.model_initialization.composed_initialization import (
     ComposedInitializationRoutines,
     ComposedModelInitializationConfig,
 )
-from modalities.optimizers.ep_adamw import get_ep_adam_w
 from modalities.optimizers.lr_schedulers import DummyLRScheduler, LRSchedulerFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
 from modalities.optimizers.optimizer_list import OptimizersList
@@ -136,7 +135,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper_config import (
 from modalities.utils.debug_components import Debugging, HookRegistration
 from modalities.utils.debugging_configs import DebuggingConfig, NaNHookConfig, PrintForwardHookConfig
 from modalities.utils.maybe_list_parameter import MaybeListDecorator, maybe_list_parameter
-from modalities.utils.mfu import GPT2MFUCalculator
+from modalities.utils.mfu import GPT2MFUCalculator, MoEMFUCalculator
 from modalities.utils.number_conversion import (
     LocalNumBatchesFromNumSamplesConfig,
     LocalNumBatchesFromNumTokensConfig,
@@ -266,7 +265,6 @@ COMPONENTS = [
     ComponentEntity(
         "optimizer", "adam_w", maybe_model_list_for_optimizer(OptimizerFactory.get_adam_w), AdamWOptimizerConfig
     ),
-    ComponentEntity("optimizer", "ep_adam_w", maybe_model_list_for_optimizer(get_ep_adam_w), EPAdamWConfig),
     ComponentEntity(
         "optimizer",
         "fsdp1_checkpointed",
@@ -418,6 +416,7 @@ COMPONENTS = [
     ),
     # MFU calculators
     ComponentEntity("mfu_calculator", "gpt2", GPT2MFUCalculator, GPT2MFUCalculatorConfig),
+    ComponentEntity("mfu_calculator", "moe", MoEMFUCalculator, MoEMFUCalculatorConfig),
     # Number conversion
     ComponentEntity(
         "number_conversion",

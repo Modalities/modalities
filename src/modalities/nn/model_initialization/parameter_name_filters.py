@@ -13,6 +13,7 @@ class WeightInitTypes(Enum):
 class SupportWeightInitModels(Enum):
     GPT2 = "gpt2"
     COCA = "coca"
+    QWEN_MOE = "qwen_moe"
 
 
 class RegexFilter(BaseModel):
@@ -73,5 +74,31 @@ NAMED_PARAMETER_INIT_GROUPS = {
         ),
         WeightInitTypes.SCALED: RegexFilter(weights=[], biases=[]),
         WeightInitTypes.SCALED_EMBED: RegexFilter(weights=[], biases=[]),
+    },
+    # MoE model (modalities.models.moe.qwen_model.QwenModel). The optional
+    # "_checkpoint_wrapped_module." infix appears when activation checkpointing is applied before initialization.
+    SupportWeightInitModels.QWEN_MOE: {
+        WeightInitTypes.PLAIN: RegexFilter(
+            weights=[
+                r"layers\.\d+\.(_checkpoint_wrapped_module\.)?attn\.(q_proj|k_proj|v_proj|o_proj)\.weight",
+                r"layers\.\d+\.(_checkpoint_wrapped_module\.)?ffn\.router\.weight",
+                r"layers\.\d+\.(_checkpoint_wrapped_module\.)?ffn\.experts\.(w1|w2|w3)",
+                r"token_emb\.weight",
+                r"lm_head\.weight",
+            ],
+        ),
+        # scaled: output projections of the attention and of the experts
+        WeightInitTypes.SCALED: RegexFilter(
+            weights=[
+                r"layers\.\d+\.(_checkpoint_wrapped_module\.)?attn\.o_proj\.weight",
+                r"layers\.\d+\.(_checkpoint_wrapped_module\.)?ffn\.experts\.w3",
+            ]
+        ),
+        WeightInitTypes.SCALED_EMBED: RegexFilter(
+            weights=[
+                r"token_emb\.weight",
+                r"lm_head\.weight",
+            ]
+        ),
     },
 }
