@@ -21,11 +21,8 @@ from modalities.config.instantiation_models import TrainingComponentsInstantiati
 from modalities.config.pydantic_if_types import PydanticLLMDataLoaderIFType
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.logging_broker.messages import Message
-from tests.end2end_tests.custom_components import (
-    MultiProcessingCudaEnv,
-    SaveAllResultSubscriber,
-    SaveAllResultSubscriberConfig,
-)
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
+from tests.end2end_tests.custom_components import SaveAllResultSubscriber, SaveAllResultSubscriberConfig
 from tests.utility import monitor_child_processes
 
 working_dir = Path(os.path.dirname(__file__))

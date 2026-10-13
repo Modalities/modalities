@@ -20,10 +20,10 @@ from modalities.config.config import ProcessGroupBackendType
 from modalities.models.gpt2.gpt2_model import GPT2LLM, GPT2LLMConfig
 from modalities.models.model_factory import ModelFactory
 from modalities.optimizers.optimizer_factory import OptimizerFactory
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.env_utils import MixedPrecisionSettings
 from modalities.training.training_progress import TrainingProgress
 from tests.checkpointing.checkpointing_test_utils import CheckpointingTestUtils
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 def get_gpt2_model(gpt2_model_config_dict: GPT2LLMConfig) -> GPT2LLM:

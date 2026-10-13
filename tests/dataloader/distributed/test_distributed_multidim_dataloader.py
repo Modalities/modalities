@@ -8,12 +8,13 @@ from modalities.config.config import ProcessGroupBackendType
 from modalities.dataloader.dataloader import LLMDataLoader
 from modalities.dataloader.dataloader_factory import DataloaderFactory
 from modalities.dataloader.sampler_factory import SamplerFactory
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_device_mesh, get_mesh_for_parallelism_method
+from modalities.utils.ports import find_free_port
 from tests.dataloader.distributed.mocks import MultiProcessingCudaEnvMock
 from tests.dataloader.dummy_sequential_dataset import TestDataset
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 from tests.mocks import MockDeviceMesh
-from tests.utility import find_free_port, tensors_equal_across_mesh, tensors_pairwise_not_equal_across_mesh
+from tests.utility import tensors_equal_across_mesh, tensors_pairwise_not_equal_across_mesh
 
 
 @pytest.mark.parametrize("world_size, dp_degree", [(4, 2)])

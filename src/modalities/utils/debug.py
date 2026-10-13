@@ -97,4 +97,6 @@ def print_forward_hook(
     )
     if not print_shape_only:
         print(f">>> Input:\n{input}")
+        if hasattr(module, "weight"):
+            print(f">>> Weights:\n{module.weight}")
         print(f">>> Output:\n{output}")

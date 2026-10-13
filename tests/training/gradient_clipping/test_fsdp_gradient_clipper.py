@@ -15,7 +15,7 @@ from modalities.training.gradient_clipping.fsdp_gradient_clipper import (
     FSDP2LoggingOnlyGradientClipper,
     GradientClippingMode,
 )
-from tests.utility import find_free_port
+from modalities.utils.ports import find_free_port
 
 
 class MockFSDPModel:

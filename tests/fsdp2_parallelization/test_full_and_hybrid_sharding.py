@@ -11,8 +11,8 @@ from pydantic import BaseModel
 from modalities.__main__ import Main
 from modalities.config.config import ProcessGroupBackendType
 from modalities.config.pydantic_if_types import PydanticDeviceMeshIFType, PydanticFSDP2ModuleType
+from modalities.running_env.cuda_env import MultiProcessingCudaEnv
 from modalities.util import get_local_number_of_trainable_parameters, get_total_number_of_trainable_parameters
-from tests.end2end_tests.custom_components import MultiProcessingCudaEnv
 
 
 @pytest.fixture
