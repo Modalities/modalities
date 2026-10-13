@@ -70,6 +70,7 @@ from modalities.config.config import (
     TorchCheckpointLoadingConfig,
     WandBEvaluationResultSubscriberConfig,
     WeightInitializedModelConfig,
+    DownstreamEvaluatorConfig,
 )
 from modalities.dataloader.collate_fns.collator_fn_wrapper_for_loss_masking import (
     LossMaskingCollateFnWrapper,
@@ -85,6 +86,7 @@ from modalities.logging_broker.subscriber_impl.subscriber_factory import (
     ResultsSubscriberFactory,
 )
 from modalities.loss_functions import CLMCrossEntropyLoss
+from modalities.evaluator import DownstreamEvaluator
 from modalities.models.coca.coca_model import CoCa, CoCaConfig
 from modalities.models.coca.collator import CoCaCollateFnConfig, CoCaCollatorFn
 from modalities.models.components.layer_norms import (
@@ -539,4 +541,5 @@ COMPONENTS = [
         maybe_model_list(HookRegistration.register_print_forward_hooks),
         PrintForwardHookConfig,
     ),
+    ComponentEntity("downstream_evaluator", "default", DownstreamEvaluator, DownstreamEvaluatorConfig),
 ]

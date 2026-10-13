@@ -22,6 +22,7 @@ from modalities.config.pydantic_if_types import (
     PydanticSteppableProfilerIFType,
     PydanticTextInferenceComponentType,
     PydanticTokenizerIFType,
+    PydanticDownstreamEvaluatorType,
 )
 from modalities.config.utils import parse_torch_device
 from modalities.dataloader.dataset import Dataset
@@ -192,6 +193,7 @@ class TrainingComponentsInstantiationModel(BaseModel):
     mfu_calculator: PydanticMFUCalculatorABCType | None = None
     scheduled_pipeline: PydanticPipelineType | None = None
     device_mesh: PydanticDeviceMeshIFType | None = None
+    downstream_evaluator: Optional[PydanticDownstreamEvaluatorType] = None
     model_raw: PydanticPytorchModuleType
 
     @model_validator(mode="after")

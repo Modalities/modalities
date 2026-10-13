@@ -207,6 +207,7 @@ class Trainer:
         evaluation_callback: Callable[[int], None],
         checkpointing_callback: Callable[[TrainingProgress], None],
         scheduled_pipeline: Pipeline | None = None,
+        downstream_evaluation_callback: Optional[Callable[[int], None]] = None,
     ):
         """
         Trains the model.
@@ -257,6 +258,8 @@ class Trainer:
             num_target_tokens=self.num_target_tokens,
         )
         checkpointing_callback(training_progress=training_progress)
+        if downstream_evaluation_callback is not None:
+            downstream_evaluation_callback(num_train_steps_done=self.num_seen_train_steps)
 
         num_steps_todo = self.num_target_steps - self.num_seen_train_steps
         num_batches_todo = num_steps_todo * self.gradient_acc_steps
@@ -388,6 +391,8 @@ class Trainer:
                     self.gc.run(step_count=training_progress.num_seen_steps_total)
                     evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
                     checkpointing_callback(training_progress=training_progress)
+                    if downstream_evaluation_callback is not None:
+                        downstream_evaluation_callback(num_train_steps_done=training_progress.num_seen_steps_total)
 
                 profiler_cm.step()
 

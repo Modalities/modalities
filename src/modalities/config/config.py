@@ -545,6 +545,15 @@ class ParallelDegreeConfig(BaseModel):
     parallelism_methods: list[ParallelismDegrees]
 
 
+class DownstreamEvaluatorConfig(BaseModel):
+    tokenizer: PydanticTokenizerIFType
+    tasks: list[str]
+    eval_interval: Annotated[int, Field(strict=True, gt=0)]
+    checkpoint_dir: Path
+    global_rank: Annotated[int, Field(strict=True, ge=0)]
+    olmes_command_template: str
+
+
 # Recursive type representing arbitrary-depth YAML config structures.
 YAMLPrimitive = str | int | float | bool | None
 YAMLValue: TypeAlias = YAMLPrimitive | Path | list["YAMLValue"] | dict[str, "YAMLValue"]
