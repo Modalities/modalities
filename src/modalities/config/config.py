@@ -87,6 +87,7 @@ class MoECrossEntropyLossConfig(BaseModel):
     target_key: str
     prediction_key: str
     model: Any
+    device_mesh: Optional[PydanticDeviceMeshIFType] = None
     tag: str = "MoECrossEntropyLoss"
 
     class Config:
@@ -175,19 +176,6 @@ class AdamWOptimizerConfig(BaseModel):
     weight_decay_groups_excluded: list[str]
     foreach: bool | None = None
     fused: bool | None = None
-
-
-class EPAdamWConfig(BaseModel):
-    wrapped_model: PydanticPytorchModuleOrListType
-    device_mesh: PydanticDeviceMeshIFType
-    lr: float
-    betas: tuple[float, float]
-    eps: float
-    weight_decay: float
-    weight_decay_groups_excluded: list[str]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class DummyLRSchedulerConfig(BaseModel):
@@ -338,7 +326,6 @@ class EPWrappedModelConfig(BaseModel):
     model: PydanticPytorchModuleOrListType
     block_names: list[str]
     device_mesh: PydanticDeviceMeshIFType
-    mixed_precision_settings: FSDP2MixedPrecisionSettings
 
 
 class DebuggingEnrichedModelConfig(BaseModel):
@@ -543,6 +530,12 @@ class GPT2MFUCalculatorConfig(BaseModel):
     world_size: Annotated[int, Field(strict=True, gt=0)]
     model_parts: PydanticFSDP1ModuleType | PydanticFSDP2ModuleType | list[PydanticFSDP2ModuleType]
     device_mesh: Optional[PydanticDeviceMeshIFType] = None
+
+
+class MoEMFUCalculatorConfig(GPT2MFUCalculatorConfig):
+    num_experts: Annotated[int, Field(strict=True, gt=0)]
+    top_k: Annotated[int, Field(strict=True, gt=0)]
+    moe_d_ff: Annotated[int, Field(strict=True, gt=0)]
 
 
 class ParallelDegreeConfig(BaseModel):

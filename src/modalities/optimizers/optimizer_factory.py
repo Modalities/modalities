@@ -92,9 +92,38 @@ def get_optimizer_groups(model: FSDP, weight_decay: float, weight_decay_groups_e
             model, weight_decay, weight_decay_groups_excluded
         )
 
+    optimizer_groups, optimizer_groups_names = _split_optimizer_groups_by_device_mesh(
+        optimizer_groups, optimizer_groups_names
+    )
     _assert_completeness_of_optimizer_groups(model, optimizer_groups)
     _print_optimizer_groups_overview(optimizer_groups, optimizer_groups_names)
     return optimizer_groups
+
+
+def _split_optimizer_groups_by_device_mesh(
+    optimizer_groups: OptimizerGroups, optimizer_groups_names: list[str]
+) -> tuple[OptimizerGroups, list[str]]:
+    """
+    Splits optimizer groups such that each group only contains DTensors on the same device mesh.
+    The foreach/fused optimizer implementations cannot operate on DTensors from different meshes
+    within one group (e.g., expert-parallel experts and FSDP-sharded dense parameters in MoE models).
+    For models whose parameters all live on one mesh, the groups are returned unchanged.
+    """
+    split_groups: OptimizerGroups = []
+    split_names: list[str] = []
+    for group, name in zip(optimizer_groups, optimizer_groups_names):
+        params_by_mesh: dict[object, list[nn.Parameter]] = {}
+        for param in group["params"]:
+            mesh = param.device_mesh if isinstance(param, DTensor) else None
+            params_by_mesh.setdefault(mesh, []).append(param)
+        if len(params_by_mesh) <= 1:
+            split_groups.append(group)
+            split_names.append(name)
+            continue
+        for i, params in enumerate(params_by_mesh.values()):
+            split_groups.append({**group, "params": params})
+            split_names.append(f"{name}_mesh{i}")
+    return split_groups, split_names
 
 
 def _check_existence_of_weight_decay_groups_excluded(model: nn.Module, weight_decay_groups_excluded: list[str]) -> None:

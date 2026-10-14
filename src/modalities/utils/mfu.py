@@ -195,3 +195,39 @@ class GPT2MFUCalculator(MFUCalculatorABC):
             theoretical_flops_per_token=self._theoretical_flops_per_token,
             theoretical_gpu_peak_performance=self._theoretical_gpu_peak_performance,
         )
+
+
+class MoEMFUCalculator(GPT2MFUCalculator):
+    """
+    MFU calculator for MoE transformers. Only the parameters that are active per token are counted,
+    i.e. all dense parameters plus top_k of the num_experts SwiGLU experts in every layer.
+    """
+
+    def __init__(
+        self,
+        n_layer: int,
+        sequence_length: int,
+        n_embd: int,
+        world_size: int,
+        model_parts: FSDPX | list[FSDP2],
+        num_experts: int,
+        top_k: int,
+        moe_d_ff: int,
+        device_mesh: Optional[torch.distributed.device_mesh.DeviceMesh] = None,
+    ):
+        super().__init__(
+            n_layer=n_layer,
+            sequence_length=sequence_length,
+            n_embd=n_embd,
+            world_size=world_size,
+            model_parts=model_parts,
+            device_mesh=device_mesh,
+        )
+        inactive_expert_params = n_layer * 3 * n_embd * moe_d_ff * (num_experts - top_k)
+        self._num_params = self._num_params - inactive_expert_params
+        self._theoretical_flops_per_token = GPT2MFUCalculator._get_theoretical_flops_per_token(
+            num_params=self._num_params,
+            n_layer=self._n_layer,
+            sequence_length=self._sequence_length,
+            n_embd=self._n_embd,
+        )

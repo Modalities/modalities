@@ -19,7 +19,6 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import FSDPModule as FSDP2
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP1
 from torch.distributed.fsdp import ShardingStrategy
-from torch.distributed.tensor import DTensor
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
     PrepareModuleInput,
@@ -46,7 +45,7 @@ from modalities.models.model import ActivationType
 from modalities.models.parallelism.expert_parallelism import ExpertParallel
 from modalities.nn.model_initialization.initialization_if import ModelInitializationIF
 from modalities.running_env.env_utils import FSDP2MixedPrecisionSettings, MixedPrecisionSettings
-from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_mesh_for_parallelism_method
+from modalities.running_env.fsdp.device_mesh import ParallelismDegrees, get_expert_meshes
 from modalities.running_env.fsdp.fsdp_auto_wrapper import FSDPTransformerAutoWrapPolicyFactory
 from modalities.training.activation_checkpointing.activation_checkpointing import (
     ActivationCheckpointing,
@@ -215,11 +214,17 @@ class ModelFactory:
 
         modules = list(model.modules())
 
-        # Collect EP parameters to exclude from FSDP2 sharding
-        ep_params = {
-            p for m in model.modules() if getattr(m, "_ep_enabled", False) for p in m.parameters(recurse=False)
-        }
-        ignored_params = ep_params if ep_params else None
+        # Expert-parallel experts are FSDP-sharded on their own mesh before the blocks are wrapped,
+        # so that the block-level FSDP units do not manage the expert parameters.
+        expert_modules = [m for m in modules if getattr(m, "_ep_enabled", False)]
+        if len(expert_modules) > 0:
+            ModelFactory._fully_shard_experts(
+                expert_modules=expert_modules,
+                device_mesh=device_mesh,
+                mp_policy=mp_policy,
+                reshard_after_forward=reshard_after_forward,
+            )
+        fsdp_blocks: list[nn.Module] = []
 
         # we first shard all the blocks
         grouped_modules: list[nn.Module] = []
@@ -235,8 +240,8 @@ class ModelFactory:
                         grouped_modules,
                         **fsdp_config,
                         reshard_after_forward=reshard_block_after_forward,
-                        ignored_params=ignored_params,
                     )
+                    fsdp_blocks.append(grouped_modules[0])
                     grouped_modules = list()
 
         if len(grouped_modules) > 0:
@@ -245,11 +250,13 @@ class ModelFactory:
                 grouped_modules,
                 **fsdp_config,
                 reshard_after_forward=reshard_block_after_forward,
-                ignored_params=ignored_params,
             )
+            fsdp_blocks.append(grouped_modules[0])
 
         # finally, we shard the entire model
-        fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward, ignored_params=ignored_params)
+        fully_shard(model, **fsdp_config, reshard_after_forward=reshard_after_forward)
+        if len(expert_modules) > 0 and layers_per_fsdp_unit == 1:
+            ModelFactory._set_explicit_moe_prefetching(root=model, fsdp_blocks=fsdp_blocks)
         logger.info(
             f"Rank {dist.get_rank()} sharded number of parameters: "
             f"{get_local_number_of_trainable_parameters(model)}"
@@ -257,11 +264,68 @@ class ModelFactory:
         return model
 
     @staticmethod
+    def _fully_shard_experts(
+        expert_modules: list[nn.Module],
+        device_mesh: DeviceMesh,
+        mp_policy: MixedPrecisionPolicy,
+        reshard_after_forward: bool,
+    ) -> None:
+        """FSDP-shards expert-parallel experts over the expert FSDP mesh (dp_shard // ep ranks).
+
+        Each expert's gradient receives contributions from the tokens of all data parallel ranks,
+        so the gradient divide factor is set to the full data parallel degree to match the dense gradients.
+        """
+        expert_meshes = get_expert_meshes(device_mesh)
+        if expert_meshes is None:
+            raise ValueError(
+                "Found expert-parallel modules, but the device mesh has no expert meshes. "
+                "Set expert_parallel_degree > 1 in the device mesh config."
+            )
+        efsdp_degree = expert_meshes.expert_fsdp.size(-1)
+        ep_degree = expert_meshes.ep.size()
+        for experts in expert_modules:
+            num_experts = experts.w1.shape[0]
+            # If there are fewer local experts than efsdp ranks, shard on the hidden dim instead.
+            shard_placement_fn = (lambda param: Shard(1)) if efsdp_degree * ep_degree > num_experts else None
+            fully_shard(
+                experts,
+                mesh=expert_meshes.expert_fsdp,
+                mp_policy=mp_policy,
+                reshard_after_forward=reshard_after_forward,
+                shard_placement_fn=shard_placement_fn,
+            )
+            experts.set_gradient_divide_factor(float(expert_meshes.gradient_divide_factor))
+            if expert_meshes.expert_fsdp.size() > 1:
+                # A custom divide factor makes FSDP reduce-scatter with NCCL's PREMUL_SUM. On Leonardo
+                # (torch 2.10, bf16, reduce-scatter across nodes) this returned all-zero expert gradients.
+                # Plain SUM followed by a local division is correct and costs only one extra elementwise op.
+                # NOTE: not for single-rank groups: there, torch would apply the divide factor twice.
+                experts.set_force_sum_reduction_for_comms(True)
+
+    @staticmethod
+    def _set_explicit_moe_prefetching(root: FSDP2, fsdp_blocks: list[nn.Module]) -> None:
+        """Explicit FSDP prefetching for MoE models (as in TorchTitan).
+
+        The device-to-host synchronization in the expert-parallel token dispatch blocks the CPU and
+        delays FSDP's implicit prefetching, so we prefetch the next block and its experts explicitly.
+        """
+
+        def with_experts(block: nn.Module) -> list[nn.Module]:
+            return [block] + [m for m in block.modules() if getattr(m, "_ep_enabled", False)]
+
+        if len(fsdp_blocks) == 0:
+            return
+        root.set_modules_to_forward_prefetch(with_experts(fsdp_blocks[0]))
+        for block, next_block in zip(fsdp_blocks[:-1], fsdp_blocks[1:]):
+            block.set_modules_to_forward_prefetch(with_experts(next_block))
+        for block, prev_block in zip(fsdp_blocks[1:], fsdp_blocks[:-1]):
+            block.set_modules_to_backward_prefetch(with_experts(prev_block))
+
+    @staticmethod
     def get_ep_wrapped_model(
         model,
         block_names: list[str],
         device_mesh: DeviceMesh,
-        mixed_precision_settings: FSDP2MixedPrecisionSettings,
     ) -> nn.Module:
         """Apply expert parallel wrapping for selected MoE blocks."""
         block_types = []
@@ -286,8 +350,10 @@ class ModelFactory:
         if len(block_types) == 0:
             raise ValueError(f"None of the requested MoE block names were found: {block_names}")
 
-        ep_mesh = get_mesh_for_parallelism_method(device_mesh, ParallelismDegrees.EP)
-        target_dtype = mixed_precision_settings.param_dtype.value
+        expert_meshes = get_expert_meshes(device_mesh)
+        if expert_meshes is None:
+            raise ValueError("EP wrapping requires a device mesh with expert_parallel_degree > 1.")
+        ep_mesh = expert_meshes.ep
 
         wrapped_blocks = 0
         for module in model.modules():
@@ -318,21 +384,21 @@ class ModelFactory:
                         f"w2.ndim={experts.w2.ndim}"
                     )
 
+                if experts.w1.shape[0] % ep_mesh.size() != 0:
+                    raise ValueError(
+                        f"Number of experts ({experts.w1.shape[0]}) must be divisible by the "
+                        f"expert parallel degree ({ep_mesh.size()})."
+                    )
+
                 ep_target._ep_mesh = ep_mesh
                 ep_target._ep_group = ep_mesh.get_group()
                 ep_target._ep_size = ep_mesh.size()
                 ep_target._ep_rank = ep_mesh.get_local_rank()
 
                 ep_target.experts = ExpertParallel()._apply(ep_target.experts, ep_mesh)
+                # NOTE: expert parameters stay in full precision (master weights); the low precision
+                # compute copies are created by FSDP's mixed precision policy.
                 setattr(ep_target.experts, "_ep_enabled", True)
-
-                for pname, p in list(ep_target.experts._parameters.items()):
-                    if isinstance(p, DTensor) and p.dtype != target_dtype:
-                        local = p.to_local().to(target_dtype)
-                        ep_target.experts._parameters[pname] = nn.Parameter(
-                            DTensor.from_local(local, p.device_mesh, p.placements, run_check=False),
-                            requires_grad=p.requires_grad,
-                        )
 
                 wrapped_blocks += 1
 

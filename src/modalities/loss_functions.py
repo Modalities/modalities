@@ -1,10 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import overload
+from typing import Optional, overload
 
 import torch
+from torch.distributed.device_mesh import DeviceMesh
 from torch.nn import CrossEntropyLoss
 
 from modalities.batch import InferenceResultBatch
+from modalities.running_env.fsdp.device_mesh import (
+    ParallelismDegrees,
+    get_mesh_for_parallelism_method,
+    has_parallelism_method,
+)
 
 
 class Loss(ABC):
@@ -88,20 +94,39 @@ class CLMCrossEntropyLoss(Loss):
 
 
 class MoECrossEntropyLoss(Loss):
-    """Cross entropy loss with optional MoE auxiliary losses from model layers."""
+    """Cross entropy loss plus the global-batch load balancing loss (and router z-loss) of the MoE layers."""
 
     def __init__(
         self,
         target_key: str,
         prediction_key: str,
         model,
+        device_mesh: Optional[DeviceMesh] = None,
         tag: str = "MoECrossEntropyLoss",
     ):
+        """
+        Args:
+            target_key (str): Key of the targets in the batch.
+            prediction_key (str): Key of the logits in the model output.
+            model: The (unwrapped or FSDP-wrapped) MoE model whose MoE blocks provide the router statistics.
+            device_mesh (Optional[DeviceMesh]): Device mesh; the load balancing token counts are aggregated over
+                its data parallel dimensions. If None, they are aggregated over the default (world) group.
+            tag (str): Tag of the loss.
+        """
+        from modalities.models.moe.qwen_model import GlobalBatchLoadBalancingLoss
+
         super().__init__(tag)
         self.target_key = target_key
         self.prediction_key = prediction_key
-        self.model = model
         self.loss_fun = CrossEntropyLoss(reduction="mean")
+        process_groups = None
+        if device_mesh is not None:
+            process_groups = [
+                get_mesh_for_parallelism_method(device_mesh, method).get_group()
+                for method in (ParallelismDegrees.DP_REPLICATE, ParallelismDegrees.DP_SHARD)
+                if has_parallelism_method(device_mesh, method)
+            ]
+        self.load_balancing_loss = GlobalBatchLoadBalancingLoss(model=model, process_groups=process_groups)
 
     def __call__(self, forward_batch: InferenceResultBatch) -> torch.Tensor:
         labels = forward_batch.get_targets(self.target_key)
@@ -113,10 +138,9 @@ class MoECrossEntropyLoss(Loss):
             labels.contiguous().long().view(-1),
         )
 
-        for layer in self.model.layers.values():
-            if hasattr(layer, "aux_loss") and layer.aux_loss is not None:
-                loss = loss + layer.aux_loss.to(loss.dtype)
-
+        moe_loss = self.load_balancing_loss()
+        if moe_loss is not None:
+            loss = loss + moe_loss.to(loss.dtype)
         return loss
 
 

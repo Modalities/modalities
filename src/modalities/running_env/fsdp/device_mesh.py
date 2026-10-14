@@ -52,7 +52,6 @@ class DeviceMeshConfig(BaseModel):
             self.data_parallel_shard_degree = self.world_size // (
                 self.data_parallel_replicate_degree
                 * self.context_parallel_degree
-                * self.expert_parallel_degree
                 * self.tensor_parallel_degree
                 * self.pipeline_parallel_degree
             )
@@ -61,14 +60,12 @@ class DeviceMeshConfig(BaseModel):
             self.data_parallel_replicate_degree = self.world_size // (
                 self.data_parallel_shard_degree
                 * self.context_parallel_degree
-                * self.expert_parallel_degree
                 * self.tensor_parallel_degree
                 * self.pipeline_parallel_degree
             )
         if (
             self.data_parallel_shard_degree
             * self.data_parallel_replicate_degree
-            * self.expert_parallel_degree
             * self.tensor_parallel_degree
             * self.pipeline_parallel_degree
             * self.context_parallel_degree
@@ -77,13 +74,29 @@ class DeviceMeshConfig(BaseModel):
             raise ConfigError(
                 f"Invalid parallel dims: data_parallel_shard_degree({self.data_parallel_shard_degree}) * "
                 f"data_parallel_replicate_degree({self.data_parallel_replicate_degree}) * "
-                f"expert_parallel_degree({self.expert_parallel_degree}) * "
                 f"tensor_parallel_degree({self.tensor_parallel_degree}) *"
                 f"* pipeline_parallel_degree({self.pipeline_parallel_degree}) *"
                 f"context_parallel_degree({self.context_parallel_degree})!= WORLD_SIZE({self.world_size})"
             )
         if self.enable_loss_parallel and self.tensor_parallel_degree <= 1:
             raise ConfigError(f"{self.enable_loss_parallel=} requires tensor_parallel_degree > 1")
+        if self.expert_parallel_degree > 1:
+            # Expert parallelism is folded into data parallel sharding:
+            # the dp_shard ranks act as data parallel ranks for dense layers and are split into
+            # (dp_shard // ep) x ep for the experts.
+            if self.data_parallel_shard_degree % self.expert_parallel_degree != 0:
+                raise ConfigError(
+                    f"expert_parallel_degree({self.expert_parallel_degree}) must divide "
+                    f"data_parallel_shard_degree({self.data_parallel_shard_degree})."
+                )
+            unsupported = {
+                "tensor_parallel_degree": self.tensor_parallel_degree,
+                "pipeline_parallel_degree": self.pipeline_parallel_degree,
+                "context_parallel_degree": self.context_parallel_degree,
+            }
+            unsupported = {k: v for k, v in unsupported.items() if v > 1}
+            if unsupported:
+                raise ConfigError(f"Expert parallelism is not yet supported in combination with {unsupported}.")
         return self
 
 
@@ -92,6 +105,7 @@ class ParallelismDegrees(Enum):
     DP_SHARD = "dp_shard"
     CP = "cp"
     EP = "ep"
+    EFSDP = "efsdp"
     TP = "tp"
     PP = "pp"
 
@@ -132,7 +146,6 @@ def get_device_mesh(
             data_parallel_replicate_degree,
             data_parallel_shard_degree,
             context_parallel_degree,
-            expert_parallel_degree,
             tensor_parallel_degree,
         ],
         [
@@ -140,7 +153,6 @@ def get_device_mesh(
             ParallelismDegrees.DP_REPLICATE.value,
             ParallelismDegrees.DP_SHARD.value,
             ParallelismDegrees.CP.value,
-            ParallelismDegrees.EP.value,
             ParallelismDegrees.TP.value,
         ],
         strict=True,
@@ -151,9 +163,64 @@ def get_device_mesh(
     names = tuple(names)
     device_mesh = init_device_mesh(device_type, dims, mesh_dim_names=names)
     logger.info(f"{device_mesh=} | {world_size=} | {enable_loss_parallel=}")
+    if expert_parallel_degree > 1:
+        _init_expert_meshes(device_mesh, expert_parallel_degree)
     # TODO: Torch Titan had some more checks here. We need to check if we also need those:
     # https://github.com/pytorch/torchtitan/blob/b291ad662493b63d25b038a30a915082d3617baf/torchtitan/distributed/parallel_dims.py#L86-L104
     return device_mesh
+
+
+class ExpertMeshes:
+    """Device meshes used for the experts of MoE layers when expert parallelism is enabled.
+
+    Expert parallelism is folded into data parallel sharding: dp_shard is split into
+    (efsdp = dp_shard // ep, ep), with ep as the innermost dimension so that EP groups
+    consist of consecutive ranks (i.e., stay within a node for ep <= GPUs per node).
+
+    Attributes:
+        ep (DeviceMesh): 1D mesh over which experts are distributed (Shard(0) on the expert dim).
+        expert_fsdp (DeviceMesh): Mesh over which each expert shard is additionally FSDP-sharded
+            (1D "efsdp", or 2D ("dp_replicate", "efsdp") for HSDP).
+        gradient_divide_factor (int): Number of data parallel ranks contributing tokens to each expert,
+            i.e. the factor that expert gradients have to be divided by to match the dense gradients.
+    """
+
+    def __init__(self, ep: DeviceMesh, expert_fsdp: DeviceMesh, gradient_divide_factor: int):
+        self.ep = ep
+        self.expert_fsdp = expert_fsdp
+        self.gradient_divide_factor = gradient_divide_factor
+
+
+_EXPERT_MESHES_ATTR = "_modalities_expert_meshes"
+
+
+def _init_expert_meshes(device_mesh: DeviceMesh, expert_parallel_degree: int) -> None:
+    dp_shard_degree = device_mesh[ParallelismDegrees.DP_SHARD.value].size()
+    efsdp_degree = dp_shard_degree // expert_parallel_degree
+    # NOTE: pass the dim as an index; torch 2.10's _unflatten rejects valid dim names (inverted membership check).
+    sparse_mesh = device_mesh._unflatten(
+        device_mesh.mesh_dim_names.index(ParallelismDegrees.DP_SHARD.value),
+        (efsdp_degree, expert_parallel_degree),
+        (ParallelismDegrees.EFSDP.value, ParallelismDegrees.EP.value),
+    )
+    if has_parallelism_method(device_mesh, ParallelismDegrees.DP_REPLICATE):
+        expert_fsdp = sparse_mesh[(ParallelismDegrees.DP_REPLICATE.value, ParallelismDegrees.EFSDP.value)]
+        dp_replicate_degree = device_mesh[ParallelismDegrees.DP_REPLICATE.value].size()
+    else:
+        expert_fsdp = sparse_mesh[ParallelismDegrees.EFSDP.value]
+        dp_replicate_degree = 1
+    expert_meshes = ExpertMeshes(
+        ep=sparse_mesh[ParallelismDegrees.EP.value],
+        expert_fsdp=expert_fsdp,
+        gradient_divide_factor=dp_replicate_degree * dp_shard_degree,
+    )
+    setattr(device_mesh, _EXPERT_MESHES_ATTR, expert_meshes)
+    logger.info(f"{sparse_mesh=} | {expert_parallel_degree=} | {efsdp_degree=}")
+
+
+def get_expert_meshes(device_mesh: DeviceMesh) -> ExpertMeshes | None:
+    """Returns the expert meshes if expert parallelism is enabled for the given device mesh, else None."""
+    return getattr(device_mesh, _EXPERT_MESHES_ATTR, None)
 
 
 def get_parallel_degree(device_mesh: DeviceMesh, parallelism_methods: list[ParallelismDegrees]) -> int:
